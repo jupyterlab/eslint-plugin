@@ -1,5 +1,5 @@
 import { RuleTester } from 'eslint';
-import jupyterPluginDescription from '../src/rules/jupyter-plugin-description';
+import pluginDescription from '../src/rules/plugin-description';
 
 const ruleTester = new RuleTester({
   parser: require.resolve('@typescript-eslint/parser'),
@@ -9,7 +9,7 @@ const ruleTester = new RuleTester({
   },
 });
 
-ruleTester.run('jupyter-plugin-description', jupyterPluginDescription, {
+ruleTester.run('plugin-description', pluginDescription, {
   valid: [
     {
       code: `

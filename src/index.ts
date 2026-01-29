@@ -1,12 +1,12 @@
-import jupyterPluginActivationArgs from './rules/jupyter-plugin-activation-args';
-import jupyterCommandDescribedBy from './rules/jupyter-command-described-by';
-import jupyterPluginDescription from './rules/jupyter-plugin-description';
+import pluginActivationArgs from './rules/plugin-activation-args';
+import commandDescribedBy from './rules/command-described-by';
+import pluginDescription from './rules/plugin-description';
 
 const plugin = {
   rules: {
-    'jupyter-plugin-activation-args': jupyterPluginActivationArgs,
-    'jupyter-command-described-by': jupyterCommandDescribedBy,
-    'jupyter-plugin-description': jupyterPluginDescription,
+    'plugin-activation-args': pluginActivationArgs,
+    'command-described-by': commandDescribedBy,
+    'plugin-description': pluginDescription,
   },
   configs: {
     recommended: {
@@ -14,16 +14,16 @@ const plugin = {
       plugins: {
         dp: {
           rules: {
-            'jupyter-plugin-activation-args': jupyterPluginActivationArgs,
-            'jupyter-command-described-by': jupyterCommandDescribedBy,
-            'jupyter-plugin-description': jupyterPluginDescription,
+            'plugin-activation-args': pluginActivationArgs,
+            'command-described-by': commandDescribedBy,
+            'plugin-description': pluginDescription,
           },
         },
       },
       rules: {
-        'dp/jupyter-plugin-activation-args': 'error',
-        'dp/jupyter-command-described-by': 'error',
-        'dp/jupyter-plugin-description': 'error',
+        'dp/plugin-activation-args': 'error',
+        'dp/command-described-by': 'error',
+        'dp/plugin-description': 'error',
       },
     },
   },

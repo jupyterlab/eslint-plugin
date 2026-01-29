@@ -10,9 +10,9 @@ npm install --save-dev eslint-plugin-jupyter
 
 ## Rules
 
-- `jupyter-command-described-by` - Ensure JupyterLab commands include describedBy property
-- `jupyter-plugin-activation-args` - Ensure JupyterLab plugin activation function arguments match requires and optional tokens in order
-- `jupyter-plugin-description` - Ensure JupyterLab plugins have a description property
+- `command-described-by` - Ensure JupyterLab commands include describedBy property
+- `plugin-activation-args` - Ensure JupyterLab plugin activation function arguments match requires and optional tokens in order
+- `plugin-description` - Ensure JupyterLab plugins have a description property
 
 ## Usage
 
@@ -29,9 +29,9 @@ module.exports = [
       jupyter: jupyterPlugin,
     },
     rules: {
-      'jupyter/jupyter-command-described-by': 'warn',
-      'jupyter/jupyter-plugin-activation-args': 'warn',
-      'jupyter/jupyter-plugin-description': 'warn',
+      'jupyter/command-described-by': 'warn',
+      'jupyter/plugin-activation-args': 'warn',
+      'jupyter/plugin-description': 'warn',
     },
   },
 ];

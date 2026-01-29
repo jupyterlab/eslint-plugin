@@ -1,5 +1,5 @@
 import { RuleTester } from 'eslint';
-import jupyterCommandDescribedBy from '../src/rules/jupyter-command-described-by';
+import commandDescribedBy from '../src/rules/command-described-by';
 
 const ruleTester = new RuleTester({
   parser: require.resolve('@typescript-eslint/parser'),
@@ -9,7 +9,7 @@ const ruleTester = new RuleTester({
   },
 });
 
-ruleTester.run('jupyter-command-described-by', jupyterCommandDescribedBy, {
+ruleTester.run('command-described-by', commandDescribedBy, {
     valid: [
         {
             code: `

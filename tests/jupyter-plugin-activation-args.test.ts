@@ -1,5 +1,5 @@
 import { RuleTester } from 'eslint';
-import jupyterPluginActivationArgs from '../src/rules/jupyter-plugin-activation-args';
+import pluginActivationArgs from '../src/rules/plugin-activation-args';
 
 const ruleTester = new RuleTester({
   parser: require.resolve('@typescript-eslint/parser'),
@@ -9,7 +9,7 @@ const ruleTester = new RuleTester({
   },
 });
 
-ruleTester.run('jupyter-plugin-activation-args', jupyterPluginActivationArgs, {
+ruleTester.run('plugin-activation-args', pluginActivationArgs, {
   valid: [
     {
       // Only requires token
