@@ -12,7 +12,7 @@ const plugin = {
     recommended: {
       files: ['**/*.js', '**/*.ts', '**/*.jsx', '**/*.tsx'],
       plugins: {
-        dp: {
+        jupyter: {
           rules: {
             'plugin-activation-args': pluginActivationArgs,
             'command-described-by': commandDescribedBy,
@@ -21,9 +21,9 @@ const plugin = {
         },
       },
       rules: {
-        'dp/plugin-activation-args': 'error',
-        'dp/command-described-by': 'error',
-        'dp/plugin-description': 'error',
+        'jupyter/plugin-activation-args': 'error',
+        'jupyter/command-described-by': 'error',
+        'jupyter/plugin-description': 'error',
       },
     },
   },
