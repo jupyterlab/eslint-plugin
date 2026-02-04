@@ -1,11 +1,14 @@
-module.exports = [
+import tsParser from '@typescript-eslint/parser';
+import tsPlugin from '@typescript-eslint/eslint-plugin';
+
+export default [
   {
     ignores: ['node_modules/', 'dist/', 'coverage/', '*.js']
   },
   {
     files: ['src/**/*.ts'],
     languageOptions: {
-      parser: require('@typescript-eslint/parser'),
+      parser: tsParser,
       parserOptions: {
         ecmaVersion: 2020,
         sourceType: 'module',
@@ -13,7 +16,7 @@ module.exports = [
       }
     },
     plugins: {
-      '@typescript-eslint': require('@typescript-eslint/eslint-plugin')
+      '@typescript-eslint': tsPlugin
     },
     rules: {
       '@typescript-eslint/explicit-module-boundary-types': 'warn',
@@ -28,14 +31,14 @@ module.exports = [
   {
     files: ['tests/**/*.ts'],
     languageOptions: {
-      parser: require('@typescript-eslint/parser'),
+      parser: tsParser,
       parserOptions: {
         ecmaVersion: 2020,
         sourceType: 'module'
       }
     },
     plugins: {
-      '@typescript-eslint': require('@typescript-eslint/eslint-plugin')
+      '@typescript-eslint': tsPlugin
     },
     rules: {
       '@typescript-eslint/no-explicit-any': 'warn',
