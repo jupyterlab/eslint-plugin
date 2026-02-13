@@ -1,9 +1,10 @@
 import { RuleTester } from 'eslint';
 import commandDescribedBy from '../src/rules/command-described-by';
+import parser from '@typescript-eslint/parser';
 
 const ruleTester = new RuleTester({
   languageOptions: {
-    parser: require('@typescript-eslint/parser'),
+    parser,
     parserOptions: {
       ecmaVersion: 2020,
       sourceType: 'module'
@@ -20,7 +21,7 @@ ruleTester.run('command-described-by', commandDescribedBy, {
                     execute: () => {
                         console.log('test');
                     },
-                    describedBy: {
+                    'describedBy': {
                         args: {
                             type: 'object',
                             properties: {}
@@ -43,6 +44,44 @@ ruleTester.run('command-described-by', commandDescribedBy, {
                                 value: { type: 'string' }
                             }
                         }
+                    }
+                });
+            `
+    },
+    {
+      code: `
+                const commandId = 'test:execute';
+                test.addCommand(commandId, {
+                    label: 'Test Execute',
+                    execute: (args) => {
+                        console.log(args.value);
+                    },
+                    describedBy: {
+                        args: {
+                            type: 'object',
+                            properties: {
+                                value: { type: 'string' }
+                            }
+                        }
+                    }
+                });
+            `
+    },
+    {
+      code: `
+                test.addCommand('test:execute', 
+                  (args) => {
+                      console.log(args.value);
+                  }
+                );
+            `
+    },
+    {
+      code: `
+                test.addCommand({
+                    random_1: 'Test Execute',
+                    random_2: (args) => {
+                        console.log(args.value);
                     }
                 });
             `

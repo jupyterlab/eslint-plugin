@@ -1,9 +1,10 @@
 import { RuleTester } from 'eslint';
 import pluginActivationArgs from '../src/rules/plugin-activation-args';
+import parser from '@typescript-eslint/parser';
 
 const ruleTester = new RuleTester({
   languageOptions: {
-    parser: require('@typescript-eslint/parser'),
+    parser,
     parserOptions: {
       ecmaVersion: 2020,
       sourceType: 'module'
@@ -90,7 +91,7 @@ ruleTester.run('plugin-activation-args', pluginActivationArgs, {
         const plugin: JupyterFrontEndPlugin<void> = {
           id: 'test-plugin',
           requires: [INotebookTracker, IRenderMimeRegistry, ILabShell],
-          optional: [IToolbarWidgetRegistry, ITranslator, ISettingRegistry, ICommandPalette],
+          'optional': [IToolbarWidgetRegistry, ITranslator, ISettingRegistry, ICommandPalette],
           activate: async (
             app: JupyterFrontEnd,
             tracker: INotebookTracker,
@@ -101,6 +102,43 @@ ruleTester.run('plugin-activation-args', pluginActivationArgs, {
             settingRegistry: ISettingRegistry | null,
             palette: ICommandPalette | null,
           ) => {
+            console.log('Activated');
+          }
+        };
+      `
+    },
+    {
+      // Multiple required and optional tokens
+      code: `
+        const plugin: JupyterFrontEndPlugin<void> = {
+          id: 'test-plugin',
+          requires: [INotebookTracker],
+          optional: [IToolbarWidgetRegistry],
+          otherThanActivate: async (
+            random: ITest
+          ) => {
+            console.log('Activated');
+          }
+        };
+      `
+    },
+    {
+      // Multiple required and optional tokens
+      code: `
+        const plugin: JupyterFrontEndPlugin<void> = {
+          id: 'test-plugin',
+          requires: [INotebookTracker],
+          optional: [IToolbarWidgetRegistry],
+          activate: true
+        };
+      `
+    },
+    {
+      code: `
+        const plugin = {
+          id: 'test-plugin',
+          requires: [],
+          activate: () => {
             console.log('Activated');
           }
         };

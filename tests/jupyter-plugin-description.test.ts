@@ -1,9 +1,10 @@
 import { RuleTester } from 'eslint';
 import pluginDescription from '../src/rules/plugin-description';
+import parser from '@typescript-eslint/parser';
 
 const ruleTester = new RuleTester({
   languageOptions: {
-    parser: require('@typescript-eslint/parser'),
+    parser,
     parserOptions: {
       ecmaVersion: 2020,
       sourceType: 'module'
@@ -16,8 +17,8 @@ ruleTester.run('plugin-description', pluginDescription, {
     {
       code: `
         const plugin: JupyterFrontEndPlugin<void> = {
-          id: 'jupyterlab-notify:plugin',
-          description: 'Enhanced cell execution notifications for JupyterLab',
+          'id': 'jupyterlab-notify:plugin',
+          'description': 'Enhanced cell execution notifications for JupyterLab',
           autoStart: true,
           activate: (app: JupyterFrontEnd) => {
             console.log('Activated');
