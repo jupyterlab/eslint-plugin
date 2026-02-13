@@ -90,7 +90,7 @@ ruleTester.run('plugin-activation-args', pluginActivationArgs, {
         const plugin: JupyterFrontEndPlugin<void> = {
           id: 'test-plugin',
           requires: [INotebookTracker, IRenderMimeRegistry, ILabShell],
-          optional: [IToolbarWidgetRegistry, ITranslator, ISettingRegistry, ICommandPalette],
+          'optional': [IToolbarWidgetRegistry, ITranslator, ISettingRegistry, ICommandPalette],
           activate: async (
             app: JupyterFrontEnd,
             tracker: INotebookTracker,
@@ -105,7 +105,44 @@ ruleTester.run('plugin-activation-args', pluginActivationArgs, {
           }
         };
       `
-    }
+    },
+    {
+      // Multiple required and optional tokens
+      code: `
+        const plugin: JupyterFrontEndPlugin<void> = {
+          id: 'test-plugin',
+          requires: [INotebookTracker],
+          optional: [IToolbarWidgetRegistry],
+          otherThanActivate: async (
+            random: ITest
+          ) => {
+            console.log('Activated');
+          }
+        };
+      `
+    },
+    {
+      // Multiple required and optional tokens
+      code: `
+        const plugin: JupyterFrontEndPlugin<void> = {
+          id: 'test-plugin',
+          requires: [INotebookTracker],
+          optional: [IToolbarWidgetRegistry],
+          activate: true
+        };
+      `
+    },
+     {
+      code: `
+        const plugin = {
+          id: 'test-plugin',
+          requires: [],
+          activate: () => {
+            console.log('Activated');
+          }
+        };
+      `
+    },
   ],
 
   invalid: [
