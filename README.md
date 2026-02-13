@@ -20,9 +20,9 @@ Add `jupyter` to the plugins section of your ESLint configuration:
 
 ```javascript
 // eslint.config.js
-const jupyterPlugin = require('eslint-plugin-jupyter');
+import jupyterPlugin from 'eslint-plugin-jupyter';
 
-module.exports = [
+export default [
   {
     files: ['**/*.ts', '**/*.tsx'],
     plugins: {
