@@ -1,6 +1,6 @@
 {
-  "name": "eslint-plugin-jupyter",
-  "version": "1.0.0",
+  "name": "@jupyterlab/eslint-plugin-jupyter",
+  "version": "0.0.0",
   "description": "ESLint plugin for Jupyter core and extensions with early error catching and best practices enforcement",
   "main": "lib/index.js",
   "types": "lib/index.d.ts",
@@ -21,16 +21,21 @@
     "eslint",
     "eslint-plugin",
     "jupyter",
-    "jupyterlab",
-    "extensions",
-    "typescript"
+    "jupyterlab"
   ],
+  "author": "Jupyter Development Team",
+  "license": "BSD-3-Clause",
   "repository": {
     "type": "git",
-    "url": "https://github.com/Darshan808/eslint-plugin-jupyter.git"
+    "url": "https://github.com/jupyterlab/eslint-plugin.git"
   },
-  "author": "",
-  "license": "MIT",
+  "bugs": {
+    "url": "https://github.com/jupyterlab/eslint-plugin/issues"
+  },
+  "homepage": "https://github.com/jupyterlab/eslint-plugin",
+  "publishConfig": {
+      "access": "public"
+  },
   "jupyter-releaser": {
     "hooks": {
       "before-build-npm": [

@@ -14,7 +14,7 @@ const jupyterCommandDescribedBy: Rule.RuleModule = {
     docs: {
       description: 'Ensure JupyterLab commands include describedBy property',
       recommended: 'recommended',
-      url: 'https://github.com/jupyter-extensions/eslint-plugin-jupyter'
+      url: 'https://github.com/jupyterlab/eslint-plugin'
     },
     messages: {
       missingDescribedBy:
