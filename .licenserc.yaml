@@ -16,7 +16,6 @@ header:
     - '**/build'
     - '**/lib'
     - '**/node_modules'
-    - '**/MANIFEST.in'
     - '**/static'
     - '**/.*'
     - 'coverage'
