@@ -25,6 +25,10 @@
     "extensions",
     "typescript"
   ],
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/darshan808/eslint-plugin-jupyter.git"
+  },
   "author": "",
   "license": "MIT",
   "devDependencies": {
