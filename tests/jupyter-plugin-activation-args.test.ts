@@ -1,3 +1,8 @@
+/*
+ * Copyright (c) Jupyter Development Team.
+ * Distributed under the terms of the Modified BSD License.
+ */
+
 import { RuleTester } from 'eslint';
 import pluginActivationArgs from '../src/rules/plugin-activation-args';
 
