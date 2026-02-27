@@ -27,12 +27,12 @@
   "license": "BSD-3-Clause",
   "repository": {
     "type": "git",
-    "url": "https://github.com/jupyterlab/eslint-plugin-jupyter.git"
+    "url": "https://github.com/jupyterlab/eslint-plugin.git"
   },
   "bugs": {
-    "url": "https://github.com/jupyterlab/eslint-plugin-jupyter/issues"
+    "url": "https://github.com/jupyterlab/eslint-plugin/issues"
   },
-  "homepage": "https://github.com/jupyterlab/eslint-plugin-jupyter",
+  "homepage": "https://github.com/jupyterlab/eslint-plugin",
   "publishConfig": {
       "access": "public"
   },
