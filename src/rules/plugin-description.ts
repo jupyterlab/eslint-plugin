@@ -1,3 +1,8 @@
+/*
+ * Copyright (c) Jupyter Development Team.
+ * Distributed under the terms of the Modified BSD License.
+ */
+
 import { Rule } from 'eslint';
 import * as ESTree from 'estree';
 import { hasJupyterPluginType, getPluginId } from '../utils/plugin-utils';
