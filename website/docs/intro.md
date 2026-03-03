@@ -4,11 +4,11 @@ slug: /
 
 # Introduction
 
-`@jupyterlab/eslint-plugin-jupyter` enforces code quality and project-specific standards for Jupyter core and extensions with early error catching and best practices enforcement.
+`@jupyter/eslint-plugin` enforces code quality and project-specific standards for Jupyter core and extensions with early error catching and best practices enforcement.
 
 ## What it does
 
-This plugin is built for JupyterLab extension and core package development. It enforces conventions that are easy to miss during development but costly in production.
+This plugin is built for JupyterLab extensions and core package development. It enforces conventions that are easy to miss during development but costly in production.
 
 ### Who should use it
 

@@ -5,7 +5,7 @@
 Install with your package manager:
 
 ```bash
-npm install --save-dev @jupyterlab/eslint-plugin-jupyter
+npm install --save-dev @jupyter/eslint-plugin
 ```
 
 ## Configuration
@@ -18,7 +18,7 @@ The plugin is designed for ESLint flat config format.
 
 ```js
 import tsParser from '@typescript-eslint/parser';
-import jupyterPlugin from '@jupyterlab/eslint-plugin-jupyter';
+import jupyterPlugin from '@jupyter/eslint-plugin';
 
 export default [
   {
@@ -47,7 +47,7 @@ export default [
 The plugin exports a `recommended` config that comes with sensible defaults:
 
 ```js
-import jupyterPlugin from '@jupyterlab/eslint-plugin-jupyter';
+import jupyterPlugin from '@jupyter/eslint-plugin';
 
 export default [
   {
@@ -65,8 +65,8 @@ If you're still using legacy ESLint configuration, use the `recommended-legacy` 
 
 ```json
 {
-  "plugins": ["@jupyterlab/eslint-plugin-jupyter"],
-  "extends": ["plugin:@jupyterlab/eslint-plugin-jupyter/recommended-legacy"]
+  "plugins": ["@jupyter/eslint-plugin"],
+  "extends": ["plugin:@jupyter/eslint-plugin/recommended-legacy"]
 }
 ```
 
@@ -75,7 +75,7 @@ If you're still using legacy ESLint configuration, use the `recommended-legacy` 
 You can override individual rules from the recommended config:
 
 ```js
-import jupyterPlugin from '@jupyterlab/eslint-plugin-jupyter';
+import jupyterPlugin from '@jupyter/eslint-plugin';
 
 export default [
   {

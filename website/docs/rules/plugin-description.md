@@ -17,7 +17,7 @@ The rule inspects `JupyterFrontEndPlugin` object declarations and reports when:
 
 ```ts
 const plugin: JupyterFrontEndPlugin<void> = {
-  id: 'jupyterlab-notify:plugin',
+  id: 'test-plugin:plugin',
   autoStart: true,
   activate: (app: JupyterFrontEnd) => {
     console.log('Activated');
@@ -29,8 +29,8 @@ const plugin: JupyterFrontEndPlugin<void> = {
 
 ```ts
 const plugin: JupyterFrontEndPlugin<void> = {
-  id: 'jupyterlab-notify:plugin',
-  description: 'Enhanced cell execution notifications for JupyterLab',
+  id: 'test-plugin:plugin',
+  description: 'Test plugin used for lint rule examples',
   autoStart: true,
   activate: (app: JupyterFrontEnd) => {
     console.log('Activated');
