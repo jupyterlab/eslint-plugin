@@ -18,9 +18,9 @@ const presetClassicOptions: PresetClassicOptions = {
 
 const config: Config = {
   title: 'Eslint Plugin Jupyter',
-  tagline: 'ESLint rules for JupyterLab code quality and consistency',
+  tagline: 'ESLint rules for Jupyter core and extensions with early error catching and best practices enforcement',
   favicon: '/jupyter_logo.svg',
-  url: 'https://jupyterlab.github.io',
+  url: 'https://example.com', // TODO: Replace with actual docs URL
   baseUrl: '/',
   onBrokenLinks: 'throw',
   markdown: {
@@ -29,7 +29,7 @@ const config: Config = {
       onBrokenMarkdownLinks: 'throw'
     }
   },
-  organizationName: 'jupyterlab',
+  organizationName: 'jupyter',
   projectName: 'eslint-plugin',
   i18n: {
     defaultLocale: 'en',
