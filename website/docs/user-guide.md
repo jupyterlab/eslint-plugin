@@ -11,24 +11,18 @@ npm install --save-dev @jupyter/eslint-plugin
 ## Configuration
 
 ### Flat Config (Recommended)
-
-The plugin is designed for ESLint flat config format.
+The plugin is designed for ESLint's flat config format, which was set to the default in [ESLint 9.0.0](https://eslint.org/blog/2024/04/eslint-v9.0.0-released/).
 
 #### Minimal Setup
 
 ```js
-import tsParser from '@typescript-eslint/parser';
 import jupyterPlugin from '@jupyter/eslint-plugin';
 
 export default [
   {
     files: ['src/**/*.{ts,tsx}'],
     languageOptions: {
-      parser: tsParser,
-      parserOptions: {
-        ecmaVersion: 2020,
-        sourceType: 'module'
-      }
+      // Your TypeScript parser config...
     },
     plugins: {
       jupyter: jupyterPlugin

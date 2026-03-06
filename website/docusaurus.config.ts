@@ -20,20 +20,33 @@ const presetClassicOptions: PresetClassicOptions = {
     customCss: require.resolve('./src/css/custom.css')
   }
 };
-const canonical = process.env.READTHEDOCS_CANONICAL_URL!;
-const parsed = new URL(canonical);
-let _url = parsed.origin;
-let _baseUrl = parsed.pathname;
-if (!_baseUrl.endsWith('/')) {
-  _baseUrl += '/';
-}
+
+const canonical = process.env.READTHEDOCS_CANONICAL_URL;
+
+const { url, baseUrl } = canonical
+  ? (() => {
+      const parsed = new URL(canonical);
+      const pathname = parsed.pathname.endsWith('/')
+        ? parsed.pathname
+        : parsed.pathname + '/';
+
+      return {
+        url: parsed.origin,
+        baseUrl: pathname
+      };
+    })()
+  : {
+      // For local development where we do not have a canonical URL
+      url: 'http://localhost:3000',
+      baseUrl: '/'
+    };
 
 const config: Config = {
   title: 'Eslint Plugin Jupyter',
   tagline: 'ESLint rules for Jupyter core and extensions with early error catching and best practices enforcement',
   favicon: '/jupyter_logo.svg',
-  url: _url,
-  baseUrl: _baseUrl,
+  url,
+  baseUrl,
   onBrokenLinks: 'throw',
   trailingSlash: true,
   markdown: {
