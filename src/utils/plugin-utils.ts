@@ -80,23 +80,28 @@ export function getPluginId(obj: ESTree.ObjectExpression): string | null {
 }
 
 /**
- * Extracts identifier names from an array expression
- * Useful for extracting token names from requires/optional arrays
+ * Extracts element names from an array, including member expressions like JupyterFrontEnd.IPaths
  */
-export function extractIdentifierNames(
-  arrayNode: ESTree.ArrayExpression
-): string[] {
-  return arrayNode.elements
-    .filter((elem): elem is ESTree.Identifier => {
-      return elem !== null && elem.type === 'Identifier';
-    })
-    .map(id => id.name);
-}
+export function extractArrayElements(arrayExpr: ESTree.ArrayExpression): string[] {
+  const names: string[] = [];
 
-/**
- * Extracts type annotation from a function parameter
- * Returns the type name if it has a type annotation, null otherwise
- */
+  for (const element of arrayExpr.elements) {
+    if (element === null) continue;
+
+    if (element.type === 'Identifier') {
+      names.push(element.name);
+    } else if (element.type === 'MemberExpression') {
+      if (
+        element.object.type === 'Identifier' &&
+        element.property.type === 'Identifier'
+      ) {
+        names.push(`${element.object.name}.${element.property.name}`);
+      }
+    }
+  }
+
+  return names;
+}
 export function extractParameterType(param: ESTree.Identifier): string | null {
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   if ((param as any).typeAnnotation) {
@@ -105,14 +110,11 @@ export function extractParameterType(param: ESTree.Identifier): string | null {
     if (annotation && annotation.typeAnnotation) {
       const typeNode = annotation.typeAnnotation;
 
-      // Handle TSTypeReference (e.g., type: IType)
+      // Handle TSTypeReference (like JupyterFrontEnd.IPaths)
       if (typeNode.type === 'TSTypeReference' && typeNode.typeName) {
-        if (typeNode.typeName.type === 'Identifier') {
-          return typeNode.typeName.name;
-        }
+        return extractTypeName(typeNode.typeName);
       }
 
-      // Handle TSUnionType (e.g., type: IType | null)
       if (typeNode.type === 'TSUnionType') {
         const types = typeNode.types;
         if (Array.isArray(types) && types.length > 0) {
@@ -121,15 +123,34 @@ export function extractParameterType(param: ESTree.Identifier): string | null {
             (t: any) => t.type !== 'TSNullKeyword'
           );
           if (nonNullType && nonNullType.type === 'TSTypeReference') {
-            if (
-              nonNullType.typeName &&
-              nonNullType.typeName.type === 'Identifier'
-            ) {
-              return nonNullType.typeName.name;
-            }
+            return extractTypeName(nonNullType.typeName);
           }
         }
       }
+    }
+  }
+
+  return null;
+}
+
+/**
+ * Recursively extracts the full name from a TSTypeReference typeName node,
+ * handling both simple Identifiers and qualified names (TSQualifiedName)
+ * e.g. `IType` -> "IType", `JupyterFrontEnd.IPaths` -> "JupyterFrontEnd.IPaths"
+ */
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+function extractTypeName(typeName: any): string | null {
+  if (!typeName) return null;
+
+  if (typeName.type === 'Identifier') {
+    return typeName.name;
+  }
+
+  if (typeName.type === 'TSQualifiedName') {
+    const left = extractTypeName(typeName.left);
+    const right = typeName.right?.name;
+    if (left && right) {
+      return `${left}.${right}`;
     }
   }
 
