@@ -131,10 +131,6 @@ function isCompatibleWithJupyterFrontEnd(typeName: string | null): boolean {
   return compatibleTypes.includes(typeName);
 }
 
-function getArgumentLabel(arg: string | null, index: number): string {
-  return arg ?? `arg${index + 1}`;
-}
-
 const jupyterPluginActivationArgs: Rule.RuleModule = {
   meta: {
     type: 'problem',
@@ -222,7 +218,7 @@ const jupyterPluginActivationArgs: Rule.RuleModule = {
                 node: activateInfo.node,
                 messageId: 'appNotFirst',
                 data: {
-                  arg: getArgumentLabel(params[0], 0),
+                  arg: params[0],
                   allowedNames: allowedFirstArgumentNames
                     .map(name => `"${name}"`)
                     .join(', ')
@@ -239,7 +235,7 @@ const jupyterPluginActivationArgs: Rule.RuleModule = {
                   node: activateInfo.node,
                   messageId: 'invalidAppType',
                   data: {
-                    arg: getArgumentLabel(params[0], 0),
+                    arg: params[0],
                     type: firstParamType || 'unknown'
                   }
                 });
@@ -308,7 +304,7 @@ const jupyterPluginActivationArgs: Rule.RuleModule = {
                   context.report({
                     node: activateInfo.node,
                     messageId: 'extraArgument',
-                    data: { arg: getArgumentLabel(params[i + 1], i + 1) }
+                    data: { arg: params[i + 1] }
                   });
                 }
               } else if (paramType !== null && paramType !== expectedToken) {
@@ -316,7 +312,7 @@ const jupyterPluginActivationArgs: Rule.RuleModule = {
                 context.report({
                   node: activateInfo.node,
                   messageId: 'mismatchedOrder',
-                  data: { arg: getArgumentLabel(params[i + 1], i + 1) }
+                  data: { arg: params[i + 1] }
                 });
               }
             }
@@ -331,7 +327,7 @@ const jupyterPluginActivationArgs: Rule.RuleModule = {
               context.report({
                 node: activateInfo.node,
                 messageId: 'extraArgument',
-                data: { arg: getArgumentLabel(actualParams[i], i + 1) }
+                data: { arg: actualParams[i + 1] }
               });
             }
           }
