@@ -112,6 +112,29 @@ ruleTester.run('plugin-activation-args', pluginActivationArgs, {
       `
     },
     {
+      // Tokens with qualified names (JupyterFrontEnd.IPaths)
+      code: `
+        const plugin: JupyterFrontEndPlugin<void> = {
+          id: 'test-plugin',
+          requires: [INotebookTracker, IRenderMimeRegistry, ILabShell, JupyterFrontEnd.IPaths],
+          'optional': [IToolbarWidgetRegistry, ITranslator, ISettingRegistry, ICommandPalette],
+          activate: async (
+            app: JupyterFrontEnd,
+            tracker: INotebookTracker,
+            rendermime: IRenderMimeRegistry,
+            shell: ILabShell,
+            paths: JupyterFrontEnd.IPaths,
+            toolbarRegistry: IToolbarWidgetRegistry | null,
+            translator: ITranslator | null,
+            settingRegistry: ISettingRegistry | null,
+            palette: ICommandPalette | null,
+          ) => {
+            console.log('Activated');
+          }
+        };
+      `
+    },
+    {
       // Multiple required and optional tokens
       code: `
         const plugin: JupyterFrontEndPlugin<void> = {
