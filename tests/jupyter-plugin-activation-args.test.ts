@@ -193,6 +193,21 @@ ruleTester.run('plugin-activation-args', pluginActivationArgs, {
         };
       `
     },
+    {
+      // ServiceManagerPlugin must use null as first activate argument
+      code: `
+        const plugin: ServiceManagerPlugin<void> = {
+          id: 'test-service-manager-plugin',
+          requires: [TestToken],
+          activate: (
+            _: null,
+            testToken: TestToken
+          ) => {
+            console.log('Activated');
+          }
+        };
+      `
+    },
   ],
 
   invalid: [
@@ -401,6 +416,27 @@ ruleTester.run('plugin-activation-args', pluginActivationArgs, {
         {
           messageId: 'invalidAppType',
           data: { arg: 'app', type: 'JupyterFrontEndPlugin' }
+        }
+      ]
+    },
+    {
+      // ServiceManagerPlugin first argument must be null literal
+      code: `
+        const plugin: ServiceManagerPlugin<void> = {
+          id: 'test-service-manager-plugin',
+          optional: [TestToken],
+          activate: (
+            app: JupyterFrontEnd,
+            testToken: TestToken
+          ) => {
+            console.log('Activated');
+          }
+        };
+      `,
+      errors: [
+        {
+          messageId: 'serviceManagerFirstArgNotNull',
+          data: { arg: 'app' }
         }
       ]
     },

@@ -6,14 +6,14 @@
 import { Rule } from 'eslint';
 import * as ESTree from 'estree';
 import {
-  hasJupyterPluginType,
+  getJupyterPluginKind,
   extractParameterType,
   extractArrayElements
 } from '../utils/plugin-utils';
 
 interface ActivateFunctionInfo {
   node: ESTree.Node;
-  params: string[];
+  params: (string)[];
   paramTypes: (string | null)[];
 }
 
@@ -57,14 +57,15 @@ function findActivateFunction(
       )
       .map(param => param.name);
 
-    // Extract type annotations if available
-    const paramTypes = activateValue.params
-      .filter(
-        (param): param is ESTree.Identifier => param.type === 'Identifier'
-      )
-      .map(param => extractParameterType(param));
+    const paramTypes = activateValue.params.map(param =>
+      param.type === 'Identifier' ? extractParameterType(param) : null
+    );
 
-    return { node: activateProp, params, paramTypes };
+    return {
+      node: activateProp,
+      params,
+      paramTypes,
+    };
   }
 
   return null;
@@ -148,6 +149,8 @@ const jupyterPluginActivationArgs: Rule.RuleModule = {
         'Activation argument "{{ arg }}" is not in requires/optional tokens.',
       appNotFirst:
         'First activation argument must be one of [{{ allowedNames }}] (JupyterFrontEnd), got "{{ arg }}".',
+      serviceManagerFirstArgNotNull:
+        'First activation argument for ServiceManagerPlugin must be null, got "{{ arg }}".',
       invalidAppType:
         'First activation argument "{{ arg }}" has invalid type "{{ type }}". Expected JupyterFrontEnd, JupyterLab, or Application.',
       wrongArgumentCount:
@@ -182,7 +185,8 @@ const jupyterPluginActivationArgs: Rule.RuleModule = {
       VariableDeclarator(node: ESTree.Node) {
         const varDecl = node as ESTree.VariableDeclarator;
 
-        if (!hasJupyterPluginType(varDecl)) {
+        const pluginKind = getJupyterPluginKind(varDecl);
+        if (!pluginKind) {
           return;
         }
 
@@ -204,18 +208,53 @@ const jupyterPluginActivationArgs: Rule.RuleModule = {
             // Special case, not invalid
             return;
           }
+          if (pluginKind === 'frontend') {
+            // Validation 1a: Check if first argument is one of the allowed names
+            if (
+              params.length > 0 &&
+              (params[0] === null || !allowedFirstArgumentNames.includes(params[0]))
+            ) {
+              context.report({
+                node: activateInfo.node,
+                messageId: 'appNotFirst',
+                data: {
+                  arg: params[0],
+                  allowedNames: allowedFirstArgumentNames
+                    .map(name => `"${name}"`)
+                    .join(', ')
+                }
+              });
+              return;
+            }
 
-          // Validation 1a: Check if first argument is one of the allowed names
-          if (params.length > 0 && !allowedFirstArgumentNames.includes(params[0])) {
-            context.report({
-              node: activateInfo.node,
-              messageId: 'appNotFirst',
-              data: {
-                arg: params[0],
-                allowedNames: allowedFirstArgumentNames.map(name => `"${name}"`).join(', ')
+            // Validation 1b: Check if first argument type is compatible with JupyterFrontEnd
+            if (params.length > 0 && paramTypes.length > 0) {
+              const firstParamType = paramTypes[0];
+              if (!isCompatibleWithJupyterFrontEnd(firstParamType)) {
+                context.report({
+                  node: activateInfo.node,
+                  messageId: 'invalidAppType',
+                  data: {
+                    arg: params[0],
+                    type: firstParamType || 'unknown'
+                  }
+                });
+                return;
               }
-            });
-            return;
+            }
+          } else if (pluginKind === 'service-manager') {
+            // Validation 1: First argument must be literal null
+            if (params.length === 0 || paramTypes[0] !== null) {
+              const firstArg = params[0] ?? 'missing';
+              context.report({
+                node: activateInfo.node,
+                messageId: 'serviceManagerFirstArgNotNull',
+                data: {
+                  arg: firstArg
+                }
+              });
+              return;
+            }
           }
 
           // Validation 1b: Check if first argument type is compatible with JupyterFrontEnd
@@ -248,7 +287,7 @@ const jupyterPluginActivationArgs: Rule.RuleModule = {
           }
 
           // Validation 3: If parameters have type annotations, validate order
-          const actualParamTypes = paramTypes.slice(1); // Already validated above
+          const actualParamTypes = paramTypes.slice(1); // First arg already validated above
           const hasTypeInfo = actualParamTypes.some(
             (t: string | null) => t !== null
           );
@@ -288,7 +327,7 @@ const jupyterPluginActivationArgs: Rule.RuleModule = {
               context.report({
                 node: activateInfo.node,
                 messageId: 'extraArgument',
-                data: { arg: actualParams[i] }
+                data: { arg: actualParams[i + 1] }
               });
             }
           }
