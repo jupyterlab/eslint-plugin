@@ -38,7 +38,7 @@
   },
   "homepage": "https://github.com/jupyterlab/eslint-plugin",
   "publishConfig": {
-      "access": "public"
+    "access": "public"
   },
   "jupyter-releaser": {
     "hooks": {
@@ -52,7 +52,7 @@
     "@types/eslint": "^9.6.1",
     "@types/estree": "^1.0.8",
     "@types/jest": "^30.0.0",
-    "@types/node": "^25.2.0",
+    "@types/node": "^25.3.5",
     "@typescript-eslint/eslint-plugin": "^8.54.0",
     "@typescript-eslint/parser": "^8.54.0",
     "@typescript-eslint/utils": "^8.54.0",
