@@ -7,8 +7,8 @@ import { Rule } from 'eslint';
 import * as ESTree from 'estree';
 import {
   getJupyterPluginKind,
-  extractIdentifierNames,
-  extractParameterType
+  extractParameterType,
+  extractArrayElements
 } from '../utils/plugin-utils';
 
 interface ActivateFunctionInfo {
@@ -98,14 +98,14 @@ function extractRequiresOptional(
     }
 
     if (keyName === 'requires' && prop.value.type === 'ArrayExpression') {
-      result.requires = extractIdentifierNames(
+      result.requires = extractArrayElements(
         prop.value as ESTree.ArrayExpression
       );
     } else if (
       keyName === 'optional' &&
       prop.value.type === 'ArrayExpression'
     ) {
-      result.optional = extractIdentifierNames(
+      result.optional = extractArrayElements(
         prop.value as ESTree.ArrayExpression
       );
     }
@@ -307,7 +307,7 @@ const jupyterPluginActivationArgs: Rule.RuleModule = {
                     data: { arg: params[i + 1] }
                   });
                 }
-              } else if (paramType !== null && paramType !== expectedToken) {
+              } else if (paramType !== expectedToken) {
                 // Type mismatch
                 context.report({
                   node: activateInfo.node,
