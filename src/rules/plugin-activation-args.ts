@@ -4,7 +4,7 @@
  */
 
 import { Rule } from 'eslint';
-import * as ESTree from 'estree';
+import { TSESTree } from '@typescript-eslint/types';
 import {
   getJupyterPluginKind,
   extractParameterType,
@@ -12,8 +12,8 @@ import {
 } from '../utils/plugin-utils';
 
 interface ActivateFunctionInfo {
-  node: ESTree.Node;
-  params: (string)[];
+  node: TSESTree.Node;
+  params: string[];
   paramTypes: (string | null)[];
 }
 
@@ -28,18 +28,16 @@ const DEFAULT_ALLOWED_FIRST_ARGUMENT_NAMES = ['app', '_app', '_'];
  * Finds the activate function in the plugin object
  */
 function findActivateFunction(
-  node: ESTree.ObjectExpression
+  node: TSESTree.ObjectExpression
 ): ActivateFunctionInfo | null {
   const activateProp = node.properties.find(
-    prop =>
-      ((prop.type === 'Property' || prop.type === 'SpreadElement') &&
-        prop.type === 'Property' &&
-        ((prop.key.type === 'Identifier' && prop.key.name === 'activate') ||
-          (prop.key.type === 'Literal' && prop.key.value === 'activate'))) ||
-      prop.type === 'SpreadElement'
-  ) as ESTree.Property | undefined;
+    (prop): prop is TSESTree.Property =>
+      prop.type === 'Property' &&
+      ((prop.key.type === 'Identifier' && prop.key.name === 'activate') ||
+        (prop.key.type === 'Literal' && prop.key.value === 'activate'))
+  );
 
-  if (!activateProp || activateProp.type !== 'Property') {
+  if (!activateProp) {
     return null;
   }
 
@@ -47,13 +45,12 @@ function findActivateFunction(
 
   // Handle both arrow functions and regular functions
   if (
-    (activateValue.type === 'ArrowFunctionExpression' ||
-      activateValue.type === 'FunctionExpression') &&
-    activateValue.params
+    activateValue.type === 'ArrowFunctionExpression' ||
+    activateValue.type === 'FunctionExpression'
   ) {
     const params = activateValue.params
       .filter(
-        (param): param is ESTree.Identifier => param.type === 'Identifier'
+        (param): param is TSESTree.Identifier => param.type === 'Identifier'
       )
       .map(param => param.name);
 
@@ -64,7 +61,7 @@ function findActivateFunction(
     return {
       node: activateProp,
       params,
-      paramTypes,
+      paramTypes
     };
   }
 
@@ -75,16 +72,14 @@ function findActivateFunction(
  * Extracts requires and optional arrays from a plugin object
  */
 function extractRequiresOptional(
-  node: ESTree.ObjectExpression
+  node: TSESTree.ObjectExpression
 ): RequiresOptionalInfo {
   const result: RequiresOptionalInfo = {
     requires: [],
     optional: []
   };
 
-  const props = node.properties as ESTree.Property[];
-
-  for (const prop of props) {
+  for (const prop of node.properties) {
     if (prop.type !== 'Property') continue;
 
     let keyName: string | null = null;
@@ -98,16 +93,12 @@ function extractRequiresOptional(
     }
 
     if (keyName === 'requires' && prop.value.type === 'ArrayExpression') {
-      result.requires = extractArrayElements(
-        prop.value as ESTree.ArrayExpression
-      );
+      result.requires = extractArrayElements(prop.value);
     } else if (
       keyName === 'optional' &&
       prop.value.type === 'ArrayExpression'
     ) {
-      result.optional = extractArrayElements(
-        prop.value as ESTree.ArrayExpression
-      );
+      result.optional = extractArrayElements(prop.value);
     }
   }
 
@@ -122,11 +113,7 @@ function isCompatibleWithJupyterFrontEnd(typeName: string | null): boolean {
     return true; // If we can't check, we allow it
   }
 
-  const compatibleTypes = [
-    'JupyterFrontEnd',
-    'JupyterLab',
-    'Application'
-  ];
+  const compatibleTypes = ['JupyterFrontEnd', 'JupyterLab', 'Application'];
 
   return compatibleTypes.includes(typeName);
 }
@@ -167,7 +154,8 @@ const jupyterPluginActivationArgs: Rule.RuleModule = {
               type: 'string'
             },
             default: DEFAULT_ALLOWED_FIRST_ARGUMENT_NAMES,
-            description: 'Allowed names for the first activation argument (JupyterFrontEnd)'
+            description:
+              'Allowed names for the first activation argument (JupyterFrontEnd)'
           }
         },
         additionalProperties: false
@@ -182,8 +170,12 @@ const jupyterPluginActivationArgs: Rule.RuleModule = {
       options.allowedFirstArgumentNames || DEFAULT_ALLOWED_FIRST_ARGUMENT_NAMES;
 
     return {
-      VariableDeclarator(node: ESTree.Node) {
-        const varDecl = node as ESTree.VariableDeclarator;
+      VariableDeclarator(node: Rule.Node) {
+        if (node.type !== 'VariableDeclarator') {
+          return;
+        }
+
+        const varDecl = node as unknown as TSESTree.VariableDeclarator;
 
         const pluginKind = getJupyterPluginKind(varDecl);
         if (!pluginKind) {
@@ -191,7 +183,7 @@ const jupyterPluginActivationArgs: Rule.RuleModule = {
         }
 
         if (varDecl.init && varDecl.init.type === 'ObjectExpression') {
-          const pluginObj = varDecl.init as ESTree.ObjectExpression;
+          const pluginObj = varDecl.init;
 
           const { requires, optional } = extractRequiresOptional(pluginObj);
 
@@ -204,15 +196,16 @@ const jupyterPluginActivationArgs: Rule.RuleModule = {
           const expectedCount = 1 + requires.length + optional.length;
           const expectedTokensWithoutApp = [...requires, ...optional];
 
-          if(expectedCount === 1 && params.length === 0) {
+          if (expectedCount === 1 && params.length === 0) {
             // Special case, not invalid
             return;
           }
+
           if (pluginKind === 'frontend') {
             // Validation 1a: Check if first argument is one of the allowed names
             if (
               params.length > 0 &&
-              (params[0] === null || !allowedFirstArgumentNames.includes(params[0]))
+              !allowedFirstArgumentNames.includes(params[0])
             ) {
               context.report({
                 node: activateInfo.node,
@@ -251,22 +244,6 @@ const jupyterPluginActivationArgs: Rule.RuleModule = {
                 messageId: 'serviceManagerFirstArgNotNull',
                 data: {
                   arg: firstArg
-                }
-              });
-              return;
-            }
-          }
-
-          // Validation 1b: Check if first argument type is compatible with JupyterFrontEnd
-          if (params.length > 0 && paramTypes.length > 0) {
-            const firstParamType = paramTypes[0];
-            if (!isCompatibleWithJupyterFrontEnd(firstParamType)) {
-              context.report({
-                node: activateInfo.node,
-                messageId: 'invalidAppType',
-                data: {
-                  arg: params[0],
-                  type: firstParamType || 'unknown'
                 }
               });
               return;
@@ -327,7 +304,7 @@ const jupyterPluginActivationArgs: Rule.RuleModule = {
               context.report({
                 node: activateInfo.node,
                 messageId: 'extraArgument',
-                data: { arg: actualParams[i + 1] }
+                data: { arg: actualParams[i] }
               });
             }
           }
@@ -335,7 +312,7 @@ const jupyterPluginActivationArgs: Rule.RuleModule = {
           // Validation 4: Check for missing arguments (only if counts don't match)
           if (params.length < expectedCount) {
             for (
-              let i = params.length - 1;
+              let i = Math.max(params.length - 1, 0);
               i < expectedTokensWithoutApp.length;
               i++
             ) {

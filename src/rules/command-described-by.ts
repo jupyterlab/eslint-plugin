@@ -4,7 +4,7 @@
  */
 
 import { Rule } from 'eslint';
-import * as ESTree from 'estree';
+import { TSESTree } from '@typescript-eslint/types';
 import { getObjectProperties } from '../utils/plugin-utils';
 import { isAddCommandCall } from '../utils/commands';
 
@@ -25,8 +25,12 @@ const jupyterCommandDescribedBy: Rule.RuleModule = {
 
   create(context: Rule.RuleContext): Rule.RuleListener {
     return {
-      CallExpression(node: ESTree.Node) {
-        const callExpr = node as ESTree.CallExpression;
+      CallExpression(node: Rule.Node) {
+        if (node.type !== 'CallExpression') {
+          return;
+        }
+
+        const callExpr = node as unknown as TSESTree.CallExpression;
 
         // Check if this is <something>.addCommand()
         if (!isAddCommandCall(callExpr)) {
@@ -62,8 +66,7 @@ const jupyterCommandDescribedBy: Rule.RuleModule = {
           return;
         }
 
-        const options = optionsArg as ESTree.ObjectExpression;
-        const properties = getObjectProperties(options);
+        const properties = getObjectProperties(optionsArg);
 
         // Check if execute function exists and has parameters
         const executeProp = properties.get('execute');

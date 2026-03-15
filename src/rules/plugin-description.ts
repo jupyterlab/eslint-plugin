@@ -4,13 +4,12 @@
  */
 
 import { Rule } from 'eslint';
-import * as ESTree from 'estree';
-import {getJupyterPluginKind, getPluginId } from '../utils/plugin-utils';
-
+import { TSESTree } from '@typescript-eslint/types';
+import { getJupyterPluginKind, getPluginId } from '../utils/plugin-utils';
 /**
  * Checks if an object expression has a description property
  */
-function hasDescriptionProperty(obj: ESTree.ObjectExpression): boolean {
+function hasDescriptionProperty(obj: TSESTree.ObjectExpression): boolean {
   for (const prop of obj.properties) {
     if (prop.type === 'Property') {
       let keyName: string | null = null;
@@ -25,7 +24,7 @@ function hasDescriptionProperty(obj: ESTree.ObjectExpression): boolean {
       if (keyName === 'description') {
         // Check if description value is not empty
         if (prop.value.type === 'Literal') {
-          const value = (prop.value as ESTree.Literal).value;
+          const value = prop.value.value;
           return typeof value === 'string' && value.trim().length > 0;
         }
         return true; // Non-literal descriptions are assumed valid
@@ -54,8 +53,12 @@ const jupyterPluginDescription: Rule.RuleModule = {
 
   create(context: Rule.RuleContext): Rule.RuleListener {
     return {
-      VariableDeclarator(node: ESTree.Node) {
-        const varDecl = node as ESTree.VariableDeclarator;
+      VariableDeclarator(node: Rule.Node) {
+        if (node.type !== 'VariableDeclarator') {
+          return;
+        }
+
+        const varDecl = node as unknown as TSESTree.VariableDeclarator;
 
         // Check if this has a JupyterFrontEndPlugin type annotation
         if (!getJupyterPluginKind(varDecl)) {
@@ -67,14 +70,13 @@ const jupyterPluginDescription: Rule.RuleModule = {
           return;
         }
 
-        const pluginObj = varDecl.init as ESTree.ObjectExpression;
-        const pluginId = getPluginId(pluginObj);
+        const pluginId = getPluginId(varDecl.init);
         const pluginIdSuffix = pluginId ? ` "${pluginId}"` : '';
 
         // Check if description property exists
-        if (!hasDescriptionProperty(pluginObj)) {
+        if (!hasDescriptionProperty(varDecl.init)) {
           context.report({
-            node: pluginObj,
+            node: varDecl.init,
             messageId: 'missingDescription',
             data: { pluginId: pluginIdSuffix }
           });
