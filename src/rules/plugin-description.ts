@@ -3,9 +3,10 @@
  * Distributed under the terms of the Modified BSD License.
  */
 
-import { Rule } from 'eslint';
+import { createRule } from '../utils/create-rule';
 import { TSESTree } from '@typescript-eslint/types';
 import { getJupyterPluginKind, getPluginId } from '../utils/plugin-utils';
+
 /**
  * Checks if an object expression has a description property
  */
@@ -34,13 +35,12 @@ function hasDescriptionProperty(obj: TSESTree.ObjectExpression): boolean {
   return false;
 }
 
-const jupyterPluginDescription: Rule.RuleModule = {
+const jupyterPluginDescription = createRule({
+  name: 'plugin-description',
   meta: {
     type: 'problem',
     docs: {
       description: 'Ensure all JupyterLab plugins have a description property',
-      recommended: 'recommended',
-      url: 'https://github.com/jupyterlab/eslint-plugin'
     },
     messages: {
       missingDescription:
@@ -50,12 +50,11 @@ const jupyterPluginDescription: Rule.RuleModule = {
     },
     schema: []
   },
+  defaultOptions: [],
 
-  create(context: Rule.RuleContext): Rule.RuleListener {
+  create(context) {
     return {
-      VariableDeclarator(node: Rule.Node) {
-        const varDecl = node as TSESTree.VariableDeclarator;
-
+      VariableDeclarator(varDecl) {
         // Check if this has a JupyterFrontEndPlugin type annotation
         if (!getJupyterPluginKind(varDecl)) {
           return;
@@ -80,6 +79,6 @@ const jupyterPluginDescription: Rule.RuleModule = {
       }
     };
   }
-};
+});
 
 export = jupyterPluginDescription;

@@ -3,13 +3,13 @@
  * Distributed under the terms of the Modified BSD License.
  */
 
-import { Rule } from 'eslint';
 import { TSESTree } from '@typescript-eslint/types';
 import {
   getJupyterPluginKind,
   extractParameterType,
   extractArrayElements
 } from '../utils/plugin-utils';
+import { createRule } from '../utils/create-rule';
 
 interface ActivateFunctionInfo {
   node: TSESTree.Node;
@@ -118,14 +118,13 @@ function isCompatibleWithJupyterFrontEnd(typeName: string | null): boolean {
   return compatibleTypes.includes(typeName);
 }
 
-const jupyterPluginActivationArgs: Rule.RuleModule = {
+const jupyterPluginActivationArgs = createRule({
+  name: 'plugin-activation-args',
   meta: {
     type: 'problem',
     docs: {
       description:
         'Ensure JupyterLab plugin activation function arguments match requires and optional tokens in order',
-      recommended: 'recommended',
-      url: 'https://github.com/jupyterlab/eslint-plugin'
     },
     messages: {
       mismatchedOrder:
@@ -162,24 +161,26 @@ const jupyterPluginActivationArgs: Rule.RuleModule = {
       }
     ]
   },
+  defaultOptions: [
+    {
+      allowedFirstArgumentNames: DEFAULT_ALLOWED_FIRST_ARGUMENT_NAMES
+    }
+  ],
 
-  create(context: Rule.RuleContext): Rule.RuleListener {
+  create(context, [options]) {
     // Get configuration options
-    const options = context.options[0] || {};
     const allowedFirstArgumentNames: string[] =
       options.allowedFirstArgumentNames || DEFAULT_ALLOWED_FIRST_ARGUMENT_NAMES;
 
     return {
-      VariableDeclarator(node: Rule.Node) {
-        const varDecl = node as TSESTree.VariableDeclarator;
-
-        const pluginKind = getJupyterPluginKind(varDecl);
+      VariableDeclarator(node) {
+        const pluginKind = getJupyterPluginKind(node);
         if (!pluginKind) {
           return;
         }
 
-        if (varDecl.init && varDecl.init.type === 'ObjectExpression') {
-          const pluginObj = varDecl.init;
+        if (node.init && node.init.type === 'ObjectExpression') {
+          const pluginObj = node.init;
 
           const { requires, optional } = extractRequiresOptional(pluginObj);
 
@@ -261,9 +262,7 @@ const jupyterPluginActivationArgs: Rule.RuleModule = {
 
           // Validation 3: If parameters have type annotations, validate order
           const actualParamTypes = paramTypes.slice(1); // First arg already validated above
-          const hasTypeInfo = actualParamTypes.some(
-            (t: string | null) => t !== null
-          );
+          const hasTypeInfo = actualParamTypes.some(t => t !== null);
 
           if (hasTypeInfo) {
             // Validate that parameter types match expected token types in order
@@ -324,6 +323,6 @@ const jupyterPluginActivationArgs: Rule.RuleModule = {
       }
     };
   }
-};
+});
 
 export = jupyterPluginActivationArgs;
