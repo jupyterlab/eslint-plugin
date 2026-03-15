@@ -2,6 +2,7 @@
  * Copyright (c) Jupyter Development Team.
  * Distributed under the terms of the Modified BSD License.
  */
+
 import { getObjectProperties } from '../utils/plugin-utils';
 import { isAddCommandCall } from '../utils/commands';
 import { createRule } from '../utils/create-rule';

@@ -235,12 +235,11 @@ const jupyterPluginActivationArgs = createRule({
           } else if (pluginKind === 'service-manager') {
             // Validation 1: First argument must be literal null
             if (params.length === 0 || paramTypes[0] !== null) {
-              const firstArg = params[0] ?? 'missing';
               context.report({
                 node: activateInfo.node,
                 messageId: 'serviceManagerFirstArgNotNull',
                 data: {
-                  arg: firstArg
+                  arg: paramTypes[0]
                 }
               });
               return;

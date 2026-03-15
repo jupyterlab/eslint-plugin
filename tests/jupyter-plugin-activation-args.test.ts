@@ -436,7 +436,7 @@ ruleTester.run('plugin-activation-args', pluginActivationArgs, {
       errors: [
         {
           messageId: 'serviceManagerFirstArgNotNull',
-          data: { arg: 'app' }
+          data: { arg: 'JupyterFrontEnd' }
         }
       ]
     },
