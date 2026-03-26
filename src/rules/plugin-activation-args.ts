@@ -4,7 +4,7 @@
  */
 
 import { TSESTree } from '@typescript-eslint/types';
-import { ESLintUtils } from '@typescript-eslint/utils';
+import { ESLintUtils, ParserServices } from '@typescript-eslint/utils';
 import * as ts from 'typescript';
 import {
   getJupyterPluginKind,
@@ -149,7 +149,9 @@ const jupyterPluginActivationArgs = createRule({
       invalidAppType:
         'First activation argument "{{ arg }}" has invalid type "{{ type }}". Expected JupyterFrontEnd, JupyterLab, or Application.',
       wrongArgumentCount:
-        'Expected {{ expected }} activation arguments (app + {{ tokenCount }} tokens), got {{ actual }}.'
+        'Expected {{ expected }} activation arguments (app + {{ tokenCount }} tokens), got {{ actual }}.',
+      unresolvableTokenType:
+        'Token "{{ token }}" type could not be resolved — package may be unbuilt. Build it for accurate type checking.'
     },
     fixable: 'code',
     schema: [
@@ -181,8 +183,16 @@ const jupyterPluginActivationArgs = createRule({
       options.allowedFirstArgumentNames || DEFAULT_ALLOWED_FIRST_ARGUMENT_NAMES;
 
     // Try to obtain the TypeScript type checker for type-aware comparisons.
-    const services = ESLintUtils.getParserServices(context, true);
-    const checker = services.program ? services.program.getTypeChecker() : null;
+    let services: ParserServices | null = null;
+    let checker: ts.TypeChecker | null = null;
+
+    try {
+      services = ESLintUtils.getParserServices(context, true);
+      checker = services.program ? services.program.getTypeChecker() : null;
+    } catch {
+      // Parser services unavailable (e.g., non-TS file or misconfigured parser)
+      services = null;
+    }
 
     /**
      * Given the AST node for a token in requires/optional, uses the TypeScript checker to extract T from
@@ -194,7 +204,7 @@ const jupyterPluginActivationArgs = createRule({
         return null;
       }
       try {
-        const tsNode = services.esTreeNodeToTSNodeMap.get(tokenNode);
+        const tsNode = services?.esTreeNodeToTSNodeMap.get(tokenNode);
         if (!tsNode) {
           return null;
         }
@@ -219,7 +229,7 @@ const jupyterPluginActivationArgs = createRule({
     function resolveParamType(paramNode: TSESTree.Identifier): ts.Type | null {
       if (!checker) return null;
       try {
-        const tsNode = services.esTreeNodeToTSNodeMap.get(paramNode);
+        const tsNode = services?.esTreeNodeToTSNodeMap.get(paramNode);
         if (!tsNode) return null;
         const type = checker.getTypeAtLocation(tsNode);
         // Handle `T | null/undefined` (optional token pattern)
@@ -250,27 +260,36 @@ const jupyterPluginActivationArgs = createRule({
     }
 
     /**
-     * Returns true when the activate parameter type is compatible with the token's type.
+     * Returns [matches, tokenUnresolved] where:
+     * - matches: true when the activate parameter type is compatible with the token's type.
+     * - tokenUnresolved: true when the token's inner type could not be resolved (null, undefined, or any),
+     *   meaning the result is inconclusive (e.g. package is unbuilt).
      */
     function tokenMatchesParam(
       token: TokenEntry,
       paramType: string | null,
       paramNode: TSESTree.Identifier | null
-    ): boolean {
+    ): [boolean, boolean] {
+      // For most cases this check is sufficient
+      if (paramType === token.name) return [true, false];
       if (checker && paramNode) {
         const resolvedToken = resolveTokenInnerType(token.node);
+        const tokenUnresolved =
+          resolvedToken === null ||
+          resolvedToken === undefined ||
+          !!(resolvedToken.flags & ts.TypeFlags.Any);
+        if (tokenUnresolved) {
+          return [true, true];
+        }
         const resolvedParam = resolveParamType(paramNode);
-        if (resolvedToken !== null && resolvedParam !== null) {
-          return isSameType(resolvedToken, resolvedParam);
+        if (resolvedParam !== null) {
+          return [isSameType(resolvedToken, resolvedParam), false];
         }
       }
-      if (paramType === token.name) return true;
       // Without a checker we cannot resolve namespace patterns like
       // `IDebugger.ISidebar` ↔ `IDebuggerSidebar`.
-      // Should Qualified names (those containing a dot)
-      // be passed through ?
-      if (!checker && paramType && paramType.includes('.')) return true;
-      return false;
+      if (!checker && paramType && paramType.includes('.')) return [true, false];
+      return [false, false];
     }
 
     return {
@@ -381,15 +400,25 @@ const jupyterPluginActivationArgs = createRule({
                     data: { arg: params[i + 1] }
                   });
                 }
-              } else if (
-                !tokenMatchesParam(expectedToken, paramType, paramNode)
-              ) {
-                // Type mismatch
-                context.report({
-                  node: activateInfo.node,
-                  messageId: 'mismatchedOrder',
-                  data: { arg: params[i + 1] }
-                });
+              } else {
+                const [matches, tokenUnresolved] = tokenMatchesParam(
+                  expectedToken,
+                  paramType,
+                  paramNode
+                );
+                if (tokenUnresolved) {
+                  context.report({
+                    node: activateInfo.node,
+                    messageId: 'unresolvableTokenType',
+                    data: { token: expectedToken.name }
+                  });
+                } else if (!matches) {
+                  context.report({
+                    node: activateInfo.node,
+                    messageId: 'mismatchedOrder',
+                    data: { arg: params[i + 1] }
+                  });
+                }
               }
             }
           } else {
