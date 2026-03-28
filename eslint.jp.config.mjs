@@ -1,26 +1,24 @@
-/*
- * Copyright (c) Jupyter Development Team.
- * Distributed under the terms of the Modified BSD License.
- */
-
 import path from 'path';
 import { fileURLToPath } from 'url';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 
 const pluginModule = await import(path.resolve(__dirname, 'lib/index.js'));
-// CJS modules imported via ESM land as { default: { rules, configs }, rules, configs }
-// We want the object that actually has .rules on it
 const resolvedPlugin = pluginModule.default?.rules ? pluginModule.default : pluginModule;
 const parserModule = await import('@typescript-eslint/parser');
-// Same CJS/ESM interop issue applies to the parser
 const resolvedParser = parserModule.default ?? parserModule;
+
+// This prevents "Definition for rule not found" errors from eslint-disable comments
+const tsPlugin = await import('@typescript-eslint/eslint-plugin');
+const resolvedTsPlugin = tsPlugin.default ?? tsPlugin;
+
 export default [
   {
-    basePath: __dirname,  // explicitly anchor to this config file's directory
+    basePath: __dirname,
     files: ['jupyterlab/packages/*/src/**/*.ts'],
     plugins: {
-      'jupyter': resolvedPlugin
+      'jupyter': resolvedPlugin,
+      '@typescript-eslint': resolvedTsPlugin  // registered but rules not enforced
     },
     rules: {
       'jupyter/command-described-by': 'warn',
