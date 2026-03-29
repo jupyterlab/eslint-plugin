@@ -20,7 +20,7 @@ const resolvedTsPlugin = tsPlugin.default ?? tsPlugin;
 export default [
   {
     basePath: __dirname,
-    files: ['jupyterlab/packages/*/src/**/*.ts'],
+    files: ['jupyterlab/packages/*/src/**/*.ts', "notebook/packages/*/src/**/*.ts"],
     plugins: {
       'jupyter': resolvedPlugin,
       '@typescript-eslint': resolvedTsPlugin  // registered but rules not enforced
