@@ -474,7 +474,43 @@ ruleTester.run('plugin-activation-args', pluginActivationArgs, {
           data: { arg: 'JupyterFrontEnd' }
         }
       ]
-    }
+    },
+    {
+      // Incorrect type (null)
+      code: `
+        const plugin: JupyterFrontEndPlugin<void> = {
+          id: 'test-plugin',
+          requires: [INotebookTracker],
+          activate: (app: JupyterFrontEnd, tracker: null) => {
+            console.log('Activated');
+          }
+        };
+      `,
+      errors: [
+        {
+          messageId: 'incorrectType',
+          data: { arg: 'tracker', type: 'null', expected: 'INotebookTracker' }
+        }
+      ]
+    },
+    {
+      // Incorrect type
+      code: `
+        const plugin: JupyterFrontEndPlugin<void> = {
+          id: 'test-plugin',
+          requires: [INotebookTracker, IRenderMimeRegistry],
+          activate: (app: JupyterFrontEnd, tracker: IDocumentTracker, rendermime: IRenderMimeRegistry) => {
+            console.log('Activated');
+          }
+        };
+      `,
+      errors: [
+        {
+          messageId: 'incorrectType',
+          data: { arg: 'tracker', type: 'IDocumentTracker', expected: 'INotebookTracker' }
+        }
+      ]
+    },
   ]
 });
 
