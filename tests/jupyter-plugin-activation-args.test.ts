@@ -268,7 +268,7 @@ ruleTester.run('plugin-activation-args', pluginActivationArgs, {
       // Cross-file: token and interface declared in a separate .d.ts.
     filename: 'tests/type-aware-fixture.ts',
     code: `
-      import { IDebugger, IDebuggerSidebar, INotebookTracker, INotebookTracker } from './fixtures/debugger-types';
+      import { IDebugger, IDebuggerSidebar, INotebookTracker } from './fixtures/debugger-types';
       declare class JupyterFrontEnd {}
       declare class JupyterFrontEndPlugin<T> {}
       const plugin: JupyterFrontEndPlugin<void> = {
