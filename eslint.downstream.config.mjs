@@ -29,7 +29,8 @@ export default [
     rules: {
       'jupyter/command-described-by': 'error',
       'jupyter/plugin-activation-args': 'error',
-      'jupyter/plugin-description': 'error'
+      'jupyter/plugin-description': 'error',
+      'jupyter/no-translation-concatenation': 'error'
     },
     languageOptions: {
       parser: resolvedParser,
