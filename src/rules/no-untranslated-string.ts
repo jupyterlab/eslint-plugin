@@ -36,21 +36,44 @@ function isRawStringNode(node: TSESTree.Node): boolean {
 }
 
 function isSetAttributeCall(node: TSESTree.CallExpression): boolean {
-  if (node.callee.type === 'MemberExpression') {
-    const callee = node.callee;
-    if (
-      callee.property.type === 'Identifier' &&
-      callee.property.name === 'setAttribute'
-    ) {
-      return true;
-    }
-  }
-  return false;
+  return (
+    node.callee.type === 'MemberExpression' &&
+    !node.callee.computed &&
+    node.callee.property.type === 'Identifier' &&
+    node.callee.property.name === 'setAttribute'
+  );
 }
 
-const MONITORED_COMMAND_PROPS = ['label', 'caption', 'description'];
+function isShowDialogCall(node: TSESTree.CallExpression): boolean {
+  return (
+    node.callee.type === 'Identifier' && node.callee.name === 'showDialog'
+  );
+}
+
+function isDialogConstructor(node: TSESTree.NewExpression): boolean {
+  return node.callee.type === 'Identifier' && node.callee.name === 'Dialog';
+}
+
+const DIALOG_BUTTON_BUILDERS = [
+  'okButton',
+  'cancelButton',
+  'warnButton',
+  'errorButton'
+];
+
+function isDialogButtonCall(node: TSESTree.CallExpression): boolean {
+  return (
+    node.callee.type === 'MemberExpression' &&
+    !node.callee.computed &&
+    node.callee.property.type === 'Identifier' &&
+    DIALOG_BUTTON_BUILDERS.includes(node.callee.property.name)
+  );
+}
+
+const MONITORED_COMMAND_PROPS = ['label', 'caption', 'usage'];
 const MONITORED_SET_ATTRIBUTE_ATTRS = ['aria-label', 'aria-description', 'title'];
 const MONITORED_ASSIGNMENT_PROPS = ['title', 'ariaLabel'];
+const MONITORED_DIALOG_PROPS = ['title', 'body'];
 
 const noUntranslatedString = createRule({
   name: 'no-untranslated-string',
@@ -67,7 +90,15 @@ const noUntranslatedString = createRule({
       untranslatedSetAttribute:
         'setAttribute("{{ attr }}", ...) has an untranslated string literal. Wrap the value with trans.__().',
       untranslatedPropertyAssign:
-        'Assignment to "{{ prop }}" has an untranslated string literal. Wrap it with trans.__().'
+        'Assignment to "{{ prop }}" has an untranslated string literal. Wrap it with trans.__().',
+      untranslatedTitleProp:
+        'Assignment to "title.{{ prop }}" has an untranslated string literal. Wrap it with trans.__().',
+      untranslatedDialogOption:
+        'Dialog/showDialog "{{ prop }}" option has an untranslated string literal. Wrap it with trans.__().',
+      untranslatedDialogButtonLabel:
+        'Dialog button "label" option has an untranslated string literal. Wrap it with trans.__().',
+      untranslatedJsxText:
+        'JSX text content has an untranslated string literal. Wrap it with {trans.__(...)}'
     },
     schema: []
   },
@@ -76,7 +107,7 @@ const noUntranslatedString = createRule({
   create(context) {
     return {
       CallExpression(node) {
-        // commands.addCommand(id, { label, caption, description })
+        // Branch A: commands.addCommand(id, { label, caption, usage })
         if (isAddCommandCall(node)) {
           if (node.arguments.length < 2) {
             return;
@@ -99,7 +130,7 @@ const noUntranslatedString = createRule({
           return;
         }
 
-        // element.setAttribute('aria-label'/'title', string)
+        // Branch B: element.setAttribute('aria-label'/'aria-description'/'title', string)
         if (isSetAttributeCall(node)) {
           if (node.arguments.length < 2) {
             return;
@@ -107,11 +138,9 @@ const noUntranslatedString = createRule({
           const attrNameArg = node.arguments[0];
           if (
             attrNameArg.type !== 'Literal' ||
-            typeof attrNameArg.value !== 'string'
+            typeof attrNameArg.value !== 'string' ||
+            !MONITORED_SET_ATTRIBUTE_ATTRS.includes(attrNameArg.value)
           ) {
-            return;
-          }
-          if (!MONITORED_SET_ATTRIBUTE_ATTRS.includes(attrNameArg.value)) {
             return;
           }
           const attrValueArg = node.arguments[1];
@@ -120,6 +149,74 @@ const noUntranslatedString = createRule({
               node: attrValueArg,
               messageId: 'untranslatedSetAttribute',
               data: { attr: attrNameArg.value }
+            });
+          }
+          return;
+        }
+
+        // Branch C: showDialog({ title, body })
+        if (isShowDialogCall(node)) {
+          if (node.arguments.length < 1) {
+            return;
+          }
+          const optionsArg = node.arguments[0];
+          if (optionsArg.type !== 'ObjectExpression') {
+            return;
+          }
+          const properties = getObjectProperties(optionsArg);
+          for (const propName of MONITORED_DIALOG_PROPS) {
+            const prop = properties.get(propName);
+            if (prop && isRawStringNode(prop.value)) {
+              context.report({
+                node: prop.value,
+                messageId: 'untranslatedDialogOption',
+                data: { prop: propName }
+              });
+            }
+          }
+          return;
+        }
+
+        // Branch D: Dialog.okButton/cancelButton/warnButton/errorButton({ label })
+        if (isDialogButtonCall(node)) {
+          if (node.arguments.length < 1) {
+            return;
+          }
+          const optionsArg = node.arguments[0];
+          if (optionsArg.type !== 'ObjectExpression') {
+            return;
+          }
+          const properties = getObjectProperties(optionsArg);
+          const labelProp = properties.get('label');
+          if (labelProp && isRawStringNode(labelProp.value)) {
+            context.report({
+              node: labelProp.value,
+              messageId: 'untranslatedDialogButtonLabel'
+            });
+          }
+        }
+      },
+
+      // new Dialog({ title, body })
+      NewExpression(node) {
+        if (!isDialogConstructor(node)) {
+          return;
+        }
+        if (node.arguments.length < 1) {
+          return;
+        }
+        const optionsArg = node.arguments[0];
+        if (optionsArg.type !== 'ObjectExpression') {
+          return;
+        }
+        const properties = getObjectProperties(optionsArg);
+        for (const propName of MONITORED_DIALOG_PROPS) {
+          const prop = properties.get(propName);
+          if (prop && isRawStringNode(prop.value)) {
+            context.report({
+              node: prop.value,
+              messageId: 'untranslatedDialogOption',
+              data: { prop: propName }
             });
           }
         }
@@ -137,15 +234,56 @@ const noUntranslatedString = createRule({
         ) {
           return;
         }
-        const propName = left.property.name;
+
+        // element.title = STRING  or  element.ariaLabel = STRING
         if (
-          MONITORED_ASSIGNMENT_PROPS.includes(propName) &&
+          MONITORED_ASSIGNMENT_PROPS.includes(left.property.name) &&
           isRawStringNode(node.right)
         ) {
           context.report({
             node: node.right,
             messageId: 'untranslatedPropertyAssign',
-            data: { prop: propName }
+            data: { prop: left.property.name }
+          });
+          return;
+        }
+
+        // *.title.label = STRING  or  *.title.caption = STRING
+        if (
+          (left.property.name === 'label' || left.property.name === 'caption') &&
+          left.object.type === 'MemberExpression' &&
+          !left.object.computed &&
+          left.object.property.type === 'Identifier' &&
+          left.object.property.name === 'title' &&
+          isRawStringNode(node.right)
+        ) {
+          context.report({
+            node: node.right,
+            messageId: 'untranslatedTitleProp',
+            data: { prop: left.property.name }
+          });
+        }
+      },
+
+      // Raw text between JSX tags: <span>Untranslated text</span>
+      JSXText(node) {
+        if (node.value.trim().length > 0) {
+          context.report({
+            node,
+            messageId: 'untranslatedJsxText'
+          });
+        }
+      },
+
+      // String literal inside JSX expression: <span>{'raw string'}</span>
+      JSXExpressionContainer(node) {
+        if (node.expression.type === 'JSXEmptyExpression') {
+          return;
+        }
+        if (isRawStringNode(node.expression)) {
+          context.report({
+            node: node.expression,
+            messageId: 'untranslatedJsxText'
           });
         }
       }
