@@ -9,9 +9,42 @@ import { TSESTree } from '@typescript-eslint/types';
 const TRANS_METHOD = '__';
 
 /**
+ * Returns the first `+` BinaryExpression found anywhere in the subtree,
+ * or null if none exists.
+ */
+function findConcatenation(
+  node: TSESTree.Node
+): TSESTree.BinaryExpression | null {
+  if (node.type === 'BinaryExpression' && node.operator === '+') {
+    return node;
+  }
+  const record = node as unknown as Record<string, unknown>;
+  for (const key of Object.keys(record)) {
+    if (key === 'type' || key === 'loc' || key === 'range' || key === 'parent') {
+      continue;
+    }
+    const child = record[key];
+    if (child && typeof child === 'object') {
+      if (Array.isArray(child)) {
+        for (const item of child) {
+          if (item && typeof (item as TSESTree.Node).type === 'string') {
+            const found = findConcatenation(item as TSESTree.Node);
+            if (found) return found;
+          }
+        }
+      } else if (typeof (child as TSESTree.Node).type === 'string') {
+        const found = findConcatenation(child as TSESTree.Node);
+        if (found) return found;
+      }
+    }
+  }
+  return null;
+}
+
+/**
  * Returns true if the node is a recognized JupyterLab translation bundle:
  * trans | this.trans | this._trans | props.trans | this.props.trans
- * Refer jupyterlab.readthedocs.io/en/stable/extension/internationalization.html#rules
+ * See jupyterlab.readthedocs.io/en/stable/extension/internationalization.html#rules
  */
 function isTransBundle(node: TSESTree.Node): boolean {
   if (node.type === 'Identifier') {
@@ -88,10 +121,13 @@ const noTranslationConcatenation = createRule({
           return;
         }
 
-        for (const arg of node.arguments) {
-          if (arg.type === 'BinaryExpression' && arg.operator === '+') {
-            context.report({ node: arg, messageId: 'noConcatenation' });
-          }
+        const message = node.arguments[0];
+        if (!message) {
+          return;
+        }
+        const concat = findConcatenation(message);
+        if (concat) {
+          context.report({ node: concat, messageId: 'noConcatenation' });
         }
       }
     };

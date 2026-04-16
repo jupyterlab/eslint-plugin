@@ -23,6 +23,7 @@ ruleTester.run('no-translation-concatenation', noTranslationConcatenation, {
     { code: `this._trans.__("Hello %1", x)` },
     { code: `this.props.trans.__("Hello")` },
     { code: `props.trans.__("Hello %1", x)` },
+    { code: `trans.__('Total %1', a + b)` },
   ],
 
   invalid: [
@@ -44,6 +45,10 @@ ruleTester.run('no-translation-concatenation', noTranslationConcatenation, {
     },
     {
       code: `props.trans.__("a" + "b")`,
+      errors: [{ messageId: 'noConcatenation' }]
+    },
+    {
+      code: `trans.__(("Delete " + fileName).trim())`,
       errors: [{ messageId: 'noConcatenation' }]
     }
   ]
