@@ -4,8 +4,8 @@ Forbid string concatenation inside JupyterLab translation wrapper calls.
 
 ## Why
 
-Translation extractors only pick up static string literals in calls like `trans.__("...")`. If you use concatenation (e.g., `"Hello " + name`), the full message becomes dynamic and cannot be extracted, so it never gets translated.
-See [Rules](https://jupyterlab.readthedocs.io/en/stable/extension/internationalization.html#rules)
+Translation extractors only pick up static string content in calls like `trans.__("...")`. Pure string-literal concatenation (for example, `"a" + "b"`) is still static and allowed, but concatenation with a variable (for example, `"Hello " + name`) is dynamic and cannot be extracted, so it never gets translated.
+See [Rules](https://jupyterlab.readthedocs.io/en/stable/extension/internationalization.html#rules).
 
 ## Rule details
 
