@@ -31,7 +31,7 @@ export default [
       'jupyter/no-untranslated-string': 'error',
       'jupyter/plugin-activation-args': 'error',
       'jupyter/plugin-description': 'error',
-      'jupyter/no-translation-concatenation': 'error'
+      'jupyter/no-translation-concatenation': 'error',
       'jupyter/token-format': 'error'
     },
     languageOptions: {
@@ -60,6 +60,7 @@ export default [
       'jupyter/no-untranslated-string': 'error',
       'jupyter/plugin-activation-args': 'error',
       'jupyter/plugin-description': 'error',
+      'jupyter/no-translation-concatenation': 'error',
       'jupyter/token-format': 'error'
     },
     languageOptions: {
@@ -85,8 +86,11 @@ export default [
     },
     rules: {
       'jupyter/command-described-by': 'error',
+      'jupyter/no-untranslated-string': 'error',
       'jupyter/plugin-activation-args': 'error',
-      'jupyter/plugin-description': 'error'
+      'jupyter/plugin-description': 'error',
+      'jupyter/no-translation-concatenation': 'error',
+      'jupyter/token-format': 'error'
     },
     languageOptions: {
       parser: resolvedParser,
