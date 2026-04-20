@@ -251,6 +251,8 @@ jsxRuleTester.run('no-untranslated-string (JSX)', noUntranslatedString, {
     { code: `<div className={'normal-class-string'} />` },
     { code: `<div id={'my-id'} />` },
     { code: `<span aria-label={trans.__('Close')} />` },
+    // Variables aren't flagged
+    { code: `<span>{myVar}</span>` },
     // Punctuation-only JSX text should not be flagged
     { code: `<span>{','}</span>` },
     { code: `<span>{' + '}</span>` }
@@ -278,11 +280,6 @@ jsxRuleTester.run('no-untranslated-string (JSX)', noUntranslatedString, {
     },
     {
       code: `<span aria-description={'Describes something'} />`,
-      errors: [{ messageId: 'untranslatedJsxText' }]
-    },
-    // --- JSX identifier in text content must be translated ---
-    {
-      code: `<span>{myVar}</span>`,
       errors: [{ messageId: 'untranslatedJsxText' }]
     }
   ]

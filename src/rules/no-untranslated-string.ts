@@ -91,10 +91,11 @@ function isDialogButtonCall(node: TSESTree.CallExpression): boolean {
 }
 
 const MONITORED_COMMAND_PROPS = ['label', 'caption', 'usage'];
-const MONITORED_SET_ATTRIBUTE_ATTRS = ['aria-label', 'aria-description', 'title'];
+const MONITORED_A11Y_ATTRS = ['aria-label', 'aria-description', 'title'];
+const MONITORED_SET_ATTRIBUTE_ATTRS = MONITORED_A11Y_ATTRS;
 const MONITORED_ASSIGNMENT_PROPS = ['title', 'ariaLabel'];
 const MONITORED_DIALOG_PROPS = ['title', 'body'];
-const MONITORED_JSX_ATTRS = ['aria-label', 'aria-description', 'title'];
+const MONITORED_JSX_ATTRS = MONITORED_A11Y_ATTRS;
 
 const noUntranslatedString = createRule({
   name: 'no-untranslated-string',
@@ -316,13 +317,6 @@ const noUntranslatedString = createRule({
               messageId: 'untranslatedJsxText'
             });
           }
-          return;
-        }
-        if (node.expression.type === 'Identifier') {
-          context.report({
-            node: node.expression,
-            messageId: 'untranslatedJsxText'
-          });
           return;
         }
         if (isRawStringNode(node.expression)) {
