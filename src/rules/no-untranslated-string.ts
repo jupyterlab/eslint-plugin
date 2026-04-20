@@ -8,10 +8,6 @@ import { isAddCommandCall } from '../utils/commands';
 import { getObjectProperties } from '../utils/plugin-utils';
 import { createRule } from '../utils/create-rule';
 
-/**
- * Returns true if the node is a non-empty raw string literal that should be
- * wrapped in a translation call.
- */
 function hasLetters(str: string): boolean {
   return /\p{L}/u.test(str);
 }
@@ -32,6 +28,13 @@ function getRawStringValue(node: TSESTree.Node): string | null {
   return null;
 }
 
+/**
+ * Returns true if the node is a non-empty raw string literal that should be
+ * wrapped in a translation call. Handles:
+ *   - String Literal: 'string' or "string"
+ *   - TemplateLiteral with no expressions: `string`
+ *   - Concise ArrowFunctionExpression whose body is one of the above
+ */
 function isRawStringNode(node: TSESTree.Node): boolean {
   if (node.type === 'Literal') {
     return typeof node.value === 'string' && node.value.length > 0;
