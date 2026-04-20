@@ -10,11 +10,28 @@ import { createRule } from '../utils/create-rule';
 
 /**
  * Returns true if the node is a non-empty raw string literal that should be
- * wrapped in a translation call. Handles:
- *   - String Literal: 'string' or "string"
- *   - TemplateLiteral with no expressions: `string`
- *   - Concise ArrowFunctionExpression whose body is one of the above
+ * wrapped in a translation call.
  */
+function hasLetters(str: string): boolean {
+  return /\p{L}/u.test(str);
+}
+
+function getRawStringValue(node: TSESTree.Node): string | null {
+  if (node.type === 'Literal' && typeof node.value === 'string') {
+    return node.value;
+  }
+  if (node.type === 'TemplateLiteral' && node.expressions.length === 0) {
+    return node.quasis.map(q => q.value.cooked ?? '').join('');
+  }
+  if (
+    node.type === 'ArrowFunctionExpression' &&
+    node.body.type !== 'BlockStatement'
+  ) {
+    return getRawStringValue(node.body);
+  }
+  return null;
+}
+
 function isRawStringNode(node: TSESTree.Node): boolean {
   if (node.type === 'Literal') {
     return typeof node.value === 'string' && node.value.length > 0;
@@ -74,6 +91,7 @@ const MONITORED_COMMAND_PROPS = ['label', 'caption', 'usage'];
 const MONITORED_SET_ATTRIBUTE_ATTRS = ['aria-label', 'aria-description', 'title'];
 const MONITORED_ASSIGNMENT_PROPS = ['title', 'ariaLabel'];
 const MONITORED_DIALOG_PROPS = ['title', 'body'];
+const MONITORED_JSX_ATTRS = ['aria-label', 'aria-description', 'title'];
 
 const noUntranslatedString = createRule({
   name: 'no-untranslated-string',
@@ -267,7 +285,7 @@ const noUntranslatedString = createRule({
 
       // Raw text between JSX tags: <span>Untranslated text</span>
       JSXText(node) {
-        if (node.value.trim().length > 0) {
+        if (node.value.trim().length > 0 && hasLetters(node.value)) {
           context.report({
             node,
             messageId: 'untranslatedJsxText'
@@ -280,11 +298,38 @@ const noUntranslatedString = createRule({
         if (node.expression.type === 'JSXEmptyExpression') {
           return;
         }
-        if (isRawStringNode(node.expression)) {
+        if (node.parent.type === 'JSXAttribute') {
+          const attrName =
+            node.parent.name.type === 'JSXIdentifier'
+              ? node.parent.name.name
+              : null;
+          if (!attrName || !MONITORED_JSX_ATTRS.includes(attrName)) {
+            return;
+          }
+          // Accessibility attributes: flag any raw string regardless of content
+          if (isRawStringNode(node.expression)) {
+            context.report({
+              node: node.expression,
+              messageId: 'untranslatedJsxText'
+            });
+          }
+          return;
+        }
+        if (node.expression.type === 'Identifier') {
           context.report({
             node: node.expression,
             messageId: 'untranslatedJsxText'
           });
+          return;
+        }
+        if (isRawStringNode(node.expression)) {
+          const value = getRawStringValue(node.expression);
+          if (value !== null && hasLetters(value)) {
+            context.report({
+              node: node.expression,
+              messageId: 'untranslatedJsxText'
+            });
+          }
         }
       }
     };

@@ -247,7 +247,13 @@ jsxRuleTester.run('no-untranslated-string (JSX)', noUntranslatedString, {
   valid: [
     // --- JSX: translated expression ---
     { code: `const el = <span>{trans.__('Error message:')}</span>;` },
-    { code: `const el = (\n  <div>\n    <span>{trans.__('Label')}</span>\n  </div>\n);` }
+    { code: `const el = (\n  <div>\n    <span>{trans.__('Label')}</span>\n  </div>\n);` },
+    { code: `<div className={'normal-class-string'} />` },
+    { code: `<div id={'my-id'} />` },
+    { code: `<span aria-label={trans.__('Close')} />` },
+    // Punctuation-only JSX text should not be flagged
+    { code: `<span>{','}</span>` },
+    { code: `<span>{' + '}</span>` }
   ],
 
   invalid: [
@@ -259,6 +265,24 @@ jsxRuleTester.run('no-untranslated-string (JSX)', noUntranslatedString, {
     // --- JSXExpressionContainer: raw string literal ---
     {
       code: `const el = <span>{'raw string'}</span>;`,
+      errors: [{ messageId: 'untranslatedJsxText' }]
+    },
+    // --- JSX accessibility attributes must be translated ---
+    {
+      code: `<button aria-label={'Close dialog'} />`,
+      errors: [{ messageId: 'untranslatedJsxText' }]
+    },
+    {
+      code: `<div title={'My tooltip'} />`,
+      errors: [{ messageId: 'untranslatedJsxText' }]
+    },
+    {
+      code: `<span aria-description={'Describes something'} />`,
+      errors: [{ messageId: 'untranslatedJsxText' }]
+    },
+    // --- JSX identifier in text content must be translated ---
+    {
+      code: `<span>{myVar}</span>`,
       errors: [{ messageId: 'untranslatedJsxText' }]
     }
   ]
