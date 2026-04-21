@@ -30,29 +30,11 @@ function getRawStringValue(node: TSESTree.Node): string | null {
 
 /**
  * Returns true if the node is a non-empty raw string literal that should be
- * wrapped in a translation call. Handles:
- *   - String Literal: 'string' or "string"
- *   - TemplateLiteral with no expressions: `string`
- *   - Concise ArrowFunctionExpression whose body is one of the above
+ * wrapped in a translation call.
  */
 function isRawStringNode(node: TSESTree.Node): boolean {
-  if (node.type === 'Literal') {
-    return typeof node.value === 'string' && node.value.length > 0;
-  }
-  if (node.type === 'TemplateLiteral') {
-    if (node.expressions.length > 0) {
-      return false;
-    }
-    const cooked = node.quasis.map(q => q.value.cooked ?? '').join('');
-    return cooked.length > 0;
-  }
-  if (
-    node.type === 'ArrowFunctionExpression' &&
-    node.body.type !== 'BlockStatement'
-  ) {
-    return isRawStringNode(node.body);
-  }
-  return false;
+  const rawValue = getRawStringValue(node);
+  return rawValue !== null && rawValue.trim().length > 0;
 }
 
 function isSetAttributeCall(node: TSESTree.CallExpression): boolean {

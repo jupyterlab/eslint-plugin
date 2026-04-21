@@ -252,7 +252,7 @@ jsxRuleTester.run('no-untranslated-string (JSX)', noUntranslatedString, {
     { code: `<div id={'my-id'} />` },
     { code: `<span aria-label={trans.__('Close')} />` },
     // Punctuation-only JSX text should not be flagged
-    { code: `<span>{','}</span>` },
+    { code: `<span>,</span>` },
     { code: `<span>{' + '}</span>` }
   ],
 
