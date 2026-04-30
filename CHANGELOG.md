@@ -2,6 +2,57 @@
 
 <!-- <START NEW CHANGELOG ENTRY> -->
 
+## 0.0.5
+
+([Full Changelog](https://github.com/jupyterlab/eslint-plugin/compare/v0.0.4...dedcfee6479efba4cdcab5fe873a81c9d9bd1c89))
+
+### Enhancements made
+
+- Improve `@jupyter/no-untranslated-string` for `JSX` [#49](https://github.com/jupyterlab/eslint-plugin/pull/49) ([@Darshan808](https://github.com/Darshan808), [@krassowski](https://github.com/krassowski))
+
+### Contributors to this release
+
+The following people contributed discussions, new ideas, code and documentation contributions, and review.
+See [our definition of contributors](https://github-activity.readthedocs.io/en/latest/use/#how-does-this-tool-define-contributions-in-the-reports).
+
+([GitHub contributors page for this release](https://github.com/jupyterlab/eslint-plugin/graphs/contributors?from=2026-04-18&to=2026-04-21&type=c))
+
+@Darshan808 ([activity](https://github.com/search?q=repo%3Ajupyterlab%2Feslint-plugin+involves%3ADarshan808+updated%3A2026-04-18..2026-04-21&type=Issues)) | @krassowski ([activity](https://github.com/search?q=repo%3Ajupyterlab%2Feslint-plugin+involves%3Akrassowski+updated%3A2026-04-18..2026-04-21&type=Issues))
+
+<!-- <END NEW CHANGELOG ENTRY> -->
+
+## 0.0.4
+
+([Full Changelog](https://github.com/jupyterlab/eslint-plugin/compare/v0.0.3...ba6ec78cf61838065b13d31ed24b382b5007258a))
+
+### Enhancements made
+
+- Add `jupyter/no-translation-concatenation` [#44](https://github.com/jupyterlab/eslint-plugin/pull/44) ([@Darshan808](https://github.com/Darshan808), [@krassowski](https://github.com/krassowski))
+- Add a new rule `jupyter/no-untranslated-string` [#41](https://github.com/jupyterlab/eslint-plugin/pull/41) ([@Darshan808](https://github.com/Darshan808), [@krassowski](https://github.com/krassowski))
+- Add `jupyter/token-format` to enforce plugin token naming convention [#40](https://github.com/jupyterlab/eslint-plugin/pull/40) ([@Darshan808](https://github.com/Darshan808), [@krassowski](https://github.com/krassowski))
+- Report empty descriptions [#37](https://github.com/jupyterlab/eslint-plugin/pull/37) ([@Darshan808](https://github.com/Darshan808), [@krassowski](https://github.com/krassowski))
+- Improve error message when argument order matches but type annotation is incorrect [#36](https://github.com/jupyterlab/eslint-plugin/pull/36) ([@Darshan808](https://github.com/Darshan808), [@krassowski](https://github.com/krassowski))
+
+### Maintenance and upkeep improvements
+
+- Fix `prep-release` workflow [#48](https://github.com/jupyterlab/eslint-plugin/pull/48) ([@Darshan808](https://github.com/Darshan808))
+- Add jupyterlite to downstream tests. [#45](https://github.com/jupyterlab/eslint-plugin/pull/45) ([@Darshan808](https://github.com/Darshan808), [@krassowski](https://github.com/krassowski))
+- Fix downstream lint config [#38](https://github.com/jupyterlab/eslint-plugin/pull/38) ([@Darshan808](https://github.com/Darshan808), [@krassowski](https://github.com/krassowski))
+
+### Other merged PRs
+
+- Bump the npm_and_yarn group across 1 directory with 2 updates [#32](https://github.com/jupyterlab/eslint-plugin/pull/32) ([@Darshan808](https://github.com/Darshan808))
+- Bump the npm_and_yarn group across 2 directories with 5 updates [#30](https://github.com/jupyterlab/eslint-plugin/pull/30) ([@Darshan808](https://github.com/Darshan808))
+
+### Contributors to this release
+
+The following people contributed discussions, new ideas, code and documentation contributions, and review.
+See [our definition of contributors](https://github-activity.readthedocs.io/en/latest/use/#how-does-this-tool-define-contributions-in-the-reports).
+
+([GitHub contributors page for this release](https://github.com/jupyterlab/eslint-plugin/graphs/contributors?from=2026-03-30&to=2026-04-18&type=c))
+
+@Darshan808 ([activity](https://github.com/search?q=repo%3Ajupyterlab%2Feslint-plugin+involves%3ADarshan808+updated%3A2026-03-30..2026-04-18&type=Issues)) | @krassowski ([activity](https://github.com/search?q=repo%3Ajupyterlab%2Feslint-plugin+involves%3Akrassowski+updated%3A2026-03-30..2026-04-18&type=Issues))
+
 ## 0.0.3
 
 ([Full Changelog](https://github.com/jupyterlab/eslint-plugin/compare/v0.0.2...5f281b51004d8f7aabc8462d00bd252d4166391e))
@@ -27,8 +78,6 @@ See [our definition of contributors](https://github-activity.readthedocs.io/en/l
 ([GitHub contributors page for this release](https://github.com/jupyterlab/eslint-plugin/graphs/contributors?from=2026-03-09&to=2026-03-30&type=c))
 
 @Darshan808 ([activity](https://github.com/search?q=repo%3Ajupyterlab%2Feslint-plugin+involves%3ADarshan808+updated%3A2026-03-09..2026-03-30&type=Issues)) | @krassowski ([activity](https://github.com/search?q=repo%3Ajupyterlab%2Feslint-plugin+involves%3Akrassowski+updated%3A2026-03-09..2026-03-30&type=Issues))
-
-<!-- <END NEW CHANGELOG ENTRY> -->
 
 ## 0.0.2
 
