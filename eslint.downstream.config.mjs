@@ -51,8 +51,35 @@ function makeProjectConfig(projectName) {
   };
 }
 
+function makeTestConfig(projectName) {
+  return {
+    basePath: __dirname,
+    files: [
+      `${projectName}/**/*.spec.ts`,
+      `${projectName}/**/*.test.ts`
+    ],
+    plugins: {
+      'jupyter': resolvedPlugin
+    },
+    rules: {
+      'jupyter/require-soft-assertions-before-snapshots': 'error'
+    },
+    languageOptions: {
+      parser: resolvedParser,
+      parserOptions: {
+        ecmaVersion: 'latest',
+        sourceType: 'module'
+      }
+    },
+    linterOptions: {
+      reportUnusedDisableDirectives: 'off'
+    }
+  };
+}
+
+const projects = ['jupyterlab', 'notebook', 'jupyterlite'];
+
 export default [
-  makeProjectConfig('jupyterlab'),
-  makeProjectConfig('notebook'),
-  makeProjectConfig('jupyterlite')
+  ...projects.map(makeProjectConfig),
+  ...projects.map(makeTestConfig)
 ];
