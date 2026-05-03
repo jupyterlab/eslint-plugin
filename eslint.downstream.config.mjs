@@ -13,9 +13,11 @@ const resolvedPlugin = pluginModule.default?.rules ? pluginModule.default : plug
 const parserModule = await import('@typescript-eslint/parser');
 const resolvedParser = parserModule.default ?? parserModule;
 
-// This prevents "Definition for rule not found" errors from eslint-disable comments
+// These prevent "Definition for rule not found" errors from eslint-disable comments
 const tsPlugin = await import('@typescript-eslint/eslint-plugin');
 const resolvedTsPlugin = tsPlugin.default ?? tsPlugin;
+const jestPlugin = await import('eslint-plugin-jest');
+const resolvedJestPlugin = jestPlugin.default ?? jestPlugin;
 
 function makeProjectConfig(projectName) {
   return {
@@ -26,7 +28,8 @@ function makeProjectConfig(projectName) {
     ],
     plugins: {
       'jupyter': resolvedPlugin,
-      '@typescript-eslint': resolvedTsPlugin
+      '@typescript-eslint': resolvedTsPlugin,
+      'jest': resolvedJestPlugin
     },
     rules: {
       'jupyter/command-described-by': 'error',
@@ -59,7 +62,8 @@ function makeTestConfig(projectName) {
       `${projectName}/**/*.test.ts`
     ],
     plugins: {
-      'jupyter': resolvedPlugin
+      'jupyter': resolvedPlugin,
+      'jest': resolvedJestPlugin
     },
     rules: {
       'jupyter/require-soft-assertions-before-snapshots': 'error'

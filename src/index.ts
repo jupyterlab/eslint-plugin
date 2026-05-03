@@ -31,7 +31,8 @@ const plugin = {
         'jupyter/plugin-description': 'warn',
         'jupyter/no-translation-concatenation': 'error',
         'jupyter/token-format': 'error',
-        'jupyter/no-untranslated-string': 'warn'
+        'jupyter/no-untranslated-string': 'warn',
+        'jupyter/require-soft-assertions-before-snapshots': 'warn'
       }
     },
     'recommended-legacy': {
@@ -41,7 +42,8 @@ const plugin = {
         'jupyter/plugin-description': 'warn',
         'jupyter/no-translation-concatenation': 'error',
         'jupyter/token-format': 'error',
-        'jupyter/no-untranslated-string': 'warn'
+        'jupyter/no-untranslated-string': 'warn',
+        'jupyter/require-soft-assertions-before-snapshots': 'warn'
       }
     }
   }
