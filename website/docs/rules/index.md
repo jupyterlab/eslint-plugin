@@ -9,6 +9,7 @@ This section documents all rules currently provided by `eslint-plugin-jupyter`.
 - [no-untranslated-string](./no-untranslated-string)
 - [plugin-activation-args](./plugin-activation-args)
 - [plugin-description](./plugin-description)
+- [require-soft-assertions-before-snapshots](./require-soft-assertions-before-snapshots)
 - [token-format](./token-format)
 
 Each page includes intent, examples, configuration, and when to apply the rule.
