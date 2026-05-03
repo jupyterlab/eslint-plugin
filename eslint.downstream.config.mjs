@@ -122,7 +122,7 @@ export default [
     basePath: __dirname,
     files: ['jupyterlab/packages/*/schema/*.json'],
     plugins: { 'jupyter': resolvedPlugin },
-    rules: { 'jupyter/no-schema-enum': 'warn' },
+    rules: { 'jupyter/no-schema-enum': 'error' },
     languageOptions: { parser: resolvedJsoncParser }
   },
 
@@ -131,7 +131,7 @@ export default [
     basePath: __dirname,
     files: ['notebook/packages/*/schema/*.json'],
     plugins: { 'jupyter': resolvedPlugin },
-    rules: { 'jupyter/no-schema-enum': 'warn' },
+    rules: { 'jupyter/no-schema-enum': 'error' },
     languageOptions: { parser: resolvedJsoncParser }
   },
 
@@ -140,7 +140,7 @@ export default [
     basePath: __dirname,
     files: ['jupyterlite/packages/*/schema/*.json'],
     plugins: { 'jupyter': resolvedPlugin },
-    rules: { 'jupyter/no-schema-enum': 'warn' },
+    rules: { 'jupyter/no-schema-enum': 'error' },
     languageOptions: { parser: resolvedJsoncParser }
   }
 ];
