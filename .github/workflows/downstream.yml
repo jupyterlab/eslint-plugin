@@ -52,6 +52,12 @@ jobs:
         env:
           NODE_PATH: ./jupyterlab/node_modules
 
+      - name: Run schema JSON lint check
+        run: |
+          npx eslint --config eslint.downstream.config.mjs \
+            'jupyterlab/packages/*/schema/*.json' \
+            --max-warnings=9999
+
   notebook:
     runs-on: ubuntu-latest
     steps:
@@ -96,6 +102,12 @@ jobs:
         env:
           NODE_PATH: ./notebook/node_modules
 
+      - name: Run schema JSON lint check
+        run: |
+          npx eslint --config eslint.downstream.config.mjs \
+            'notebook/packages/*/schema/*.json' \
+            --max-warnings=9999
+
   jupyterlite:
     runs-on: ubuntu-latest
     steps:
@@ -139,3 +151,9 @@ jobs:
             --max-warnings=9999
         env:
           NODE_PATH: ./jupyterlite/node_modules
+
+      - name: Run schema JSON lint check
+        run: |
+          npx eslint --config eslint.downstream.config.mjs \
+            'jupyterlite/packages/*/schema/*.json' \
+            --max-warnings=9999

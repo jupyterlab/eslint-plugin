@@ -5,6 +5,7 @@ This section documents all rules currently provided by `eslint-plugin-jupyter`.
 ## Available rules
 
 - [command-described-by](./command-described-by)
+- [no-schema-enum](./no-schema-enum)
 - [no-translation-concatenation](./no-translation-concatenation)
 - [no-untranslated-string](./no-untranslated-string)
 - [plugin-activation-args](./plugin-activation-args)

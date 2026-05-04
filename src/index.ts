@@ -3,12 +3,14 @@
  * Distributed under the terms of the Modified BSD License.
  */
 
+import * as jsoncParser from 'jsonc-eslint-parser';
 import pluginActivationArgs from './rules/plugin-activation-args';
 import commandDescribedBy from './rules/command-described-by';
 import pluginDescription from './rules/plugin-description';
 import noTranslationConcatenation from './rules/no-translation-concatenation';
 import tokenFormat from './rules/token-format';
 import noUntranslatedString from './rules/no-untranslated-string';
+import noSchemaEnum from './rules/no-schema-enum';
 import requireSoftAssertionsBeforeSnapshots from './rules/require-soft-assertions-before-snapshots';
 
 const plugin = {
@@ -19,6 +21,7 @@ const plugin = {
     'no-translation-concatenation': noTranslationConcatenation,
     'token-format': tokenFormat,
     'no-untranslated-string': noUntranslatedString,
+    'no-schema-enum': noSchemaEnum,
     'require-soft-assertions-before-snapshots':
       requireSoftAssertionsBeforeSnapshots
   },
@@ -33,6 +36,13 @@ const plugin = {
           'jupyter/no-translation-concatenation': 'error',
           'jupyter/token-format': 'error',
           'jupyter/no-untranslated-string': 'warn'
+        }
+      },
+      {
+        files: ['**/schema/*.json'],
+        languageOptions: { parser: jsoncParser },
+        rules: {
+          'jupyter/no-schema-enum': 'warn'
         }
       },
       {
@@ -54,7 +64,8 @@ const plugin = {
         'jupyter/plugin-description': 'warn',
         'jupyter/no-translation-concatenation': 'error',
         'jupyter/token-format': 'error',
-        'jupyter/no-untranslated-string': 'warn'
+        'jupyter/no-untranslated-string': 'warn',
+        'jupyter/no-schema-enum': 'warn'
       },
       overrides: [
         {
