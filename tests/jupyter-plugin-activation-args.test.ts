@@ -320,6 +320,34 @@ ruleTester.run('plugin-activation-args', pluginActivationArgs, {
         }
       };
     `
+    },
+    {
+      // Aliased import: JupyterFrontEndPlugin imported under a different name
+      filename: 'tests/type-aware-fixture.ts',
+      code: `
+        import { JupyterFrontEndPlugin as JFEP, INotebookTracker } from './fixtures/debugger-types';
+        const plugin: JFEP<void> = {
+          id: 'test-plugin',
+          requires: [INotebookTracker],
+          activate: (app: JupyterFrontEnd, tracker: INotebookTracker) => {
+            console.log('Activated');
+          }
+        };
+      `
+    },
+    {
+      // Aliased import: Tokens under a different name
+      filename: 'tests/type-aware-fixture.ts',
+      code: `
+        import { JupyterFrontEndPlugin as JFEP, INotebookTracker as INT } from './fixtures/debugger-types';
+        const plugin: JFEP<void> = {
+          id: 'test-plugin',
+          requires: [INT],
+          activate: (app: JupyterFrontEnd, tracker: INT) => {
+            console.log('Activated');
+          }
+        };
+      `
     }
   ],
 
@@ -645,6 +673,23 @@ ruleTester.run('plugin-activation-args', pluginActivationArgs, {
       errors: [
         { messageId: 'mismatchedOrder', data: { arg: 'debuggerSidebar' } },
         { messageId: 'mismatchedOrder', data: { arg: 'tracker' } }
+      ]
+    },
+    {
+      // Aliased import: rule still applies and detects violations
+      filename: 'tests/type-aware-fixture.ts',
+      code: `
+        import { JupyterFrontEndPlugin as JFEP, INotebookTracker } from './fixtures/debugger-types';
+        const plugin: JFEP<void> = {
+          id: 'test-plugin',
+          requires: [INotebookTracker],
+          activate: (tracker: INotebookTracker, app: JupyterFrontEnd) => {
+            console.log('Activated');
+          }
+        };
+      `,
+      errors: [
+        { messageId: 'appNotFirst', data: { arg: 'tracker', allowedNames: '"app", "_app", "_"' } }
       ]
     }
   ]
