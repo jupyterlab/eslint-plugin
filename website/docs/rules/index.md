@@ -28,8 +28,10 @@ The plugin ships with a recommended configuration that enables all current rules
 | [jupyter/no-translation-concatenation](./no-translation-concatenation) | `error` |
 | [jupyter/token-format](./token-format) | `error` |
 | [jupyter/require-soft-assertions-before-snapshots](./require-soft-assertions-before-snapshots) | `warn` ¹ |
+| [jupyter/no-schema-enum](./no-schema-enum) | `warn` ² |
 
-¹ Applied only to `**/*.spec.{ts,js}` and `**/*.test.{ts,js}` files.
+¹ Applied only to `**/*.spec.{ts,js}` and `**/*.test.{ts,js}` files.  
+² Applied only to `**/schema/*.json` files
 
 These defaults are the same in both `jupyterPlugin.configs.recommended` (flat config) and `plugin:@jupyter/eslint-plugin/recommended-legacy`.
 
