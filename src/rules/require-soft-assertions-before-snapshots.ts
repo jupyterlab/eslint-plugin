@@ -26,7 +26,7 @@ function isTestBlock(node: TSESTree.CallExpression): boolean {
     (callee.object.name === 'test' || callee.object.name === 'it') &&
     callee.property.type === 'Identifier'
   ) {
-    return true;
+    return callee.property.name !== 'step';
   }
   return false;
 }

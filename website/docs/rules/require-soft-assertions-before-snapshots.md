@@ -8,7 +8,7 @@ Playwright's `toMatchSnapshot()` paired with a hard `expect()` call short-circui
 
 ## Rule details
 
-The rule inspects `test(...)` and `it(...)` blocks and collects every `expect(...).toMatchSnapshot(...)` call found within them. When a block contains more than one snapshot assertion:
+The rule inspects any callback passed to `test(...)`, `it(...)`, or their dot-property variants — including modifiers (`test.only`, `test.skip`, `test.fixme`, `test.fail`) and hooks (`test.beforeAll`, `test.beforeEach`, `test.afterAll`, `test.afterEach`) — and collects every `expect(...).toMatchSnapshot(...)` call found within that callback. When a block contains more than one snapshot assertion:
 
 - All assertions **except the last** must use `expect.soft(...)`.
 - The last assertion may use either `expect(...)` or `expect.soft(...)`.
