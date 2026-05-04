@@ -263,6 +263,7 @@ const jupyterPluginActivationArgs = createRule({
      * unavailable.
      */
     function isParamNullable(paramNode: TSESTree.Identifier): boolean {
+      if (paramNode.optional) return true; // param?: T always implies | undefined
       if (checker) {
         try {
           const tsNode = services?.esTreeNodeToTSNodeMap.get(paramNode);
