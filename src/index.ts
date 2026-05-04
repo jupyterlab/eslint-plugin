@@ -22,17 +22,27 @@ const plugin = {
     'no-schema-enum': noSchemaEnum
   },
   configs: {
-    recommended: {
-      files: ['**/*.js', '**/*.ts', '**/*.jsx', '**/*.tsx'],
-      rules: {
-        'jupyter/plugin-activation-args': 'error',
-        'jupyter/command-described-by': 'warn',
-        'jupyter/plugin-description': 'warn',
-        'jupyter/no-translation-concatenation': 'error',
-        'jupyter/token-format': 'error',
-        'jupyter/no-untranslated-string': 'warn'
+    recommended: [
+      {
+        files: ['**/*.js', '**/*.ts', '**/*.jsx', '**/*.tsx'],
+        rules: {
+          'jupyter/plugin-activation-args': 'error',
+          'jupyter/command-described-by': 'warn',
+          'jupyter/plugin-description': 'warn',
+          'jupyter/no-translation-concatenation': 'error',
+          'jupyter/token-format': 'error',
+          'jupyter/no-untranslated-string': 'warn'
+        }
+      },
+      {
+        // Requires jsonc-eslint-parser configured for JSON files in the
+        // consumer's ESLint config.
+        files: ['**/schema/*.json'],
+        rules: {
+          'jupyter/no-schema-enum': 'warn'
+        }
       }
-    },
+    ],
     'recommended-legacy': {
       rules: {
         'jupyter/plugin-activation-args': 'error',
@@ -40,7 +50,8 @@ const plugin = {
         'jupyter/plugin-description': 'warn',
         'jupyter/no-translation-concatenation': 'error',
         'jupyter/token-format': 'error',
-        'jupyter/no-untranslated-string': 'warn'
+        'jupyter/no-untranslated-string': 'warn',
+        'jupyter/no-schema-enum': 'warn'
       }
     }
   }
