@@ -4,14 +4,19 @@
  */
 
 import { TSESTree } from '@typescript-eslint/types';
+import * as ts from 'typescript';
 
 export type JupyterPluginKind = 'frontend' | 'service-manager';
 
 /**
  * Gets plugin kind from a variable declaration type annotation.
+ * Accepts an optional TS checker and node mapper to resolve import aliases
+ * (e.g. `import { JupyterFrontEndPlugin as JFEP } from '@jupyterlab/application'`).
  */
 export function getJupyterPluginKind(
-  node: TSESTree.VariableDeclarator
+  node: TSESTree.VariableDeclarator,
+  checker?: ts.TypeChecker | null,
+  getTSNode?: ((n: TSESTree.Node) => ts.Node | undefined) | null
 ): JupyterPluginKind | null {
   const id = node.id;
   if (id.type !== 'Identifier' || !id.typeAnnotation) {
@@ -23,12 +28,38 @@ export function getJupyterPluginKind(
     return null;
   }
 
+  // Fast path: direct string match (no alias).
   const pluginTypeName = extractTypeName(typeNode.typeName);
   if (pluginTypeName === 'JupyterFrontEndPlugin') {
     return 'frontend';
   }
   if (pluginTypeName === 'ServiceManagerPlugin') {
     return 'service-manager';
+  }
+
+  // Slow path: resolve import aliases via the TS checker.
+  if (checker && getTSNode && typeNode.typeName.type === 'Identifier') {
+    try {
+      const tsNameNode = getTSNode(typeNode.typeName);
+      if (tsNameNode) {
+        const symbol = checker.getSymbolAtLocation(tsNameNode);
+        if (symbol) {
+          const resolved =
+            symbol.flags & ts.SymbolFlags.Alias
+              ? checker.getAliasedSymbol(symbol)
+              : symbol;
+          const resolvedName = resolved.getName();
+          if (resolvedName === 'JupyterFrontEndPlugin') {
+            return 'frontend';
+          }
+          if (resolvedName === 'ServiceManagerPlugin') {
+            return 'service-manager';
+          }
+        }
+      }
+    } catch {
+      // Fall through if checker/mapper unavailable
+    }
   }
 
   return null;

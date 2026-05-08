@@ -332,7 +332,11 @@ const jupyterPluginActivationArgs = createRule({
 
     return {
       VariableDeclarator(node) {
-        const pluginKind = getJupyterPluginKind(node);
+        const pluginKind = getJupyterPluginKind(
+          node,
+          checker,
+          n => services?.esTreeNodeToTSNodeMap.get(n)
+        );
         if (!pluginKind) {
           return;
         }
