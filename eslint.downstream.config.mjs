@@ -13,104 +13,110 @@ const resolvedPlugin = pluginModule.default?.rules ? pluginModule.default : plug
 const parserModule = await import('@typescript-eslint/parser');
 const resolvedParser = parserModule.default ?? parserModule;
 
-// This prevents "Definition for rule not found" errors from eslint-disable comments
+// Prevents "Definition for rule not found" errors
 const tsPlugin = await import('@typescript-eslint/eslint-plugin');
 const resolvedTsPlugin = tsPlugin.default ?? tsPlugin;
+const noopRule = { create: () => ({}) };
+const jestStub = { rules: new Proxy({}, { get: () => noopRule }) };
+
+const jsoncParserModule = await import('jsonc-eslint-parser');
+const resolvedJsoncParser = jsoncParserModule.default ?? jsoncParserModule;
+
+function makeProjectConfig(projectName) {
+  return {
+    basePath: __dirname,
+    files: [
+      `${projectName}/packages/*/src/**/*.ts`,
+      `${projectName}/packages/*/src/**/*.tsx`
+    ],
+    plugins: {
+      'jupyter': resolvedPlugin,
+      '@typescript-eslint': resolvedTsPlugin,
+      'jest': jestStub
+    },
+    rules: {
+      'jupyter/command-described-by': 'error',
+      'jupyter/no-untranslated-string': 'error',
+      'jupyter/plugin-activation-args': 'error',
+      'jupyter/plugin-description': 'error',
+      'jupyter/no-translation-concatenation': 'error',
+      'jupyter/token-format': 'error',
+      'jupyter/require-soft-assertions-before-snapshots': 'error'
+    },
+    languageOptions: {
+      parser: resolvedParser,
+      parserOptions: {
+        ecmaVersion: 'latest',
+        sourceType: 'module',
+        project: path.resolve(__dirname, `${projectName}/tsconfig.eslint.json`)
+      }
+    },
+    linterOptions: {
+      reportUnusedDisableDirectives: 'off'
+    }
+  };
+}
+
+function makeTestConfig(projectName) {
+  return [
+    {
+      basePath: __dirname,
+      files: [
+        `${projectName}/**/*.spec.ts`,
+        `${projectName}/**/*.test.ts`
+      ],
+      plugins: {
+        'jupyter': resolvedPlugin,
+        '@typescript-eslint': resolvedTsPlugin,
+        'jest': jestStub,
+      },
+      rules: {
+        'jupyter/require-soft-assertions-before-snapshots': 'error'
+      },
+      languageOptions: {
+        parser: resolvedParser,
+        parserOptions: {
+          ecmaVersion: 'latest',
+          sourceType: 'module'
+        }
+      },
+      linterOptions: {
+        reportUnusedDisableDirectives: 'off'
+      }
+    },
+
+    // JupyterLab — settings schema JSON files
+    {
+      basePath: __dirname,
+      files: ['jupyterlab/packages/*/schema/*.json'],
+      plugins: { 'jupyter': resolvedPlugin },
+      rules: { 'jupyter/no-schema-enum': 'error' },
+      languageOptions: { parser: resolvedJsoncParser }
+    },
+
+    // Notebook — settings schema JSON files
+    {
+      basePath: __dirname,
+      files: ['notebook/packages/*/schema/*.json'],
+      plugins: { 'jupyter': resolvedPlugin },
+      rules: { 'jupyter/no-schema-enum': 'error' },
+      languageOptions: { parser: resolvedJsoncParser }
+    },
+
+    // JupyterLite — settings schema JSON files
+    {
+      basePath: __dirname,
+      files: ['jupyterlite/packages/*/schema/*.json'],
+      plugins: { 'jupyter': resolvedPlugin },
+      rules: { 'jupyter/no-schema-enum': 'error' },
+      languageOptions: { parser: resolvedJsoncParser }
+    }
+  ];
+}
+
+const projects = ['jupyterlab', 'notebook', 'jupyterlite'];
 
 export default [
-  // JupyterLab
-  {
-    basePath: __dirname,
-    files: [
-      'jupyterlab/packages/*/src/**/*.ts',
-      'jupyterlab/packages/*/src/**/*.tsx'
-    ],
-    plugins: {
-      'jupyter': resolvedPlugin,
-      '@typescript-eslint': resolvedTsPlugin
-    },
-    rules: {
-      'jupyter/command-described-by': 'error',
-      'jupyter/no-untranslated-string': 'error',
-      'jupyter/plugin-activation-args': 'error',
-      'jupyter/plugin-description': 'error',
-      'jupyter/no-translation-concatenation': 'error',
-      'jupyter/token-format': 'error'
-    },
-    languageOptions: {
-      parser: resolvedParser,
-      parserOptions: {
-        ecmaVersion: 'latest',
-        sourceType: 'module',
-        project: path.resolve(__dirname, 'jupyterlab/tsconfig.eslint.json')
-      }
-    },
-    linterOptions: {
-      reportUnusedDisableDirectives: 'off'
-    }
-  },
-
-  // Notebook
-  {
-    basePath: __dirname,
-    files: [
-      'notebook/packages/*/src/**/*.ts',
-      'notebook/packages/*/src/**/*.tsx'
-    ],
-    plugins: {
-      'jupyter': resolvedPlugin,
-      '@typescript-eslint': resolvedTsPlugin
-    },
-    rules: {
-      'jupyter/command-described-by': 'error',
-      'jupyter/no-untranslated-string': 'error',
-      'jupyter/plugin-activation-args': 'error',
-      'jupyter/plugin-description': 'error',
-      'jupyter/no-translation-concatenation': 'error',
-      'jupyter/token-format': 'error'
-    },
-    languageOptions: {
-      parser: resolvedParser,
-      parserOptions: {
-        ecmaVersion: 'latest',
-        sourceType: 'module',
-        project: path.resolve(__dirname, 'notebook/tsconfig.eslint.json')
-      }
-    },
-    linterOptions: {
-      reportUnusedDisableDirectives: 'off'
-    }
-  },
-
-  // Jupyterlite
-  {
-    basePath: __dirname,
-    files: [
-      'jupyterlite/packages/*/src/**/*.ts',
-      'jupyterlite/packages/*/src/**/*.tsx'
-    ],
-    plugins: {
-      'jupyter': resolvedPlugin,
-      '@typescript-eslint': resolvedTsPlugin
-    },
-    rules: {
-      'jupyter/command-described-by': 'error',
-      'jupyter/no-untranslated-string': 'error',
-      'jupyter/plugin-activation-args': 'error',
-      'jupyter/plugin-description': 'error',
-      'jupyter/no-translation-concatenation': 'error',
-      'jupyter/token-format': 'error'
-    },
-    languageOptions: {
-      parser: resolvedParser,
-      parserOptions: {
-        ecmaVersion: 'latest',
-        sourceType: 'module',
-        project: path.resolve(__dirname, 'jupyterlite/tsconfig.eslint.json')
-      }
-    },
-    linterOptions: {
-      reportUnusedDisableDirectives: 'off'
-    }
-  }
-];
+  ...projects.map(makeProjectConfig),
+  ...projects.flatMap(makeTestConfig)
+]

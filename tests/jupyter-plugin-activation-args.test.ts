@@ -26,7 +26,7 @@ const ruleTester = new RuleTester({
       sourceType: 'module',
       projectService: {
         allowDefaultProject: ['tests/*.ts'],
-        defaultProject: 'tsconfig.test.json'
+        defaultProject: 'tsconfig.json'
       },
       tsconfigRootDir: path.resolve(__dirname, '..')
     }
@@ -40,7 +40,7 @@ nonTypeAwareTester.run('plugin-activation-args (non-type-aware)', pluginActivati
     {
       filename: 'tests/type-aware-fixture.ts',
       code: `
-        import { IDebuggerSidebar, IDebugger } from './fixtures/debugger-types';
+        import { IDebuggerSidebar, IDebugger } from './fixtures/types';
         const plugin: JupyterFrontEndPlugin<void> = {
           id: 'test-plugin',
           requires: [IDebuggerSidebar],
@@ -78,6 +78,7 @@ ruleTester.run('plugin-activation-args', pluginActivationArgs, {
       // Both requires and optional token
       filename: 'tests/type-aware-fixture.ts',
       code: `
+        import { INotebookTracker, IRenderMimeRegistry, IToolbarWidgetRegistry, ITranslator } from './fixtures/types';
         const plugin: JupyterFrontEndPlugin<void> = {
           id: 'test-plugin',
           requires: [INotebookTracker, IRenderMimeRegistry],
@@ -98,6 +99,7 @@ ruleTester.run('plugin-activation-args', pluginActivationArgs, {
       // Only optional tokens
       filename: 'tests/type-aware-fixture.ts',
       code: `
+        import { ISettingRegistry, ITranslator } from './fixtures/types';
         const plugin: JupyterFrontEndPlugin<void> = {
           id: 'test-plugin',
           optional: [ISettingRegistry, ITranslator],
@@ -141,6 +143,7 @@ ruleTester.run('plugin-activation-args', pluginActivationArgs, {
       // Multiple required and optional tokens
       filename: 'tests/type-aware-fixture.ts',
       code: `
+        import { INotebookTracker, IRenderMimeRegistry, ILabShell, IToolbarWidgetRegistry, ITranslator, ISettingRegistry, ICommandPalette } from './fixtures/types';
         const plugin: JupyterFrontEndPlugin<void> = {
           id: 'test-plugin',
           requires: [INotebookTracker, IRenderMimeRegistry, ILabShell],
@@ -164,7 +167,7 @@ ruleTester.run('plugin-activation-args', pluginActivationArgs, {
       // Namespace pattern with type info
       filename: 'tests/type-aware-fixture.ts',
       code: `
-       import { IDebugger, IDebuggerSidebar } from './fixtures/debugger-types';
+       import { IDebugger, IDebuggerSidebar } from './fixtures/types';
         const plugin: JupyterFrontEndPlugin<void> = {
           id: 'test-plugin',
           requires: [IDebuggerSidebar],
@@ -181,6 +184,7 @@ ruleTester.run('plugin-activation-args', pluginActivationArgs, {
       // Tokens with qualified names (JupyterFrontEnd.IPaths)
       filename: 'tests/type-aware-fixture.ts',
       code: `
+        import { INotebookTracker, IRenderMimeRegistry, ILabShell, IToolbarWidgetRegistry, ITranslator, ISettingRegistry, ICommandPalette } from './fixtures/types';
         const plugin: JupyterFrontEndPlugin<void> = {
           id: 'test-plugin',
           requires: [INotebookTracker, IRenderMimeRegistry, ILabShell, JupyterFrontEnd.IPaths],
@@ -286,7 +290,7 @@ ruleTester.run('plugin-activation-args', pluginActivationArgs, {
     // Namespace pattern with optional token
     filename: 'tests/type-aware-fixture.ts',
     code: `
-      import { IDebugger, IDebuggerSidebar } from './fixtures/debugger-types';
+      import { IDebugger, IDebuggerSidebar } from './fixtures/types';
       const plugin: JupyterFrontEndPlugin<void> = {
         id: 'test-plugin',
         requires: [INotebookTracker],
@@ -305,7 +309,7 @@ ruleTester.run('plugin-activation-args', pluginActivationArgs, {
       // Cross-file: token and interface declared in a separate .d.ts.
     filename: 'tests/type-aware-fixture.ts',
     code: `
-      import { IDebugger, IDebuggerSidebar, INotebookTracker } from './fixtures/debugger-types';
+      import { IDebugger, IDebuggerSidebar, INotebookTracker } from './fixtures/types';
       declare class JupyterFrontEnd {}
       declare class JupyterFrontEndPlugin<T> {}
       const plugin: JupyterFrontEndPlugin<void> = {
@@ -320,6 +324,24 @@ ruleTester.run('plugin-activation-args', pluginActivationArgs, {
         }
       };
     `
+    },
+    {
+      // Type alias that resolves to T | null is acceptable (type-checker path)
+      filename: 'tests/type-aware-fixture.ts',
+      code: `
+      import { IToolbarWidgetRegistry } from './fixtures/types';
+        type NullableToolbar = IToolbarWidgetRegistry | null;
+        const plugin: JupyterFrontEndPlugin<void> = {
+          id: 'test-plugin',
+          optional: [IToolbarWidgetRegistry],
+          activate: (
+            app: JupyterFrontEnd,
+            toolbarRegistry: NullableToolbar,
+          ) => {
+            console.log('Activated');
+          }
+        };
+      `
     },
     {
       // Aliased import: JupyterFrontEndPlugin imported under a different name
@@ -348,6 +370,58 @@ ruleTester.run('plugin-activation-args', pluginActivationArgs, {
           }
         };
       `
+    },
+    {
+      // Optional token with | undefined is acceptable
+      filename: 'tests/type-aware-fixture.ts',
+      code: `
+       import { ISettingRegistry } from './fixtures/types';
+        const plugin: JupyterFrontEndPlugin<void> = {
+          id: 'test-plugin',
+          optional: [ISettingRegistry],
+          activate: (
+            app: JupyterFrontEnd,
+            settingRegistry: ISettingRegistry | undefined,
+          ) => {
+            console.log('Activated');
+          }
+        };
+      `
+    },
+    {
+      // Reverse ordering
+      filename: 'tests/type-aware-fixture.ts',
+      code: `
+        import { ISettingRegistry } from './fixtures/types';
+        const plugin: JupyterFrontEndPlugin<void> = {
+          id: 'test-plugin',
+          optional: [ISettingRegistry],
+          activate: (
+            app: JupyterFrontEnd,
+            settingRegistry: undefined | ISettingRegistry,
+          ) => {
+            console.log('Activated');
+          }
+        };
+      `
+    },
+    {
+      // Optional token with ?: syntax (implies | undefined) is acceptable
+      filename: 'tests/type-aware-fixture.ts',
+      code: `
+      import { ISettingRegistry, ITranslator } from './fixtures/types';
+        const plugin: JupyterFrontEndPlugin<void> = {
+          id: 'test-plugin',
+          optional: [ISettingRegistry, ITranslator],
+          activate: (
+            app: JupyterFrontEnd,
+            settingRegistry?: ISettingRegistry,
+            translator?: ITranslator,
+          ) => {
+            console.log('Activated');
+          }
+        };
+      `
     }
   ],
 
@@ -356,7 +430,7 @@ ruleTester.run('plugin-activation-args', pluginActivationArgs, {
       // Arguments in wrong order (requires)
       filename: 'tests/type-aware-fixture.ts',
       code: `
-        import { INotebookTracker, ITranslator } from './fixtures/debugger-types';
+        import { INotebookTracker, ITranslator } from './fixtures/types';
         const plugin: JupyterFrontEndPlugin<void> = {
           id: 'test-plugin',
           requires: [INotebookTracker, ITranslator],
@@ -443,7 +517,7 @@ ruleTester.run('plugin-activation-args', pluginActivationArgs, {
       // Wrong order in requires and optional mix
       filename: 'tests/type-aware-fixture.ts',
       code: `
-        import { INotebookTracker, ITranslator, IRenderMimeRegistry, IToolbarWidgetRegistry } from './fixtures/debugger-types';
+        import { INotebookTracker, ITranslator, IRenderMimeRegistry, IToolbarWidgetRegistry } from './fixtures/types';
         const plugin: JupyterFrontEndPlugin<void> = {
           id: 'test-plugin',
           requires: [INotebookTracker, IRenderMimeRegistry],
@@ -478,7 +552,7 @@ ruleTester.run('plugin-activation-args', pluginActivationArgs, {
       // Missing optional argument
       filename: 'tests/type-aware-fixture.ts',
       code: `
-        import { INotebookTracker, ITranslator, IToolbarWidgetRegistry } from './fixtures/debugger-types';
+        import { INotebookTracker, ITranslator, IToolbarWidgetRegistry } from './fixtures/types';
         const plugin: JupyterFrontEndPlugin<void> = {
           id: 'test-plugin',
           requires: [INotebookTracker],
@@ -598,7 +672,7 @@ ruleTester.run('plugin-activation-args', pluginActivationArgs, {
       // Incorrect type (null)
       filename: 'tests/type-aware-fixture.ts',
       code: `
-        import { INotebookTracker } from './fixtures/debugger-types';
+        import { INotebookTracker } from './fixtures/types';
         const plugin: JupyterFrontEndPlugin<void> = {
           id: 'test-plugin',
           requires: [INotebookTracker],
@@ -618,7 +692,7 @@ ruleTester.run('plugin-activation-args', pluginActivationArgs, {
       // Incorrect type
       filename: 'tests/type-aware-fixture.ts',
       code: `
-        import { INotebookTracker, IRenderMimeRegistry } from './fixtures/debugger-types';
+        import { INotebookTracker, IRenderMimeRegistry } from './fixtures/types';
         const plugin: JupyterFrontEndPlugin<void> = {
           id: 'test-plugin',
           requires: [INotebookTracker, IRenderMimeRegistry],
@@ -657,7 +731,7 @@ ruleTester.run('plugin-activation-args', pluginActivationArgs, {
     // Namespace pattern but wrong order
     filename: 'tests/type-aware-fixture.ts',
     code: `
-      import { IDebugger, IDebuggerSidebar, INotebookTracker } from './fixtures/debugger-types';
+      import { IDebugger, IDebuggerSidebar, INotebookTracker } from './fixtures/types';
       const plugin: JupyterFrontEndPlugin<void> = {
         id: 'test-plugin',
         requires: [INotebookTracker, IDebuggerSidebar],
@@ -691,6 +765,63 @@ ruleTester.run('plugin-activation-args', pluginActivationArgs, {
       errors: [
         { messageId: 'appNotFirst', data: { arg: 'tracker', allowedNames: '"app", "_app", "_"' } }
       ]
+    },
+    {
+      // Aliased import: rule still applies and detects violations
+      filename: 'tests/type-aware-fixture.ts',
+      code: `
+        import { JupyterFrontEndPlugin as JFEP, INotebookTracker } from './fixtures/debugger-types';
+        const plugin: JFEP<void> = {
+          id: 'test-plugin',
+          requires: [INotebookTracker],
+          activate: (tracker: INotebookTracker, app: JupyterFrontEnd) => {
+            console.log('Activated');
+          }
+        };
+      `,
+      errors: [
+        {
+          messageId: 'optionalNotNullable',
+          data: { arg: 'toolbarRegistry', type: 'IToolbarWidgetRegistry' }
+        }
+      ]
+    },
+    {
+      // Optional token without | null
+      filename: 'tests/type-aware-fixture.ts',
+      code: `
+        import { IToolbarWidgetRegistry } from './fixtures/types';
+        const plugin: JupyterFrontEndPlugin<void> = {
+          id: 'test-plugin',
+          optional: [IToolbarWidgetRegistry],
+          activate: (
+            app: JupyterFrontEnd,
+            toolbarRegistry: IToolbarWidgetRegistry,
+          ) => {
+            console.log('Activated');
+          }
+        };
+      `,
+      errors: [
+        {
+          messageId: 'optionalNotNullable',
+          data: { arg: 'toolbarRegistry', type: 'IToolbarWidgetRegistry' }
+        }
+      ]
     }
   ]
 });
+
+/*
+      // Optional token without | null
+      filename: 'tests/type-aware-fixture.ts',
+      code: `
+        import { IToolbarWidgetRegistry } from './fixtures/types';
+        const plugin: JupyterFrontEndPlugin<void> = {
+          id: 'test-plugin',
+          optional: [IToolbarWidgetRegistry],
+          activate: (
+            app: JupyterFrontEnd,
+            toolbarRegistry: IToolbarWidgetRegistry,
+          ) => {
+*/
