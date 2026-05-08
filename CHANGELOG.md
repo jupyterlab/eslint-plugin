@@ -2,6 +2,40 @@
 
 <!-- <START NEW CHANGELOG ENTRY> -->
 
+## 1.0.0
+
+([Full Changelog](https://github.com/jupyterlab/eslint-plugin/compare/v0.0.5...3806a8cd1b9b95fd09435b6a7c976b3c750a69b2))
+
+### Enhancements made
+
+- Support aliased imports [#56](https://github.com/jupyterlab/eslint-plugin/pull/56) ([@Darshan808](https://github.com/Darshan808), [@krassowski](https://github.com/krassowski))
+- Add `no-schema-enum` rule: forbid enum in settings schema, suggest `oneOf` [#55](https://github.com/jupyterlab/eslint-plugin/pull/55) ([@Darshan808](https://github.com/Darshan808), [@krassowski](https://github.com/krassowski))
+- `plugin-activation-args`: enforce `| null` on optional token parameters [#54](https://github.com/jupyterlab/eslint-plugin/pull/54) ([@Darshan808](https://github.com/Darshan808), [@krassowski](https://github.com/krassowski))
+- Add `require-soft-assertions-before-snapshots` rule [#53](https://github.com/jupyterlab/eslint-plugin/pull/53) ([@Darshan808](https://github.com/Darshan808), [@krassowski](https://github.com/krassowski))
+
+### Maintenance and upkeep improvements
+
+- Remove `tsconfig.test.json` [#57](https://github.com/jupyterlab/eslint-plugin/pull/57) ([@Darshan808](https://github.com/Darshan808), [@krassowski](https://github.com/krassowski))
+
+### Documentation improvements
+
+- Update docs to include `jupyter/no-schema-enum` as recommended rule. [#58](https://github.com/jupyterlab/eslint-plugin/pull/58) ([@Darshan808](https://github.com/Darshan808), [@krassowski](https://github.com/krassowski))
+
+### Other merged PRs
+
+- Bump the npm_and_yarn group across 2 directories with 7 updates [#47](https://github.com/jupyterlab/eslint-plugin/pull/47) ([@Darshan808](https://github.com/Darshan808), [@krassowski](https://github.com/krassowski))
+
+### Contributors to this release
+
+The following people contributed discussions, new ideas, code and documentation contributions, and review.
+See [our definition of contributors](https://github-activity.readthedocs.io/en/latest/use/#how-does-this-tool-define-contributions-in-the-reports).
+
+([GitHub contributors page for this release](https://github.com/jupyterlab/eslint-plugin/graphs/contributors?from=2026-04-21&to=2026-05-08&type=c))
+
+@Darshan808 ([activity](https://github.com/search?q=repo%3Ajupyterlab%2Feslint-plugin+involves%3ADarshan808+updated%3A2026-04-21..2026-05-08&type=Issues)) | @krassowski ([activity](https://github.com/search?q=repo%3Ajupyterlab%2Feslint-plugin+involves%3Akrassowski+updated%3A2026-04-21..2026-05-08&type=Issues))
+
+<!-- <END NEW CHANGELOG ENTRY> -->
+
 ## 0.0.5
 
 ([Full Changelog](https://github.com/jupyterlab/eslint-plugin/compare/v0.0.4...dedcfee6479efba4cdcab5fe873a81c9d9bd1c89))
@@ -18,8 +52,6 @@ See [our definition of contributors](https://github-activity.readthedocs.io/en/l
 ([GitHub contributors page for this release](https://github.com/jupyterlab/eslint-plugin/graphs/contributors?from=2026-04-18&to=2026-04-21&type=c))
 
 @Darshan808 ([activity](https://github.com/search?q=repo%3Ajupyterlab%2Feslint-plugin+involves%3ADarshan808+updated%3A2026-04-18..2026-04-21&type=Issues)) | @krassowski ([activity](https://github.com/search?q=repo%3Ajupyterlab%2Feslint-plugin+involves%3Akrassowski+updated%3A2026-04-18..2026-04-21&type=Issues))
-
-<!-- <END NEW CHANGELOG ENTRY> -->
 
 ## 0.0.4
 
