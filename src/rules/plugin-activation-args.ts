@@ -269,6 +269,11 @@ const jupyterPluginActivationArgs = createRule({
           const tsNode = services?.esTreeNodeToTSNodeMap.get(paramNode);
           if (tsNode) {
             const type = checker.getTypeAtLocation(tsNode);
+            // Fall back to the syntactic check so `T | null` annotations are still
+            // accepted even when T cannot be resolved. (happens when package is unbuilt)
+            if (type.flags & ts.TypeFlags.Any) {
+              return isNullableAnnotation(paramNode);
+            }
             if (type.isUnion()) {
               return type.types.some(
                 t =>
