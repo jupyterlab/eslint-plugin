@@ -50,7 +50,7 @@ This rule has no options.
 Add the rule to your ESLint flat config for schema JSON files:
 
 ```js
-import jsoncParser from 'jsonc-eslint-parser';
+import * as jsoncParser from 'jsonc-eslint-parser';
 import jupyterPlugin from '@jupyter/eslint-plugin';
 
 export default [
