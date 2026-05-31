@@ -18,6 +18,7 @@ const tsPlugin = await import('@typescript-eslint/eslint-plugin');
 const resolvedTsPlugin = tsPlugin.default ?? tsPlugin;
 const noopRule = { create: () => ({}) };
 const jestStub = { rules: new Proxy({}, { get: () => noopRule }) };
+const regexStub = { rules: new Proxy({}, { get: () => noopRule }) };
 
 const jsoncParserModule = await import('jsonc-eslint-parser');
 const resolvedJsoncParser = jsoncParserModule.default ?? jsoncParserModule;
@@ -32,7 +33,8 @@ function makeProjectConfig(projectName) {
     plugins: {
       'jupyter': resolvedPlugin,
       '@typescript-eslint': resolvedTsPlugin,
-      'jest': jestStub
+      'jest': jestStub,
+      'regexp': regexStub
     },
     rules: {
       'jupyter/command-described-by': 'error',
