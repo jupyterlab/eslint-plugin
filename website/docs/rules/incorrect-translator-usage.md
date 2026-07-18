@@ -1,6 +1,6 @@
 # `incorrect-translator-usage`
 
-Require translation bundles returned by `translator.load()` to be stored in a variable named `trans`.
+Require translation bundles returned by `translator.load()` to be stored under an extractor-recognized name (e.g. `trans`, `this.trans`, `this._trans`, `props.trans`, `this.props.trans`).
 
 ## Why
 
@@ -19,11 +19,11 @@ See [Rules](https://jupyterlab.readthedocs.io/en/stable/extension/internationali
 
 The rule reports:
 
-- A translation bundle method (`__`, `_n`, `_p`, `_np`, `gettext`, `ngettext`, `pgettext`, `npgettext`, `dcnpgettext`) called directly on the result of a `.load(...)` call.
-- The result of `<translator>.load(...)` stored in a variable or object property not named `trans`, or in an instance property not named `trans` or `_trans`.
+- A translation bundle method (`__`, `_n`, `_p`, `_np`, `gettext`, `ngettext`, `pgettext`, `npgettext`, `dcnpgettext`) called directly on the result of a `<translator>.load(...)` call.
+- The result of `<translator>.load(...)` stored under a name the extractor does not recognize — a variable or object property not named `trans`, or a member target other than `this.trans`, `this._trans`, `props.trans` or `this.props.trans`.
 - Destructuring the result of `<translator>.load(...)`.
 
-An object counts as a translator when its name contains `translator` (for example `translator`, `this._translator`, `props.translator` or `nullTranslator`). Passing the bundle directly to a function or returning it is not reported: the receiver is responsible for storing it under a recognized name.
+An object counts as a translator when its name contains `translator` (for example `translator`, `this._translator`, `props.translator` or `nullTranslator`). A chained bundle method or an unrecognized target only triggers the rule when the underlying `.load(...)` is called on such a translator; an unrelated `.load(...)` API is left alone. Passing the bundle directly to a function or returning it is not reported: the receiver is responsible for storing it under a recognized name.
 
 ## Incorrect
 

@@ -37,6 +37,9 @@ ruleTester.run('incorrect-translator-usage', incorrectTranslatorUsage, {
     {
       code: `class A { constructor() { this._trans = this.translator.load('mydomain'); } }`
     },
+    // Recognized bundle member targets
+    { code: `this.props.trans = translator.load('mydomain');` },
+    { code: `props.trans = translator.load('mydomain');` },
     // Object property named trans (used later as props.trans)
     { code: `const options = { trans: translator.load('mydomain') };` },
     // Passing the bundle along without storing it is fine; the receiver
@@ -52,6 +55,9 @@ ruleTester.run('incorrect-translator-usage', incorrectTranslatorUsage, {
     { code: `const settings = registry.load('my-plugin:settings');` },
     { code: `const state = this.connector.load(id);` },
     { code: `settingRegistry.load(plugin.id).then(settings => {});` },
+    // A chained bundle method on a non-translator .load() is out of scope
+    { code: `i18n.load('mydomain').__('some text');` },
+    { code: `registry.load('my-plugin').gettext('label');` },
     // The translator has to be an identifier or property to be recognized
     { code: `const bundle = getTranslator().load('mydomain');` },
     // Computed targets are not checked
@@ -81,12 +87,6 @@ ruleTester.run('incorrect-translator-usage', incorrectTranslatorUsage, {
       code: `const label = translator.load('jupyterlab').__('label');`,
       errors: [{ messageId: 'chainedBundleMethod' }]
     },
-    // A bundle method chained on load() is reported even when the object
-    // name does not mention a translator
-    {
-      code: `i18n.load('mydomain').__('some text');`,
-      errors: [{ messageId: 'chainedBundleMethod' }]
-    },
     // Bundles stored under names the string extractor does not recognize
     {
       code: `const someNameButNotTrans = translator.load('jupyterlab'); someNameButNotTrans.__('some-string');`,
@@ -107,6 +107,23 @@ ruleTester.run('incorrect-translator-usage', incorrectTranslatorUsage, {
     },
     {
       code: `class A { constructor() { this.bundle = translator.load('jupyterlab'); } }`,
+      errors: [{ messageId: 'invalidBundleName' }]
+    },
+    // `trans`/`_trans` on an unrecognized receiver is not seen by the extractor
+    {
+      code: `options.trans = translator.load('mydomain');`,
+      errors: [{ messageId: 'invalidBundleName' }]
+    },
+    {
+      code: `SomeClass.trans = translator.load('mydomain');`,
+      errors: [{ messageId: 'invalidBundleName' }]
+    },
+    {
+      code: `this.state._trans = translator.load('mydomain');`,
+      errors: [{ messageId: 'invalidBundleName' }]
+    },
+    {
+      code: `props._trans = translator.load('mydomain');`,
       errors: [{ messageId: 'invalidBundleName' }]
     },
     {

@@ -99,13 +99,72 @@ function isTranslatorLoadCall(node: TSESTree.Node): boolean {
   return object !== null && isTranslatorReference(object);
 }
 
+/**
+ * Returns true when a member expression names one of the exact targets the
+ * string extractor recognizes as a translation bundle:
+ * this.trans, this._trans, props.trans, this.props.trans.
+ * See jupyterlab.readthedocs.io/en/stable/extension/internationalization.html#rules
+ */
+function isRecognizedBundleMember(node: TSESTree.MemberExpression): boolean {
+  if (node.computed || node.property.type !== 'Identifier') {
+    return false;
+  }
+  const propertyName = node.property.name;
+  const object = node.object;
+
+  // this.trans / this._trans
+  if (object.type === 'ThisExpression') {
+    return BUNDLE_PROPERTY_NAMES.has(propertyName);
+  }
+
+  if (propertyName !== BUNDLE_VARIABLE_NAME) {
+    return false;
+  }
+
+  // props.trans
+  if (object.type === 'Identifier' && object.name === 'props') {
+    return true;
+  }
+
+  // this.props.trans
+  return (
+    object.type === 'MemberExpression' &&
+    !object.computed &&
+    object.object.type === 'ThisExpression' &&
+    object.property.type === 'Identifier' &&
+    object.property.name === 'props'
+  );
+}
+
+/**
+ * Renders a readable dotted path for a member/identifier target, e.g.
+ * `options.trans` or `this.bundle`, for use in diagnostic messages.
+ */
+function getTargetName(node: TSESTree.Node): string {
+  const expression = unwrapExpression(node);
+  if (expression.type === 'ThisExpression') {
+    return 'this';
+  }
+  if (expression.type === 'Identifier') {
+    return expression.name;
+  }
+  if (
+    expression.type === 'MemberExpression' &&
+    !expression.computed &&
+    expression.property.type === 'Identifier'
+  ) {
+    return `${getTargetName(expression.object)}.${expression.property.name}`;
+  }
+  return 'this expression';
+}
+
 const incorrectTranslatorUsage = createRule({
   name: 'incorrect-translator-usage',
   meta: {
     type: 'problem',
     docs: {
       description:
-        'Require translation bundles returned by translator.load() to be stored in a variable named trans',
+        'Require translation bundles returned by translator.load() to be stored under an extractor-recognized name (e.g. trans, this.trans, this._trans, props.trans, this.props.trans)',
       url: 'https://eslint-plugin.readthedocs.io/en/latest/rules/incorrect-translator-usage/'
     },
     messages: {
@@ -140,7 +199,7 @@ const incorrectTranslatorUsage = createRule({
           !callee.computed &&
           callee.property.type === 'Identifier' &&
           BUNDLE_METHODS.has(callee.property.name) &&
-          getLoadCallObject(callee.object) !== null
+          isTranslatorLoadCall(callee.object)
         ) {
           context.report({
             node,
@@ -177,11 +236,11 @@ const incorrectTranslatorUsage = createRule({
           if (left.computed || left.property.type !== 'Identifier') {
             return;
           }
-          if (!BUNDLE_PROPERTY_NAMES.has(left.property.name)) {
+          if (!isRecognizedBundleMember(left)) {
             context.report({
-              node: left.property,
+              node: left,
               messageId: 'invalidBundleName',
-              data: { name: left.property.name }
+              data: { name: getTargetName(left) }
             });
           }
           return;
