@@ -47,6 +47,27 @@ const OWNED_FUNCTION_OPTION_NAMES = new Map([
 
 const FLUENT_DISPOSABLE_METHOD_NAMES = ['initializeState'];
 
+/**
+ * Resolves a configurable name list option.
+ *
+ * A user-supplied list is *added* to the built-in defaults, so a project only
+ * has to name its own helpers rather than restate this plugin's list. Passing
+ * the matching `extendDefault...` option as `false` drops the defaults, whether
+ * or not a replacement list is given, which is also how to ask for the
+ * strictest possible checking.
+ */
+export function resolveNameListOption(
+  provided: readonly string[] | undefined,
+  defaults: readonly string[],
+  extendDefaults: boolean
+): Set<string> {
+  const names = extendDefaults ? [...defaults] : [];
+  if (provided) {
+    names.push(...provided);
+  }
+  return new Set(names);
+}
+
 export const DEFAULT_OWNERSHIP_FUNCTION_NAMES = [
   'add',
   'addCell',
@@ -738,37 +759,97 @@ export function isOuterFunctionScopeVariable(
   );
 }
 
-export function isInJupyterPluginActivate(
-  node: TSESTree.Node,
+/**
+ * Checks whether a variable is an exported binding, including inside an
+ * exported `namespace` (`export const tracker = new WidgetTracker(...)`).
+ *
+ * Ownership of an exported singleton passes to the importers of the module, so
+ * this file cannot see - and is not responsible for - its disposal. Such
+ * declarations are also created exactly once and live for the lifetime of the
+ * program, so there is nothing to leak.
+ */
+export function isExportedVariable(variable: TSESLint.Scope.Variable): boolean {
+  return variable.defs.some(definition => {
+    let current: TSESTree.Node | undefined = definition.node;
+    while (current) {
+      if (
+        current.type === 'ExportNamedDeclaration' ||
+        current.type === 'ExportDefaultDeclaration'
+      ) {
+        return true;
+      }
+      // Stop at the declaration boundary: only the declaration itself and its
+      // enclosing statement can carry the `export` keyword.
+      if (
+        current.type === 'VariableDeclaration' &&
+        current.parent?.type !== 'ExportNamedDeclaration'
+      ) {
+        return false;
+      }
+      current = current.parent;
+    }
+    return false;
+  });
+}
+
+/**
+ * Checks whether a variable escapes into a nested function that unconditionally
+ * disposes it or hands off its ownership - the
+ * `requestAnimationFrame(() => splash.dispose())`,
+ * `void load().then(() => splash.dispose()).catch(() => splash.dispose())` and
+ * `return () => items.dispose()` idioms.
+ *
+ * This generalises the existing `disposed.connect(...)` special case to any
+ * callback. Disposal that is itself conditional inside the callback still does
+ * not count, so "cleanup only on some paths" stays reportable.
+ */
+export function isDisposedByNestedFunction(
+  variable: TSESLint.Scope.Variable,
   ownership: DisposableOwnershipContext
 ): boolean {
-  const fn = getEnclosingFunction(node);
-  const property = fn?.parent;
-  if (
-    !fn ||
-    !property ||
-    property.type !== 'Property' ||
-    property.value !== fn ||
-    property.computed ||
-    !(
-      (property.key.type === 'Identifier' &&
-        property.key.name === 'activate') ||
-      (property.key.type === 'Literal' && property.key.value === 'activate')
-    )
-  ) {
-    return false;
+  const declaringScope = getFunctionScope(variable.scope);
+
+  for (const reference of variable.references) {
+    if (getFunctionScope(reference.from) === declaringScope) {
+      continue;
+    }
+
+    const fn = getEnclosingFunction(reference.identifier);
+    if (
+      !fn ||
+      (fn.type !== 'ArrowFunctionExpression' &&
+        fn.type !== 'FunctionExpression')
+    ) {
+      continue;
+    }
+
+    const disposesVariable = getUnconditionalDisposeTargets(fn).some(
+      target => getIdentifierVariable(ownership.sourceCode, target) === variable
+    );
+    if (
+      disposesVariable ||
+      callbackBodyTransfersOwnership(fn, variable.name, ownership)
+    ) {
+      return true;
+    }
   }
 
-  const object = property.parent;
-  if (!object || object.type !== 'ObjectExpression') {
-    return false;
-  }
+  return false;
+}
 
-  const variable = object.parent;
+/**
+ * Checks whether an object literal is shaped like a Jupyter plugin descriptor,
+ * either by its declared type or by its property names.
+ */
+function isPluginDescriptorObject(
+  object: TSESTree.ObjectExpression,
+  ownership: DisposableOwnershipContext
+): boolean {
+  const declarator = object.parent;
   if (
-    variable?.type === 'VariableDeclarator' &&
+    declarator?.type === 'VariableDeclarator' &&
     getJupyterPluginKind(
-      variable,
+      declarator,
       ownership.checker,
       ownership.services
         ? node => ownership.services!.esTreeNodeToTSNodeMap.get(node)
@@ -793,6 +874,90 @@ export function isInJupyterPluginActivate(
     ['autoStart', 'optional', 'provides', 'requires'].some(name =>
       propertyNames.has(name)
     )
+  );
+}
+
+/**
+ * Resolves the variable a function is named by, so its references can be
+ * inspected: `function activateCsv() {}` or `const activateCsv = () => {}`.
+ */
+function getFunctionNameVariable(
+  fn: TSESTree.Node,
+  sourceCode: TSESLint.SourceCode
+): TSESLint.Scope.Variable | null {
+  if (fn.type === 'FunctionDeclaration' && fn.id) {
+    const name = fn.id.name;
+    return (
+      sourceCode.getDeclaredVariables(fn).find(entry => entry.name === name) ??
+      null
+    );
+  }
+
+  const declarator = fn.parent;
+  if (
+    declarator?.type === 'VariableDeclarator' &&
+    declarator.init === fn &&
+    declarator.id.type === 'Identifier'
+  ) {
+    return sourceCode.getDeclaredVariables(declarator)[0] ?? null;
+  }
+
+  return null;
+}
+
+/**
+ * Checks whether a function is wired up as the `activate` of a plugin
+ * descriptor elsewhere in the file, e.g. `activate: activateCsv`.
+ */
+function isReferencedAsPluginActivate(
+  variable: TSESLint.Scope.Variable,
+  ownership: DisposableOwnershipContext
+): boolean {
+  return variable.references.some(reference => {
+    const property = reference.identifier.parent;
+    return (
+      property?.type === 'Property' &&
+      property.value === reference.identifier &&
+      getPropertyName(property) === 'activate' &&
+      property.parent?.type === 'ObjectExpression' &&
+      isPluginDescriptorObject(property.parent, ownership)
+    );
+  });
+}
+
+export function isInJupyterPluginActivate(
+  node: TSESTree.Node,
+  ownership: DisposableOwnershipContext
+): boolean {
+  const fn = getEnclosingFunction(node);
+  if (!fn) {
+    return false;
+  }
+
+  // Inline form: `const plugin = { id, autoStart, activate: () => { ... } }`.
+  const property = fn.parent;
+  if (
+    property?.type === 'Property' &&
+    property.value === fn &&
+    getPropertyName(property) === 'activate' &&
+    property.parent?.type === 'ObjectExpression' &&
+    isPluginDescriptorObject(property.parent, ownership)
+  ) {
+    return true;
+  }
+
+  // Named form: `function activate() { ... }`, the convention for plugins whose
+  // activation lives in a separate function (often in a `Private` namespace).
+  if (fn.type === 'FunctionDeclaration' && fn.id?.name === 'activate') {
+    return true;
+  }
+
+  // Referenced form: `function activateCsv() { ... }` used as
+  // `{ id, autoStart, activate: activateCsv }`.
+  const nameVariable = getFunctionNameVariable(fn, ownership.sourceCode);
+  return (
+    nameVariable !== null &&
+    isReferencedAsPluginActivate(nameVariable, ownership)
   );
 }
 
@@ -1501,7 +1666,7 @@ function isOwnershipCallWithIdentifier(
   );
 }
 
-function forEachCallbackOwnsParameter(
+function callbackBodyTransfersOwnership(
   callback: TSESTree.ArrowFunctionExpression | TSESTree.FunctionExpression,
   parameterName: string,
   ownership: DisposableOwnershipContext
@@ -1550,7 +1715,7 @@ function markImmediateForEachOwnership(
   const [parameter] = callback.params;
   if (
     parameter?.type !== 'Identifier' ||
-    !forEachCallbackOwnsParameter(callback, parameter.name, ownership)
+    !callbackBodyTransfersOwnership(callback, parameter.name, ownership)
   ) {
     return;
   }

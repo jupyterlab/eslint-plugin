@@ -109,6 +109,155 @@ nonTypeAwareTester.run(
 ruleTester.run('require-disposable-ownership', requireDisposableOwnership, {
   valid: [
     {
+      // A custom ownership name is ADDED to the defaults, so the built-in
+      // `add` keeps working alongside it.
+      filename: typeAwareFilename,
+      options: [{ ownershipFunctionNames: ['ownDisposable'] }],
+      code: `
+        class DisposableDelegate {
+          constructor(callback: () => void) {}
+          dispose(): void {}
+        }
+        declare const items: { add(disposable: DisposableDelegate): void };
+
+        const first = new DisposableDelegate(() => undefined);
+        items.add(first);
+      `
+    },
+    {
+      // An empty options object must behave exactly like no options at all.
+      // ESLint fills schema `default` values into the options object, so array
+      // options must not declare one or "was it provided" becomes undetectable.
+      filename: typeAwareFilename,
+      options: [{}],
+      code: `
+        class DisposableDelegate {
+          constructor(callback: () => void) {}
+          dispose(): void {}
+        }
+        declare const items: { add(disposable: DisposableDelegate): void };
+
+        const first = new DisposableDelegate(() => undefined);
+        items.add(first);
+      `
+    },
+    {
+      // Exported singleton: ownership belongs to the importers of the module.
+      filename: typeAwareFilename,
+      code: `
+        class DisposableDelegate {
+          constructor(callback: () => void) {}
+          dispose(): void {}
+        }
+        export const tracker = new DisposableDelegate(() => undefined);
+      `
+    },
+    {
+      // Exported singleton inside a namespace (Dialog.tracker,
+      // Notification.manager).
+      filename: typeAwareFilename,
+      code: `
+        class DisposableDelegate {
+          constructor(callback: () => void) {}
+          dispose(): void {}
+        }
+        export namespace Private {
+          export const tracker = new DisposableDelegate(() => undefined);
+        }
+      `
+    },
+    {
+      // Plugin activation split into a named function, referenced as
+      // `activate: activateCsv`.
+      filename: typeAwareFilename,
+      code: `
+        class DisposableDelegate {
+          constructor(callback: () => void) {}
+          dispose(): void {}
+        }
+        function activateCsv(): void {
+          const tracker = new DisposableDelegate(() => undefined);
+          void tracker;
+        }
+        const plugin = {
+          id: 'example:plugin',
+          autoStart: true,
+          activate: activateCsv
+        };
+        export default plugin;
+      `
+    },
+    {
+      // Plugin activation as `export function activate()`, the convention for
+      // activation living in a `Private` namespace.
+      filename: typeAwareFilename,
+      code: `
+        class DisposableDelegate {
+          constructor(callback: () => void) {}
+          dispose(): void {}
+        }
+        export namespace Private {
+          export function activate(): void {
+            const palette = new DisposableDelegate(() => undefined);
+            void palette;
+          }
+        }
+      `
+    },
+    {
+      // Unconditional disposal inside a callback: the
+      // `requestAnimationFrame(() => splash.dispose())` idiom.
+      filename: typeAwareFilename,
+      code: `
+        declare function defer(callback: () => void): void;
+        class DisposableDelegate {
+          constructor(callback: () => void) {}
+          dispose(): void {}
+        }
+        function load(): void {
+          const splash = new DisposableDelegate(() => undefined);
+          defer(() => {
+            splash.dispose();
+          });
+        }
+      `
+    },
+    {
+      // Disposal in a promise chain.
+      filename: typeAwareFilename,
+      code: `
+        declare function work(): Promise<void>;
+        class DisposableDelegate {
+          constructor(callback: () => void) {}
+          dispose(): void {}
+        }
+        function load(): void {
+          const splash = new DisposableDelegate(() => undefined);
+          void work()
+            .then(() => {
+              splash.dispose();
+            })
+            .catch(() => {
+              splash.dispose();
+            });
+        }
+      `
+    },
+    {
+      // Captured by a returned closure that disposes it.
+      filename: typeAwareFilename,
+      code: `
+        class DisposableDelegate {
+          constructor(callback: () => void) {}
+          dispose(): void {}
+        }
+        function createFactory(): () => void {
+          const items = new DisposableDelegate(() => undefined);
+          return () => items.dispose();
+        }
+      `
+    },
+    {
       filename: typeAwareFilename,
       code: `
         declare function cleanup(): void;
@@ -1229,9 +1378,13 @@ ruleTester.run('require-disposable-ownership', requireDisposableOwnership, {
       ]
     },
     {
+      // Disposal inside a callback that is only *conditionally* reached still
+      // counts as unmanaged. Unconditional disposal inside the callback is
+      // accepted - see the matching valid case.
       filename: typeAwareFilename,
       code: `
         declare function cleanup(): void;
+        declare const condition: boolean;
         declare function defer(callback: () => void): void;
         class DisposableDelegate {
           constructor(callback: () => void) {}
@@ -1242,7 +1395,9 @@ ruleTester.run('require-disposable-ownership', requireDisposableOwnership, {
           cleanup();
         });
         defer(() => {
-          disposable.dispose();
+          if (condition) {
+            disposable.dispose();
+          }
         });
       `,
       errors: [
@@ -1299,7 +1454,7 @@ ruleTester.run('require-disposable-ownership', requireDisposableOwnership, {
     },
     {
       filename: typeAwareFilename,
-      options: [{ ownershipFunctionNames: [] }],
+      options: [{ extendDefaultOwnershipFunctionNames: false }],
       code: `
         declare function cleanup(): void;
         class DisposableDelegate {
