@@ -20,12 +20,16 @@ const sidebars: SidebarsConfig = {
       items: [
         'rules/index',
         'rules/command-described-by',
+        'rules/galata-prefer-filebrowser-helper',
+        'rules/incorrect-translator-usage',
         'rules/no-pageconfig-base-url',
         'rules/no-schema-enum',
         'rules/no-translation-concatenation',
         'rules/no-untranslated-string',
         'rules/plugin-activation-args',
         'rules/plugin-description',
+        'rules/require-disposable-ownership',
+        'rules/require-disposable-transfer',
         'rules/require-soft-assertions-before-snapshots',
         'rules/token-format'
       ]

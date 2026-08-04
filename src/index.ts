@@ -14,6 +14,10 @@ import noSchemaEnum from './rules/no-schema-enum';
 import requireSoftAssertionsBeforeSnapshots from './rules/require-soft-assertions-before-snapshots';
 import noPageconfigBaseUrl from './rules/no-pageconfig-base-url';
 import preferMenuHelper from './rules/prefer-menu-helper';
+import galataPreferFilebrowserHelper from './rules/galata-prefer-filebrowser-helper';
+import requireDisposableOwnership from './rules/require-disposable-ownership';
+import requireDisposableTransfer from './rules/require-disposable-transfer';
+import incorrectTranslatorUsage from './rules/incorrect-translator-usage';
 
 const plugin = {
   rules: {
@@ -27,7 +31,11 @@ const plugin = {
     'require-soft-assertions-before-snapshots':
       requireSoftAssertionsBeforeSnapshots,
     'no-pageconfig-base-url': noPageconfigBaseUrl,
-    'prefer-menu-helper': preferMenuHelper
+    'prefer-menu-helper': preferMenuHelper,
+    'galata-prefer-filebrowser-helper': galataPreferFilebrowserHelper,
+    'require-disposable-ownership': requireDisposableOwnership,
+    'require-disposable-transfer': requireDisposableTransfer,
+    'incorrect-translator-usage': incorrectTranslatorUsage
   },
   configs: {
     recommended: [
@@ -40,7 +48,10 @@ const plugin = {
           'jupyter/no-translation-concatenation': 'error',
           'jupyter/token-format': 'error',
           'jupyter/no-untranslated-string': 'warn',
-          'jupyter/no-pageconfig-base-url': 'warn'
+          'jupyter/no-pageconfig-base-url': 'warn',
+          'jupyter/require-disposable-ownership': 'warn',
+          'jupyter/require-disposable-transfer': 'warn',
+          'jupyter/incorrect-translator-usage': 'warn'
         }
       },
       {
@@ -51,14 +62,10 @@ const plugin = {
         }
       },
       {
-        files: [
-          '**/*.spec.ts',
-          '**/*.spec.js',
-          '**/*.test.ts',
-          '**/*.test.js'
-        ],
+        files: ['**/*.spec.ts', '**/*.spec.js', '**/*.test.ts', '**/*.test.js'],
         rules: {
           'jupyter/require-soft-assertions-before-snapshots': 'warn',
+          'jupyter/galata-prefer-filebrowser-helper': 'warn',
           'jupyter/prefer-menu-helper': 'warn'
         }
       }
@@ -72,7 +79,10 @@ const plugin = {
         'jupyter/token-format': 'error',
         'jupyter/no-untranslated-string': 'warn',
         'jupyter/no-schema-enum': 'warn',
-        'jupyter/no-pageconfig-base-url': 'warn'
+        'jupyter/no-pageconfig-base-url': 'warn',
+        'jupyter/require-disposable-ownership': 'warn',
+        'jupyter/require-disposable-transfer': 'warn',
+        'jupyter/incorrect-translator-usage': 'warn'
       },
       overrides: [
         {
@@ -84,6 +94,7 @@ const plugin = {
           ],
           rules: {
             'jupyter/require-soft-assertions-before-snapshots': 'warn',
+            'jupyter/galata-prefer-filebrowser-helper': 'warn',
             'jupyter/prefer-menu-helper': 'warn'
           }
         }
