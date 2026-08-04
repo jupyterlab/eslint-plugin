@@ -100,7 +100,7 @@ class Owner {
 Function or method names that take ownership of disposable arguments, such as
 `add`, `addWidget`, `insertWidget`, and `registerStatusItem`. For the full
 default list see the
-[`DEFAULT_OWNERSHIP_FUNCTION_NAMES`](https://github.com/search?q=repo%3Ajupyterlab%2Feslint-plugin+DEFAULT_OWNERSHIP_FUNCTION_NAMES&type=code)
+[`DEFAULT_OWNERSHIP_FUNCTION_NAMES`](https://github.com/search?q=repo%3Ajupyterlab%2Feslint-plugin+const+DEFAULT_OWNERSHIP_FUNCTION_NAMES&type=code)
 constant.
 
 Names given here are **added** to that default list, so a project only has to

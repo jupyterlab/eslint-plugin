@@ -51,7 +51,7 @@ reference, a fluent initializer, or a registration handle that the caller is not
 expected to own. Representative entries are `get`, `find`, `add`, `addCommand`,
 `open`, `register`, `set`, and `transform`, plus any name matching
 `add*Factory`. For the full list see the
-[`DEFAULT_IGNORED_RETURN_FUNCTION_NAMES`](https://github.com/search?q=repo%3Ajupyterlab%2Feslint-plugin+DEFAULT_IGNORED_RETURN_FUNCTION_NAMES&type=code)
+[`DEFAULT_IGNORED_RETURN_FUNCTION_NAMES`](https://github.com/search?q=repo%3Ajupyterlab%2Feslint-plugin+const+DEFAULT_IGNORED_RETURN_FUNCTION_NAMES&type=code)
 constant.
 
 ## Incorrect
@@ -92,7 +92,7 @@ disposables.dispose();
 Function or method names that take ownership of disposable arguments, such as
 `add`, `addWidget`, `insertWidget`, and `registerStatusItem`. For the full
 default list see the
-[`DEFAULT_OWNERSHIP_FUNCTION_NAMES`](https://github.com/search?q=repo%3Ajupyterlab%2Feslint-plugin+DEFAULT_OWNERSHIP_FUNCTION_NAMES&type=code)
+[`DEFAULT_OWNERSHIP_FUNCTION_NAMES`](https://github.com/search?q=repo%3Ajupyterlab%2Feslint-plugin+const+DEFAULT_OWNERSHIP_FUNCTION_NAMES&type=code)
 constant. Names given here are **added** to that default list.
 
 ### `extendDefaultOwnershipFunctionNames`
