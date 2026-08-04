@@ -153,6 +153,42 @@ ruleTester.run('require-disposable-ownership', requireDisposableOwnership, {
       `
     },
     {
+      // Exported by a later statement rather than at the declaration.
+      filename: typeAwareFilename,
+      code: `
+        class DisposableDelegate {
+          constructor(callback: () => void) {}
+          dispose(): void {}
+        }
+        const tracker = new DisposableDelegate(() => undefined);
+        export { tracker };
+      `
+    },
+    {
+      // Exported by a later statement under a different name.
+      filename: typeAwareFilename,
+      code: `
+        class DisposableDelegate {
+          constructor(callback: () => void) {}
+          dispose(): void {}
+        }
+        const tracker = new DisposableDelegate(() => undefined);
+        export { tracker as dialogTracker };
+      `
+    },
+    {
+      // Exported as the module default.
+      filename: typeAwareFilename,
+      code: `
+        class DisposableDelegate {
+          constructor(callback: () => void) {}
+          dispose(): void {}
+        }
+        const tracker = new DisposableDelegate(() => undefined);
+        export default tracker;
+      `
+    },
+    {
       // Exported singleton inside a namespace (Dialog.tracker,
       // Notification.manager).
       filename: typeAwareFilename,
@@ -1115,6 +1151,36 @@ ruleTester.run('require-disposable-ownership', requireDisposableOwnership, {
   ],
 
   invalid: [
+    {
+      // A shadowing binding inside the callback must not silence the outer
+      // disposable: the ownership check resolves identifiers, not names.
+      filename: typeAwareFilename,
+      code: `
+        declare function defer(cb: () => void): void;
+        class DisposableDelegate {
+          constructor(callback: () => void) {}
+          dispose(): void {}
+        }
+        declare const disposables: { add(d: DisposableDelegate): void };
+
+        function go(): void {
+          const splash = new DisposableDelegate(() => undefined);
+          defer(() => {
+            {
+              const splash = new DisposableDelegate(() => undefined);
+              disposables.add(splash);
+            }
+            void splash;
+          });
+        }
+      `,
+      errors: [
+        {
+          messageId: 'unmanagedDisposableVariable',
+          data: { name: 'splash' }
+        }
+      ]
+    },
     {
       filename: typeAwareFilename,
       code: `

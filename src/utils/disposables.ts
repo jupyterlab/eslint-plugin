@@ -760,15 +760,10 @@ export function isOuterFunctionScopeVariable(
 }
 
 /**
- * Checks whether a variable is an exported binding, including inside an
- * exported `namespace` (`export const tracker = new WidgetTracker(...)`).
- *
- * Ownership of an exported singleton passes to the importers of the module, so
- * this file cannot see - and is not responsible for - its disposal. Such
- * declarations are also created exactly once and live for the lifetime of the
- * program, so there is nothing to leak.
+ * Checks whether the `export` keyword sits on a variable's own declaration, as
+ * in `export const tracker = ...`, including inside an exported `namespace`.
  */
-export function isExportedVariable(variable: TSESLint.Scope.Variable): boolean {
+function isExportedAtDeclaration(variable: TSESLint.Scope.Variable): boolean {
   return variable.defs.some(definition => {
     let current: TSESTree.Node | undefined = definition.node;
     while (current) {
@@ -793,6 +788,80 @@ export function isExportedVariable(variable: TSESLint.Scope.Variable): boolean {
 }
 
 /**
+ * Checks whether a variable is exported by a later statement rather than at its
+ * declaration: `export { tracker }`, `export { tracker as t }`, or
+ * `export default tracker`. The scope manager records each of these as a
+ * reference to the local binding, so they are matched by resolution rather than
+ * by name.
+ */
+function isExportedByExportStatement(
+  variable: TSESLint.Scope.Variable
+): boolean {
+  return variable.references.some(reference => {
+    const parent = reference.identifier.parent;
+    return (
+      parent?.type === 'ExportSpecifier' ||
+      parent?.type === 'ExportDefaultDeclaration'
+    );
+  });
+}
+
+/**
+ * Checks whether a variable is an exported binding, in any of the forms the
+ * `export` keyword can take.
+ *
+ * Ownership of an exported singleton passes to the importers of the module, so
+ * this file cannot see - and is not responsible for - its disposal. Such
+ * declarations are also created exactly once and live for the lifetime of the
+ * program, so there is nothing to leak.
+ */
+export function isExportedVariable(variable: TSESLint.Scope.Variable): boolean {
+  return (
+    isExportedAtDeclaration(variable) || isExportedByExportStatement(variable)
+  );
+}
+
+/**
+ * Checks whether this exact reference is handed to an ownership call, following
+ * only value-preserving positions on the way out: `set.add(item)`,
+ * `set.add([item])`, `set.add({ item })`, `set.add(item as IDisposable)`.
+ *
+ * Anchored on the resolved reference rather than on its name, so a same-named
+ * binding elsewhere in the callback cannot be mistaken for this variable.
+ */
+function isReferenceHandedToOwnershipCall(
+  identifier: TSESTree.Node,
+  ownership: DisposableOwnershipContext
+): boolean {
+  let current: TSESTree.Node = identifier;
+  let parent = current.parent;
+
+  while (parent && !isFunctionLike(parent)) {
+    if (parent.type === 'CallExpression') {
+      return getOwnershipArguments(parent, ownership).includes(
+        current as TSESTree.CallExpressionArgument
+      );
+    }
+
+    const preservesValue =
+      getTransparentChild(parent) === current ||
+      (parent.type === 'ArrayExpression' &&
+        parent.elements.includes(current as TSESTree.Expression)) ||
+      (parent.type === 'Property' && parent.value === current) ||
+      (parent.type === 'ObjectExpression' &&
+        parent.properties.includes(current as TSESTree.Property));
+    if (!preservesValue) {
+      return false;
+    }
+
+    current = parent;
+    parent = current.parent;
+  }
+
+  return false;
+}
+
+/**
  * Checks whether a variable escapes into a nested function that unconditionally
  * disposes it or hands off its ownership - the
  * `requestAnimationFrame(() => splash.dispose())`,
@@ -801,7 +870,9 @@ export function isExportedVariable(variable: TSESLint.Scope.Variable): boolean {
  *
  * This generalises the existing `disposed.connect(...)` special case to any
  * callback. Disposal that is itself conditional inside the callback still does
- * not count, so "cleanup only on some paths" stays reportable.
+ * not count, so "cleanup only on some paths" stays reportable. Both branches
+ * resolve identifiers to this variable rather than comparing names, so a
+ * shadowing binding inside the callback cannot silence the outer one.
  */
 export function isDisposedByNestedFunction(
   variable: TSESLint.Scope.Variable,
@@ -812,6 +883,10 @@ export function isDisposedByNestedFunction(
   for (const reference of variable.references) {
     if (getFunctionScope(reference.from) === declaringScope) {
       continue;
+    }
+
+    if (isReferenceHandedToOwnershipCall(reference.identifier, ownership)) {
+      return true;
     }
 
     const fn = getEnclosingFunction(reference.identifier);
@@ -826,10 +901,7 @@ export function isDisposedByNestedFunction(
     const disposesVariable = getUnconditionalDisposeTargets(fn).some(
       target => getIdentifierVariable(ownership.sourceCode, target) === variable
     );
-    if (
-      disposesVariable ||
-      callbackBodyTransfersOwnership(fn, variable.name, ownership)
-    ) {
+    if (disposesVariable) {
       return true;
     }
   }
@@ -1666,7 +1738,7 @@ function isOwnershipCallWithIdentifier(
   );
 }
 
-function callbackBodyTransfersOwnership(
+function forEachCallbackOwnsParameter(
   callback: TSESTree.ArrowFunctionExpression | TSESTree.FunctionExpression,
   parameterName: string,
   ownership: DisposableOwnershipContext
@@ -1715,7 +1787,7 @@ function markImmediateForEachOwnership(
   const [parameter] = callback.params;
   if (
     parameter?.type !== 'Identifier' ||
-    !callbackBodyTransfersOwnership(callback, parameter.name, ownership)
+    !forEachCallbackOwnsParameter(callback, parameter.name, ownership)
   ) {
     return;
   }
