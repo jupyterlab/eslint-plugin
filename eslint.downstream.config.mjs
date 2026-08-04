@@ -73,7 +73,8 @@ function makeTestConfig(projectName) {
         'jest': jestStub,
       },
       rules: {
-        'jupyter/require-soft-assertions-before-snapshots': 'error'
+        'jupyter/require-soft-assertions-before-snapshots': 'error',
+        'jupyter/prefer-menu-helper': 'error'
       },
       languageOptions: {
         parser: resolvedParser,

@@ -11,6 +11,7 @@ This section documents all rules currently provided by `eslint-plugin-jupyter`.
 - [no-untranslated-string](./no-untranslated-string)
 - [plugin-activation-args](./plugin-activation-args)
 - [plugin-description](./plugin-description)
+- [prefer-menu-helper](./prefer-menu-helper)
 - [require-soft-assertions-before-snapshots](./require-soft-assertions-before-snapshots)
 - [token-format](./token-format)
 
@@ -29,6 +30,7 @@ The plugin ships with a recommended configuration that enables all current rules
 | [jupyter/no-translation-concatenation](./no-translation-concatenation) | `error` |
 | [jupyter/token-format](./token-format) | `error` |
 | [jupyter/require-soft-assertions-before-snapshots](./require-soft-assertions-before-snapshots) | `warn` ¹ |
+| [jupyter/prefer-menu-helper](./prefer-menu-helper) | `warn` ¹ |
 | [jupyter/no-schema-enum](./no-schema-enum) | `warn` ² |
 | [jupyter/no-pageconfig-base-url](./no-pageconfig-base-url) | `warn` |
 
