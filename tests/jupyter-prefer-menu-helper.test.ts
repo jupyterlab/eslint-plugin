@@ -368,6 +368,25 @@ ruleTester.run('prefer-menu-helper', preferMenuHelper, {
     },
     {
       code: `
+        await page.click('text=File');
+        await page.keyboard.press('ArrowDown');
+        await page.click('text=Open from Path');
+      `,
+      errors: [
+        { messageId: 'preferMenuHelper' },
+        { messageId: 'preferMenuHelper' }
+      ]
+    },
+    {
+      code: `
+        await page.click('text=File');
+        await page.keyboard.press('Escape');
+        await page.click('text=Open from Path');
+      `,
+      errors: [{ messageId: 'preferMenuHelper' }]
+    },
+    {
+      code: `
         await page.getByRole('menuitem', { name: 'Settings' }).click();
         await page.locator('li[data-type=submenu]', { hasText: /^Theme$/ }).click();
         await page.getByRole('menuitem', { name: 'JupyterLab Dark', exact: true }).click();

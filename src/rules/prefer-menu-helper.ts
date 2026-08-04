@@ -663,11 +663,15 @@ const preferMenuHelper = createRule<Options, MessageIds>({
         return false;
       }
 
-      if (
-        isPageObjectMemberExpression(callee, 'menu') ||
-        isPageObjectMemberExpression(callee, 'keyboard')
-      ) {
+      if (isPageObjectMemberExpression(callee, 'menu')) {
         return true;
+      }
+
+      if (isPageObjectMemberExpression(callee, 'keyboard')) {
+        return (
+          getPropertyName(callee) === 'press' &&
+          getStaticString(node.arguments[0]) === 'Escape'
+        );
       }
 
       return (
