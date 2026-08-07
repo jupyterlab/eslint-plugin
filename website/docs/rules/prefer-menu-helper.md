@@ -20,7 +20,7 @@ The rule reports raw Playwright click or hover interactions when they target the
 - Follow-up role or submenu locators used immediately after a raw top-level main menu open.
 - Locator chains and simple aliases rooted at those raw selectors.
 
-Dynamic selectors are reported when their static parts clearly target a Lumino main menu. Raw context-menu flows are left to context-menu-specific rules. Files that explicitly import plain `@playwright/test` without importing `@jupyterlab/galata` are skipped because `page.menu` is not available there. Use `page.menu.openLocator()` when the test needs to leave a menu open for a screenshot; use `page.menu.clickMenuItem()` when the test needs to execute a command. The recommended config enables this rule as a warning so downstream projects can clean up existing raw menu traversals before promoting it to an error.
+Dynamic selectors are reported when their static parts clearly target a Lumino main menu. Raw context-menu flows are left to context-menu-specific rules. Files whose `test` fixture is imported from plain `@playwright/test`, rather than `@jupyterlab/galata`, are skipped because `page.menu` is not available there. Use `page.menu.openLocator()` when the test needs to leave a menu open for a screenshot; use `page.menu.clickMenuItem()` when the test needs to execute a command. The recommended config enables this rule as a warning so downstream projects can clean up existing raw menu traversals before promoting it to an error.
 
 ## Incorrect
 

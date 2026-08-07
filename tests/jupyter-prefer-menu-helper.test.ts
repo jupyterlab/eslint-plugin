@@ -110,6 +110,21 @@ ruleTester.run('prefer-menu-helper', preferMenuHelper, {
     },
     {
       code: `
+        import { expect, test } from '@playwright/test';
+        import { benchmark, galata } from '@jupyterlab/galata';
+
+        test('plain Playwright benchmark menu traversal', async ({ page }) => {
+          const perf = galata.newPerformanceHelper(page);
+          await perf.measure(async () => {
+            await page.click('li[role="menuitem"]:has-text("Kernel")');
+            await page.click('.lm-Menu ul[role="menu"] >> text=Shut Down All Kernels…');
+          });
+          expect(benchmark.nSamples).toBeGreaterThan(0);
+        });
+      `
+    },
+    {
+      code: `
         await page.locator('.jp-DirListing-item').click({ button: 'right' });
         await page.click('text=Open With');
       `

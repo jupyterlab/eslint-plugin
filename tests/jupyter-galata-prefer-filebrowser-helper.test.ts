@@ -86,6 +86,32 @@ ruleTester.run(
       },
       {
         code: `await page.dblclick('text=Close >> button.jp-Button');`
+      },
+      {
+        code: `
+          import { expect, test } from '@playwright/test';
+          import { benchmark, galata } from '@jupyterlab/galata';
+
+          test('plain Playwright benchmark file traversal', async ({ page }) => {
+            const perf = galata.newPerformanceHelper(page);
+            await perf.measure(async () => {
+              await page.click('#filebrowser >> .jp-BreadCrumbs-home');
+              await page.dblclick('#filebrowser >> text=large_notebook.ipynb');
+            });
+            expect(benchmark.nSamples).toBeGreaterThan(0);
+          });
+        `
+      },
+      {
+        code: `
+          import { test } from '@jupyterlab/galata';
+          import { expect } from '@playwright/test';
+
+          test('Galata helpers are accepted', async ({ page }) => {
+            await page.filebrowser.openHomeDirectory();
+            await expect(page.locator('body')).toBeVisible();
+          });
+        `
       }
     ],
 
@@ -142,6 +168,18 @@ ruleTester.run(
       },
       {
         code: `await page.getByText('Data.ipynb').dblclick();`,
+        errors: [{ messageId: 'preferNotebookOpenByPath' }]
+      },
+      {
+        code: `
+          import { test } from '@jupyterlab/galata';
+          import { expect } from '@playwright/test';
+
+          test('Galata file traversal', async ({ page }) => {
+            await page.dblclick('text=Data.ipynb');
+            await expect(page.locator('body')).toBeVisible();
+          });
+        `,
         errors: [{ messageId: 'preferNotebookOpenByPath' }]
       },
       // Double-clicking any dotted file name in a text match is a file open

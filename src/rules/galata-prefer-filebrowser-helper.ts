@@ -3,6 +3,7 @@
  * Distributed under the terms of the Modified BSD License.
  */
 
+import { TSESTree } from '@typescript-eslint/utils';
 import { createRule } from '../utils/create-rule';
 import {
   combineStaticSelectorText,
@@ -47,8 +48,51 @@ const galataPreferFilebrowserHelper = createRule<Options, MessageIds>({
   },
   defaultOptions: [],
   create(context) {
+    let hasGalataTestImport = false;
+    let hasPlainPlaywrightTestImport = false;
+
+    function hasNamedImport(
+      node: TSESTree.ImportDeclaration,
+      name: string
+    ): boolean {
+      return node.specifiers.some(specifier => {
+        if (specifier.type !== 'ImportSpecifier') {
+          return false;
+        }
+
+        const imported = specifier.imported;
+        return imported.type === 'Identifier'
+          ? imported.name === name
+          : imported.value === name;
+      });
+    }
+
+    function shouldCheckFilebrowserHelpers(): boolean {
+      return hasGalataTestImport || !hasPlainPlaywrightTestImport;
+    }
+
     return {
+      Program(node) {
+        for (const statement of node.body) {
+          if (statement.type !== 'ImportDeclaration') {
+            continue;
+          }
+
+          if (statement.source.value === '@jupyterlab/galata') {
+            hasGalataTestImport ||= hasNamedImport(statement, 'test');
+          }
+
+          if (statement.source.value === '@playwright/test') {
+            hasPlainPlaywrightTestImport ||= hasNamedImport(statement, 'test');
+          }
+        }
+      },
+
       CallExpression(node) {
+        if (!shouldCheckFilebrowserHelpers()) {
+          return;
+        }
+
         const match = matchSelectorInteraction(node);
         if (!match) {
           return;

@@ -399,11 +399,27 @@ const preferMenuHelper = createRule<Options, MessageIds>({
     const menuLocatorAliases: Map<string, boolean>[] = [new Map()];
     const mainMenuTraversalScopes = [false];
     const contextMenuTraversalScopes = [false];
-    let hasGalataImport = false;
+    let hasGalataTestImport = false;
     let hasPlainPlaywrightTestImport = false;
 
     function shouldCheckMenuHelpers(): boolean {
-      return hasGalataImport || !hasPlainPlaywrightTestImport;
+      return hasGalataTestImport || !hasPlainPlaywrightTestImport;
+    }
+
+    function hasNamedImport(
+      node: TSESTree.ImportDeclaration,
+      name: string
+    ): boolean {
+      return node.specifiers.some(specifier => {
+        if (specifier.type !== 'ImportSpecifier') {
+          return false;
+        }
+
+        const imported = specifier.imported;
+        return imported.type === 'Identifier'
+          ? imported.name === name
+          : imported.value === name;
+      });
     }
 
     function isMenuLocatorAlias(name: string): boolean {
@@ -728,8 +744,11 @@ const preferMenuHelper = createRule<Options, MessageIds>({
           }
 
           const source = getStaticString(statement.source);
-          hasGalataImport ||= source === '@jupyterlab/galata';
-          hasPlainPlaywrightTestImport ||= source === '@playwright/test';
+          hasGalataTestImport ||=
+            source === '@jupyterlab/galata' &&
+            hasNamedImport(statement, 'test');
+          hasPlainPlaywrightTestImport ||=
+            source === '@playwright/test' && hasNamedImport(statement, 'test');
         }
       },
 

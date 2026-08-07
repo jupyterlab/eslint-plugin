@@ -14,7 +14,7 @@ Galata UI tests often drive the file browser with raw Playwright selectors such 
 
 ## Rule details
 
-The rule flags Playwright interaction calls on the `page` fixture, both direct calls (`page.dblclick(selector)`, …) and locator chains (`page.locator(...).getByText(...).dblclick()`, including `.first()`/`.last()`/`.nth()` steps), when the selector or text contains a known file browser marker.
+The rule flags Playwright interaction calls on the `page` fixture, both direct calls (`page.dblclick(selector)`, …) and locator chains (`page.locator(...).getByText(...).dblclick()`, including `.first()`/`.last()`/`.nth()` steps), when the selector or text contains a known file browser marker. Files whose `test` fixture is imported from plain `@playwright/test`, rather than `@jupyterlab/galata`, are skipped because the Galata `page.filebrowser` and `page.notebook` helpers are not available there.
 
 Known limitation: locators stored in variables (`const item = page.locator(...); await item.dblclick();`) are not tracked.
 
