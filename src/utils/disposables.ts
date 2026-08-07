@@ -816,8 +816,86 @@ function isExportedByExportStatement(
  * program, so there is nothing to leak.
  */
 export function isExportedVariable(variable: TSESLint.Scope.Variable): boolean {
+  if (
+    !isExportedAtDeclaration(variable) &&
+    !isExportedByExportStatement(variable)
+  ) {
+    return false;
+  }
+
+  // A reassigned export is not a single module-lifetime singleton: every value
+  // but the last one is replaced, and only the last one can still be disposed.
   return (
-    isExportedAtDeclaration(variable) || isExportedByExportStatement(variable)
+    variable.references.filter(reference => reference.isWrite()).length <= 1
+  );
+}
+
+/**
+ * Checks whether a node is reached on every run of its enclosing function, that
+ * is, whether nothing conditional or repeated sits between it and the function
+ * body. This is the same standard `isUnconditionalUse` applies within a scope.
+ */
+function isUnconditionalWithinFunction(node: TSESTree.Node): boolean {
+  let parent = node.parent;
+  while (parent && !isFunctionLike(parent)) {
+    if (isConditionalOrRepeated(parent)) {
+      return false;
+    }
+    parent = parent.parent;
+  }
+  return true;
+}
+
+/**
+ * Checks whether a function expression ends up somewhere that can run it later:
+ * passed to a call, returned, stored on a field or in an object literal, or
+ * assigned to a variable that itself escapes.
+ *
+ * A callback that is only declared and never used is not a cleanup path, so
+ * `const cleanupLater = () => d.dispose();` on its own leaves `d` unmanaged.
+ */
+function isEscapingCallback(
+  fn: TSESTree.Node,
+  sourceCode: TSESLint.SourceCode
+): boolean {
+  const expression = getOuterExpression(fn);
+  const parent = expression.parent;
+  if (!parent) {
+    return false;
+  }
+
+  if (parent.type === 'VariableDeclarator' && parent.init === expression) {
+    const [variable] = sourceCode.getDeclaredVariables(parent);
+    return (
+      variable !== undefined &&
+      variable.references.some(
+        reference => !reference.init && isEscapingUse(reference.identifier)
+      )
+    );
+  }
+
+  return isEscapingUse(expression);
+}
+
+/**
+ * Positions in which a value is handed to something else: an argument or callee
+ * of a call, a return value, a field or object literal entry, an array element.
+ */
+function isEscapingUse(node: TSESTree.Node): boolean {
+  const parent = getOuterExpression(node).parent;
+  if (!parent) {
+    return false;
+  }
+  return (
+    parent.type === 'CallExpression' ||
+    parent.type === 'NewExpression' ||
+    parent.type === 'ReturnStatement' ||
+    parent.type === 'PropertyDefinition' ||
+    parent.type === 'Property' ||
+    parent.type === 'ArrayExpression' ||
+    (parent.type === 'ArrowFunctionExpression' && parent.body === node) ||
+    (parent.type === 'AssignmentExpression' &&
+      parent.left.type === 'MemberExpression')
   );
 }
 
@@ -827,7 +905,9 @@ export function isExportedVariable(variable: TSESLint.Scope.Variable): boolean {
  * `set.add([item])`, `set.add({ item })`, `set.add(item as IDisposable)`.
  *
  * Anchored on the resolved reference rather than on its name, so a same-named
- * binding elsewhere in the callback cannot be mistaken for this variable.
+ * binding elsewhere in the callback cannot be mistaken for this variable. The
+ * transfer must also be unconditional, matching how same-scope transfers are
+ * treated: a transfer that only happens on some paths is not a transfer.
  */
 function isReferenceHandedToOwnershipCall(
   identifier: TSESTree.Node,
@@ -838,8 +918,10 @@ function isReferenceHandedToOwnershipCall(
 
   while (parent && !isFunctionLike(parent)) {
     if (parent.type === 'CallExpression') {
-      return getOwnershipArguments(parent, ownership).includes(
-        current as TSESTree.CallExpressionArgument
+      return (
+        getOwnershipArguments(parent, ownership).includes(
+          current as TSESTree.CallExpressionArgument
+        ) && isUnconditionalWithinFunction(parent)
       );
     }
 
@@ -885,10 +967,6 @@ export function isDisposedByNestedFunction(
       continue;
     }
 
-    if (isReferenceHandedToOwnershipCall(reference.identifier, ownership)) {
-      return true;
-    }
-
     const fn = getEnclosingFunction(reference.identifier);
     if (
       !fn ||
@@ -896,6 +974,15 @@ export function isDisposedByNestedFunction(
         fn.type !== 'FunctionExpression')
     ) {
       continue;
+    }
+
+    // A callback nobody can run is not a cleanup path.
+    if (!isEscapingCallback(fn, ownership.sourceCode)) {
+      continue;
+    }
+
+    if (isReferenceHandedToOwnershipCall(reference.identifier, ownership)) {
+      return true;
     }
 
     const disposesVariable = getUnconditionalDisposeTargets(fn).some(

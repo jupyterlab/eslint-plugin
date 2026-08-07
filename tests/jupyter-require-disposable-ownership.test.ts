@@ -109,6 +109,42 @@ nonTypeAwareTester.run(
 ruleTester.run('require-disposable-ownership', requireDisposableOwnership, {
   valid: [
     {
+      // Ownership transfer at the top level of an escaping callback.
+      filename: typeAwareFilename,
+      code: `
+        declare function defer(cb: () => void): void;
+        class DisposableDelegate {
+          constructor(callback: () => void) {}
+          dispose(): void {}
+        }
+        declare const disposables: { add(x: DisposableDelegate): void };
+
+        function go(): void {
+          const d = new DisposableDelegate(() => undefined);
+          defer(() => {
+            disposables.add(d);
+          });
+        }
+      `
+    },
+    {
+      // A callback stored on a field can still be run later.
+      filename: typeAwareFilename,
+      code: `
+        class DisposableDelegate {
+          constructor(callback: () => void) {}
+          dispose(): void {}
+        }
+        class Owner {
+          private _cleanup: (() => void) | null = null;
+          init(): void {
+            const d = new DisposableDelegate(() => undefined);
+            this._cleanup = () => d.dispose();
+          }
+        }
+      `
+    },
+    {
       // A custom ownership name is ADDED to the defaults, so the built-in
       // `add` keeps working alongside it.
       filename: typeAwareFilename,
@@ -1151,6 +1187,69 @@ ruleTester.run('require-disposable-ownership', requireDisposableOwnership, {
   ],
 
   invalid: [
+    {
+      // A callback that is only declared, never invoked, registered or
+      // returned, is not a cleanup path.
+      filename: typeAwareFilename,
+      code: `
+        class DisposableDelegate {
+          constructor(callback: () => void) {}
+          dispose(): void {}
+        }
+
+        function go(): void {
+          const d = new DisposableDelegate(() => undefined);
+          const cleanupLater = () => d.dispose();
+        }
+      `,
+      errors: [
+        { messageId: 'unmanagedDisposableVariable', data: { name: 'd' } }
+      ]
+    },
+    {
+      // Conditional ownership transfer inside a callback is not a transfer,
+      // matching how same-scope conditional uses are treated.
+      filename: typeAwareFilename,
+      code: `
+        declare function defer(cb: () => void): void;
+        declare const condition: boolean;
+        class DisposableDelegate {
+          constructor(callback: () => void) {}
+          dispose(): void {}
+        }
+        declare const disposables: { add(x: DisposableDelegate): void };
+
+        function go(): void {
+          const d = new DisposableDelegate(() => undefined);
+          defer(() => {
+            if (condition) {
+              disposables.add(d);
+            }
+          });
+        }
+      `,
+      errors: [
+        { messageId: 'unmanagedDisposableVariable', data: { name: 'd' } }
+      ]
+    },
+    {
+      // A reassigned export is not a module-lifetime singleton: the replaced
+      // value can no longer be reached, let alone disposed.
+      filename: typeAwareFilename,
+      code: `
+        class DisposableDelegate {
+          constructor(callback: () => void) {}
+          dispose(): void {}
+        }
+
+        export let tracker = new DisposableDelegate(() => undefined);
+        tracker = new DisposableDelegate(() => undefined);
+      `,
+      errors: [
+        { messageId: 'unmanagedDisposableVariable', data: { name: 'tracker' } },
+        { messageId: 'unmanagedDisposableVariable', data: { name: 'tracker' } }
+      ]
+    },
     {
       // A shadowing binding inside the callback must not silence the outer
       // disposable: the ownership check resolves identifiers, not names.
