@@ -145,6 +145,18 @@ ruleTester.run('require-disposable-transfer', requireDisposableTransfer, {
         }
         declare function createDisposable(): IDisposable;
 
+        export const manager = createDisposable();
+      `
+    },
+    {
+      filename: typeAwareFilename,
+      code: `
+        interface IDisposable {
+          readonly isDisposed: boolean;
+          dispose(): void;
+        }
+        declare function createDisposable(): IDisposable;
+
         function forwardDisposable(): IDisposable {
           return createDisposable();
         }

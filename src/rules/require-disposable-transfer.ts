@@ -17,6 +17,7 @@ import {
   isDisposableExpressionManaged,
   isDisposableSetFactoryCall,
   isDisposableType,
+  isExportedVariable,
   isInJupyterPluginActivate,
   isOuterFunctionScopeVariable,
   markManagedDisposableUse,
@@ -224,6 +225,7 @@ const requireDisposableTransfer = createRule({
         const assignedVariable = getAssignedVariable(node, context.sourceCode);
         if (assignedVariable) {
           if (
+            isExportedVariable(assignedVariable) ||
             isOuterFunctionScopeVariable(
               node,
               assignedVariable,

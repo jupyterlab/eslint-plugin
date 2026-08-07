@@ -15,6 +15,7 @@ import {
   isDisposableConstructor,
   isDisposableExpressionManaged,
   isDisposableType,
+  isExportedVariable,
   isInJupyterPluginActivate,
   isOuterFunctionScopeVariable,
   markManagedDisposableUse,
@@ -122,6 +123,7 @@ const requireDisposableOwnership = createRule({
         const assignedVariable = getAssignedVariable(node, context.sourceCode);
         if (assignedVariable) {
           if (
+            isExportedVariable(assignedVariable) ||
             isOuterFunctionScopeVariable(
               node,
               assignedVariable,

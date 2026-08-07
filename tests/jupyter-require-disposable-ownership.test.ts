@@ -425,6 +425,22 @@ ruleTester.run('require-disposable-ownership', requireDisposableOwnership, {
     {
       filename: typeAwareFilename,
       code: `
+        class WidgetTracker<T> {
+          readonly isDisposed = false;
+          constructor(options: { namespace: string }) {}
+          dispose(): void {}
+        }
+
+        export namespace Dialog {
+          export const tracker = new WidgetTracker<object>({
+            namespace: 'example'
+          });
+        }
+      `
+    },
+    {
+      filename: typeAwareFilename,
+      code: `
         class Widget {
           readonly isDisposed = false;
           dispose(): void {}
@@ -455,6 +471,40 @@ ruleTester.run('require-disposable-ownership', requireDisposableOwnership, {
             this._state = {
               widget: new Widget()
             };
+          }
+        }
+      `
+    },
+    {
+      filename: typeAwareFilename,
+      code: `
+        class Connection {
+          readonly isDisposed = false;
+          dispose(): void {}
+        }
+
+        const _connections = new Map<string, Connection>();
+
+        function connect(): void {
+          const connection = new Connection();
+          _connections.set('python', connection);
+        }
+      `
+    },
+    {
+      filename: typeAwareFilename,
+      code: `
+        class Connection {
+          readonly isDisposed = false;
+          dispose(): void {}
+        }
+
+        namespace Private {
+          const _connections = new Map<string, Connection>();
+
+          export function connect(): void {
+            const connection = new Connection();
+            _connections.set('python', connection);
           }
         }
       `
@@ -519,6 +569,100 @@ ruleTester.run('require-disposable-ownership', requireDisposableOwnership, {
 
           return widget;
         }
+      `
+    },
+    {
+      filename: typeAwareFilename,
+      code: `
+        declare function cleanup(): void;
+        class DisposableDelegate {
+          constructor(callback: () => void) {}
+          dispose(): void {}
+        }
+
+        function load(): Promise<void> {
+          const splash = new DisposableDelegate(() => {
+            cleanup();
+          });
+
+          return Promise.resolve()
+            .then(() => {
+              requestAnimationFrame(() => {
+                splash.dispose();
+              });
+            })
+            .catch(() => {
+              splash.dispose();
+            });
+        }
+      `
+    },
+    {
+      filename: typeAwareFilename,
+      code: `
+        class Model {
+          readonly isDisposed = false;
+          dispose(): void {}
+        }
+        class Handler {
+          completer: { model?: Model };
+        }
+
+        class Manager {
+          private _panelHandlers = new Map<string, Handler>();
+
+          async updateCompleter(handler?: Handler): Promise<void> {
+            const model = new Model();
+            const options = { model };
+
+            if (!handler) {
+              const handler = await this._generateHandler(options);
+              this._panelHandlers.set('id', handler);
+            } else {
+              handler.completer.model?.dispose();
+              handler.completer.model = options.model;
+            }
+          }
+
+          private _generateHandler(options: { model: Model }): Promise<Handler> {
+            return Promise.resolve(new Handler());
+          }
+        }
+      `
+    },
+    {
+      filename: typeAwareFilename,
+      code: `
+        class Completer {
+          readonly isDisposed = false;
+          dispose(): void {}
+        }
+        class CompletionHandler {
+          readonly isDisposed = false;
+          constructor(options: { completer: Completer }) {}
+          dispose(): void {}
+        }
+
+        function createHandler(): CompletionHandler {
+          const completer = new Completer();
+          return new CompletionHandler({ completer });
+        }
+      `
+    },
+    {
+      filename: typeAwareFilename,
+      code: `
+        class InlineModel {
+          readonly isDisposed = false;
+          dispose(): void {}
+        }
+        declare const _inlineCompleterFactory: {
+          factory(options: { model?: InlineModel }): object;
+        };
+
+        _inlineCompleterFactory.factory({
+          model: new InlineModel()
+        });
       `
     },
     {
@@ -1146,6 +1290,35 @@ ruleTester.run('require-disposable-ownership', requireDisposableOwnership, {
           cleanup();
         });
         if (condition) {
+          disposable.dispose();
+        }
+      `,
+      errors: [
+        {
+          messageId: 'unmanagedDisposableVariable',
+          data: { name: 'disposable' }
+        }
+      ]
+    },
+    {
+      filename: typeAwareFilename,
+      code: `
+        declare function cleanup(): void;
+        declare const condition: boolean;
+        declare const nestedCondition: boolean;
+        class DisposableDelegate {
+          constructor(callback: () => void) {}
+          dispose(): void {}
+        }
+
+        const disposable = new DisposableDelegate(() => {
+          cleanup();
+        });
+        if (condition) {
+          if (nestedCondition) {
+            disposable.dispose();
+          }
+        } else {
           disposable.dispose();
         }
       `,
