@@ -31,6 +31,9 @@ ruleTester.run('prefer-menu-helper', preferMenuHelper, {
       code: `await page.click('text=New File');`
     },
     {
+      code: `await page.click('text="New"');`
+    },
+    {
       code: `await page.click('[title="File Browser"]');`
     },
     {
@@ -52,7 +55,13 @@ ruleTester.run('prefer-menu-helper', preferMenuHelper, {
       code: `await page.getByText('File Browser').click();`
     },
     {
+      code: `await page.getByText('New').click();`
+    },
+    {
       code: `await menu.getByText('Scratchpad console').click();`
+    },
+    {
+      code: `await page.getByRole('menuitem', { name: 'New' }).click();`
     },
     {
       code: `await newTab.getByRole('menuitem', { name: 'Run', exact: true }).click();`
@@ -77,6 +86,14 @@ ruleTester.run('prefer-menu-helper', preferMenuHelper, {
         async function clickItem(menuItem) {
           await menuItem.click();
         }
+      `
+    },
+    {
+      code: `
+        await page.click('text="New"');
+        await page
+          .locator('[data-command="notebook:create-new"] >> text="Python 3 (ipykernel)"')
+          .click();
       `
     },
     {
@@ -144,10 +161,6 @@ ruleTester.run('prefer-menu-helper', preferMenuHelper, {
       errors: [{ messageId: 'preferMenuHelper' }]
     },
     {
-      code: `await page.click('text="New"');`,
-      errors: [{ messageId: 'preferMenuHelper' }]
-    },
-    {
       code: `await page.locator('text=Run').click();`,
       errors: [{ messageId: 'preferMenuHelper' }]
     },
@@ -164,7 +177,7 @@ ruleTester.run('prefer-menu-helper', preferMenuHelper, {
       errors: [{ messageId: 'preferMenuHelper' }]
     },
     {
-      code: `await page.locator('li:has(div.lm-MenuBar-itemLabel:text-is("New"))').click();`,
+      code: `await page.locator('li:has(div.lm-MenuBar-itemLabel:text-is("Help"))').click();`,
       errors: [{ messageId: 'preferMenuHelper' }]
     },
     {
@@ -176,15 +189,7 @@ ruleTester.run('prefer-menu-helper', preferMenuHelper, {
       errors: [{ messageId: 'preferMenuHelper' }]
     },
     {
-      code: `await page.getByRole('menuitem', { name: 'New' }).click();`,
-      errors: [{ messageId: 'preferMenuHelper' }]
-    },
-    {
       code: `await page.getByText('File').click();`,
-      errors: [{ messageId: 'preferMenuHelper' }]
-    },
-    {
-      code: `await page.getByText('New').click();`,
       errors: [{ messageId: 'preferMenuHelper' }]
     },
     {

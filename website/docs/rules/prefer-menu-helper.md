@@ -10,7 +10,7 @@ Raw Playwright selectors for main menu traversal are brittle. They depend on the
 
 The rule reports raw Playwright click or hover interactions when they target the JupyterLab main menu directly:
 
-- Known top-level menu selectors such as `text=File`, `text=New`, `text=Settings`, and `li[role="menuitem"]:has-text("Kernel")`.
+- Known top-level menu selectors such as `text=File`, `text=Settings`, `text=Tabs`, and `li[role="menuitem"]:has-text("Kernel")`.
 - Lumino menu-bar label selectors such as `li:has(div.lm-MenuBar-itemLabel:text-is("File"))`.
 - Lumino menu selectors such as `.lm-Menu ul[role="menu"]` when they are used directly or while traversing an opened main menu.
 - JupyterLab main menu ids such as `#jp-mainmenu-file-new`.
@@ -26,7 +26,7 @@ Dynamic selectors are reported when their static parts clearly target a Lumino m
 
 ```ts
 await page.click('text=File');
-await page.click('text=New');
+await page.click('text=Open from Path');
 await page.click('li[role="menuitem"]:has-text("Kernel")');
 await page.click('li:has(div.lm-MenuBar-itemLabel:text-is("File"))');
 await page.click('.lm-Menu ul[role="menu"] >> text=New');

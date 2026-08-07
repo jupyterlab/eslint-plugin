@@ -16,7 +16,6 @@ const TOP_LEVEL_MENU_LABELS = new Set([
   'Run',
   'Kernel',
   'Tabs',
-  'New',
   'Settings',
   'Help'
 ]);
