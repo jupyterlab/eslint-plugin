@@ -98,6 +98,18 @@ ruleTester.run('prefer-menu-helper', preferMenuHelper, {
     },
     {
       code: `
+        import { expect, test } from '@playwright/test';
+
+        test('plain Playwright menu traversal', async ({ page }) => {
+          await page.getByRole('menuitem', { name: 'Settings' }).click();
+          await page.locator('li[data-type=submenu]', { hasText: /^Theme$/ }).click();
+          await page.getByRole('menuitem', { name: 'JupyterLab Dark', exact: true }).click();
+          await expect(page.locator('body')).toHaveClass(/jp-mod-dark/);
+        });
+      `
+    },
+    {
+      code: `
         await page.locator('.jp-DirListing-item').click({ button: 'right' });
         await page.click('text=Open With');
       `
@@ -267,6 +279,18 @@ ruleTester.run('prefer-menu-helper', preferMenuHelper, {
         { messageId: 'preferMenuHelper' },
         { messageId: 'preferMenuHelper' }
       ]
+    },
+    {
+      code: `
+        import { test } from '@jupyterlab/galata';
+        import { expect } from '@playwright/test';
+
+        test('Galata menu traversal', async ({ page }) => {
+          await page.getByRole('menuitem', { name: 'Settings' }).click();
+          await expect(page.locator('body')).toBeVisible();
+        });
+      `,
+      errors: [{ messageId: 'preferMenuHelper' }]
     },
     {
       code: `

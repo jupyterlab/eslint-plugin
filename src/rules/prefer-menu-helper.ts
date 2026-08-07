@@ -399,6 +399,12 @@ const preferMenuHelper = createRule<Options, MessageIds>({
     const menuLocatorAliases: Map<string, boolean>[] = [new Map()];
     const mainMenuTraversalScopes = [false];
     const contextMenuTraversalScopes = [false];
+    let hasGalataImport = false;
+    let hasPlainPlaywrightTestImport = false;
+
+    function shouldCheckMenuHelpers(): boolean {
+      return hasGalataImport || !hasPlainPlaywrightTestImport;
+    }
 
     function isMenuLocatorAlias(name: string): boolean {
       for (let i = menuLocatorAliases.length - 1; i >= 0; i--) {
@@ -715,6 +721,18 @@ const preferMenuHelper = createRule<Options, MessageIds>({
     }
 
     return {
+      Program(node) {
+        for (const statement of node.body) {
+          if (statement.type !== 'ImportDeclaration') {
+            continue;
+          }
+
+          const source = getStaticString(statement.source);
+          hasGalataImport ||= source === '@jupyterlab/galata';
+          hasPlainPlaywrightTestImport ||= source === '@playwright/test';
+        }
+      },
+
       FunctionDeclaration: enterFunction,
       'FunctionDeclaration:exit': exitFunction,
       FunctionExpression: enterFunction,
@@ -729,16 +747,26 @@ const preferMenuHelper = createRule<Options, MessageIds>({
       },
 
       VariableDeclarator(node) {
+        if (!shouldCheckMenuHelpers()) {
+          return;
+        }
         declarePattern(node.id, isMenuLocatorExpression(node.init));
       },
 
       AssignmentExpression(node) {
+        if (!shouldCheckMenuHelpers()) {
+          return;
+        }
         if (node.left.type === 'Identifier') {
           setAlias(node.left.name, isMenuLocatorExpression(node.right));
         }
       },
 
       CallExpression(node) {
+        if (!shouldCheckMenuHelpers()) {
+          return;
+        }
+
         const directSelectorParts =
           isPageMemberCall(node, 'click') || isPageMemberCall(node, 'hover')
             ? getStaticSelectorParts(node.arguments[0])
