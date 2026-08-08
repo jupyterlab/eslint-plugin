@@ -1447,7 +1447,7 @@ ruleTester.run('require-disposable-transfer', requireDisposableTransfer, {
         }
         declare function createDisposable(): IDisposable;
         class Owner {
-          constructor(disposable: IDisposable) {}
+          constructor(disposable: unknown) {}
         }
 
         new Owner(createDisposable());

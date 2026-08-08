@@ -1478,14 +1478,32 @@ function isOwnershipArgument(
     return true;
   }
 
-  const index = call.arguments.indexOf(
+  let index = call.arguments.indexOf(
     argument as TSESTree.CallExpressionArgument
   );
+  let elementOfArrayArgument = false;
+
   if (index < 0) {
-    return false;
+    // `new Owner([disposable])`: the element binds to the element type of the
+    // parameter, not to the parameter itself.
+    const array = argument.parent;
+    if (
+      array?.type === 'ArrayExpression' &&
+      array.elements.includes(argument as TSESTree.Expression)
+    ) {
+      index = call.arguments.indexOf(array as TSESTree.CallExpressionArgument);
+      elementOfArrayArgument = index >= 0;
+    }
+    if (!elementOfArrayArgument) {
+      return false;
+    }
   }
 
-  const type = getParameterTypeForArgument(call, index, ownership);
+  let type = getParameterTypeForArgument(call, index, ownership);
+  if (type && elementOfArrayArgument && ownership.checker) {
+    type =
+      ownership.checker.getIndexTypeOfType(type, ts.IndexKind.Number) ?? type;
+  }
   return (
     type !== null &&
     ownership.checker !== null &&
@@ -1980,13 +1998,14 @@ export function isDisposableExpressionManaged(
     return true;
   }
 
-  if (parent.type === 'CallExpression') {
+  if (parent.type === 'CallExpression' || parent.type === 'NewExpression') {
     return isOwnershipArgument(parent, expression, ownership);
   }
 
   if (
     parent.type === 'ArrayExpression' &&
-    parent.parent?.type === 'CallExpression'
+    (parent.parent?.type === 'CallExpression' ||
+      parent.parent?.type === 'NewExpression')
   ) {
     return isOwnershipArgument(parent.parent, expression, ownership);
   }

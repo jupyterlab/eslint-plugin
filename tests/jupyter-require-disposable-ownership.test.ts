@@ -109,6 +109,48 @@ nonTypeAwareTester.run(
 ruleTester.run('require-disposable-ownership', requireDisposableOwnership, {
   valid: [
     {
+      // A disposable created inline as a constructor argument: the constructor
+      // declares the parameter as disposable, so it takes ownership.
+      filename: typeAwareFilename,
+      code: `
+        class DisposableDelegate {
+          readonly isDisposed = false;
+          constructor(callback: () => void) {}
+          dispose(): void {}
+        }
+        class Owner {
+          readonly isDisposed = false;
+          constructor(disposable: DisposableDelegate) {}
+          dispose(): void {}
+        }
+
+        export function make(): Owner {
+          return new Owner(new DisposableDelegate(() => undefined));
+        }
+      `
+    },
+    {
+      // The same through an array argument: the element binds to the element
+      // type of the declared parameter.
+      filename: typeAwareFilename,
+      code: `
+        class DisposableDelegate {
+          readonly isDisposed = false;
+          constructor(callback: () => void) {}
+          dispose(): void {}
+        }
+        class Owner {
+          readonly isDisposed = false;
+          constructor(items: DisposableDelegate[]) {}
+          dispose(): void {}
+        }
+
+        export function make(): Owner {
+          return new Owner([new DisposableDelegate(() => undefined)]);
+        }
+      `
+    },
+    {
       // Mirrors ServiceManagerMock (services/src/testutils.ts): disposables are
       // properties of an object literal held in a variable that is returned.
       filename: typeAwareFilename,
