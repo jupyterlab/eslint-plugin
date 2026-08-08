@@ -109,6 +109,64 @@ nonTypeAwareTester.run(
 ruleTester.run('require-disposable-ownership', requireDisposableOwnership, {
   valid: [
     {
+      // Mirrors ServiceManagerMock (services/src/testutils.ts): disposables are
+      // properties of an object literal held in a variable that is returned.
+      filename: typeAwareFilename,
+      code: `
+        class Manager {
+          dispose(): void {}
+          readonly isDisposed: boolean = false;
+        }
+
+        export function makeServiceManager(): { contents: Manager } {
+          const thisObject = {
+            contents: new Manager(),
+            sessions: new Manager()
+          };
+          return thisObject;
+        }
+      `
+    },
+    {
+      // Mirrors ContentsManagerMock: the disposable is captured by callbacks
+      // that are wrapped in jest.fn() and hung off the returned object.
+      filename: typeAwareFilename,
+      code: `
+        class Manager {
+          driveName(path: string): string {
+            return path;
+          }
+          dispose(): void {}
+          readonly isDisposed: boolean = false;
+        }
+        declare function wrap<T>(fn: T): T;
+
+        export function makeContentsManager(): { get: (p: string) => string } {
+          const dummy = new Manager();
+          const thisObject = {
+            get: wrap((p: string) => dummy.driveName(p))
+          };
+          return thisObject;
+        }
+      `
+    },
+    {
+      // A spread carries the aggregate onwards.
+      filename: typeAwareFilename,
+      code: `
+        class Manager {
+          dispose(): void {}
+          readonly isDisposed: boolean = false;
+        }
+        declare const disposables: { add(x: unknown): void };
+
+        export function build(): void {
+          const extra = { manager: new Manager() };
+          disposables.add({ ...extra, name: 'x' });
+        }
+      `
+    },
+    {
       // Mirrors JupyterLab's createToolbarFactory (apputils/src/toolbar/factory.ts):
       // `items` is created once, passed to a helper, captured by the returned
       // factory closure and by handlers declared inside it, and never disposed.
@@ -1393,7 +1451,7 @@ ruleTester.run('require-disposable-ownership', requireDisposableOwnership, {
           dispose(): void {}
         }
         class Widget {
-          constructor(options: { disposable: DisposableDelegate }) {}
+          constructor(options: { disposable: unknown }) {}
         }
 
         new Widget({
@@ -1412,7 +1470,7 @@ ruleTester.run('require-disposable-ownership', requireDisposableOwnership, {
         }
         declare const widget: object;
         declare const values: {
-          set(owner: object, value: DisposableSet): void;
+          set(owner: object, value: unknown): void;
         };
 
         const disposables = new DisposableSet();
@@ -1715,7 +1773,7 @@ ruleTester.run('require-disposable-ownership', requireDisposableOwnership, {
           constructor(callback: () => void) {}
           dispose(): void {}
         }
-        declare const items: { add(disposable: DisposableDelegate): void };
+        declare const items: { add(disposable: unknown): void };
 
         const disposable = new DisposableDelegate(() => {
           cleanup();
