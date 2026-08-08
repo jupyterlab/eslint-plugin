@@ -900,6 +900,63 @@ function isEscapingUse(node: TSESTree.Node): boolean {
 }
 
 /**
+ * Checks whether a reference sits inside a closure that the declaring function
+ * unconditionally returns, the factory pattern:
+ *
+ * ```ts
+ * function createToolbarFactory() {
+ *   const items = new ObservableList(...);
+ *   return (widget: Widget) => { ...uses items... };
+ * }
+ * ```
+ *
+ * The closure is the function's product, so the captured state's lifetime is
+ * bound to it and belongs to whoever holds the factory. Walks outwards through
+ * enclosing functions, because the reference is often nested deeper than the
+ * returned closure itself (in a handler declared inside it).
+ *
+ * Only an unconditional `return` counts, matching how ownership transfer is
+ * treated elsewhere in this file. A closure that merely escapes as a call
+ * argument does not count: that is `defer(() => console.log(d))`, which hands
+ * off nothing.
+ */
+function isCapturedByReturnedClosure(
+  identifier: TSESTree.Node,
+  variable: TSESLint.Scope.Variable
+): boolean {
+  const declaringFunction = getFunctionScope(variable.scope)?.block;
+  if (!declaringFunction) {
+    return false;
+  }
+
+  let fn = getEnclosingFunction(identifier);
+  while (fn && fn !== declaringFunction) {
+    const expression = getOuterExpression(fn);
+    const parent = expression.parent;
+
+    const returnedFromDeclaringFunction =
+      parent?.type === 'ReturnStatement' &&
+      parent.argument === expression &&
+      getEnclosingFunction(parent) === declaringFunction &&
+      isUnconditionalWithinFunction(parent);
+
+    // `const make = () => () => items.use()` returns implicitly.
+    const isImplicitReturnBody =
+      parent?.type === 'ArrowFunctionExpression' &&
+      parent.body === expression &&
+      parent === declaringFunction;
+
+    if (returnedFromDeclaringFunction || isImplicitReturnBody) {
+      return true;
+    }
+
+    fn = getEnclosingFunction(fn);
+  }
+
+  return false;
+}
+
+/**
  * Checks whether this exact reference is handed to an ownership call, following
  * only value-preserving positions on the way out: `set.add(item)`,
  * `set.add([item])`, `set.add({ item })`, `set.add(item as IDisposable)`.
@@ -944,16 +1001,19 @@ function isReferenceHandedToOwnershipCall(
 }
 
 /**
- * Checks whether a variable escapes into a nested function that unconditionally
- * disposes it or hands off its ownership - the
- * `requestAnimationFrame(() => splash.dispose())`,
- * `void load().then(() => splash.dispose()).catch(() => splash.dispose())` and
- * `return () => items.dispose()` idioms.
+ * Checks whether a variable's lifetime is taken over by a nested function, in
+ * any of three ways:
  *
- * This generalises the existing `disposed.connect(...)` special case to any
- * callback. Disposal that is itself conditional inside the callback still does
- * not count, so "cleanup only on some paths" stays reportable. Both branches
- * resolve identifiers to this variable rather than comparing names, so a
+ * - it is captured by a closure the declaring function returns, so the closure
+ *   owns it (`createToolbarFactory`);
+ * - an escaping callback unconditionally disposes it
+ *   (`requestAnimationFrame(() => splash.dispose())`, promise chains);
+ * - an escaping callback unconditionally hands its ownership to something else.
+ *
+ * The last two generalise the existing `disposed.connect(...)` special case to
+ * any callback. Cleanup that is itself conditional inside the callback does not
+ * count, so "cleanup only on some paths" stays reportable, and every branch
+ * resolves identifiers to this variable rather than comparing names, so a
  * shadowing binding inside the callback cannot silence the outer one.
  */
 export function isDisposedByNestedFunction(
@@ -965,6 +1025,10 @@ export function isDisposedByNestedFunction(
   for (const reference of variable.references) {
     if (getFunctionScope(reference.from) === declaringScope) {
       continue;
+    }
+
+    if (isCapturedByReturnedClosure(reference.identifier, variable)) {
+      return true;
     }
 
     const fn = getEnclosingFunction(reference.identifier);

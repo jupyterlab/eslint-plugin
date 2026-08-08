@@ -109,6 +109,74 @@ nonTypeAwareTester.run(
 ruleTester.run('require-disposable-ownership', requireDisposableOwnership, {
   valid: [
     {
+      // Mirrors JupyterLab's createToolbarFactory (apputils/src/toolbar/factory.ts):
+      // `items` is created once, passed to a helper, captured by the returned
+      // factory closure and by handlers declared inside it, and never disposed.
+      // The returned closure owns it.
+      filename: typeAwareFilename,
+      code: `
+        declare class ObservableList<T> {
+          constructor(options: { itemCmp: (a: T, b: T) => boolean });
+          readonly changed: {
+            connect(cb: () => void): void;
+            disconnect(cb: () => void): void;
+          };
+          get(index: number): T;
+          dispose(): void;
+          readonly isDisposed: boolean;
+        }
+        declare function setToolbarItems(
+          items: ObservableList<string>
+        ): Promise<void>;
+        declare const registry: {
+          factoryAdded: {
+            connect(cb: () => void): void;
+            disconnect(cb: () => void): void;
+          };
+        };
+        declare const widget: { disposed: { connect(cb: () => void): void } };
+
+        export function createToolbarFactory(): () => void {
+          const items = new ObservableList<string>({
+            itemCmp: (a, b) => a === b
+          });
+
+          setToolbarItems(items).catch(() => undefined);
+
+          return () => {
+            const updateToolbar = () => {
+              void Array.from([items.get(0)]);
+            };
+            const updateWidget = () => {
+              void items.get(0);
+            };
+            registry.factoryAdded.connect(updateWidget);
+            items.changed.connect(updateToolbar);
+            widget.disposed.connect(() => {
+              items.changed.disconnect(updateToolbar);
+              registry.factoryAdded.disconnect(updateWidget);
+            });
+          };
+        }
+      `
+    },
+    {
+      // The same ownership handoff written with an implicit arrow return.
+      filename: typeAwareFilename,
+      code: `
+        class DisposableDelegate {
+          constructor(callback: () => void) {}
+          dispose(): void {}
+          use(): void {}
+        }
+        const makeFactory = () => {
+          const items = new DisposableDelegate(() => undefined);
+          return () => items.use();
+        };
+        void makeFactory;
+      `
+    },
+    {
       // Ownership transfer at the top level of an escaping callback.
       filename: typeAwareFilename,
       code: `
@@ -1187,6 +1255,27 @@ ruleTester.run('require-disposable-ownership', requireDisposableOwnership, {
   ],
 
   invalid: [
+    {
+      // A closure that captures the disposable but is not returned hands off
+      // nothing, so the disposable is still unowned.
+      filename: typeAwareFilename,
+      code: `
+        declare function defer(cb: () => void): void;
+        class DisposableDelegate {
+          constructor(callback: () => void) {}
+          dispose(): void {}
+          use(): void {}
+        }
+
+        function go(): void {
+          const items = new DisposableDelegate(() => undefined);
+          defer(() => items.use());
+        }
+      `,
+      errors: [
+        { messageId: 'unmanagedDisposableVariable', data: { name: 'items' } }
+      ]
+    },
     {
       // A callback that is only declared, never invoked, registered or
       // returned, is not a cleanup path.
