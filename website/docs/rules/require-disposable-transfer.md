@@ -115,9 +115,10 @@ Note that this option has no effect under the default settings: only
 factory-named calls (`create*`, `build*`, `make*`, `new*`) have their return
 value checked, and no name in the default list matches that pattern. The list
 becomes load-bearing only once `checkAllDisposableReturns` is enabled, where on
-JupyterLab it takes the finding count from 589 down to 37. Whether a returned
-disposable is borrowed or freshly created is not something the declared types
-express, which is why this remains a name list while ownership does not.
+JupyterLab it takes the finding count down by an order of magnitude.
+Whether a returned disposable is borrowed or freshly created is not something
+the declared types express, which is why this remains a name list while ownership
+does not.
 
 ### `extendDefaultIgnoredReturnFunctionNames`
 
