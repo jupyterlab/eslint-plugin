@@ -109,6 +109,28 @@ nonTypeAwareTester.run(
 ruleTester.run('require-disposable-ownership', requireDisposableOwnership, {
   valid: [
     {
+      // A tuple rest parameter after a leading parameter: the first rest
+      // argument maps to tuple element 0, not to element 1.
+      filename: typeAwareFilename,
+      code: `
+        class DisposableDelegate {
+          readonly isDisposed = false;
+          constructor(callback: () => void) {}
+          dispose(): void {}
+        }
+        class Plain {
+          value = 1;
+        }
+        declare const sink: {
+          (a: number, ...rest: [DisposableDelegate, Plain]): void;
+        };
+
+        export function go(): void {
+          sink(1, new DisposableDelegate(() => undefined), new Plain());
+        }
+      `
+    },
+    {
       // A disposable created inline as a constructor argument: the constructor
       // declares the parameter as disposable, so it takes ownership.
       filename: typeAwareFilename,
@@ -1355,6 +1377,35 @@ ruleTester.run('require-disposable-ownership', requireDisposableOwnership, {
   ],
 
   invalid: [
+    {
+      // Owned option names are scoped to the parameter they came from: `payload`
+      // is disposable on the first parameter only, so the second argument's
+      // object must not be credited by it.
+      filename: typeAwareFilename,
+      code: `
+        class DisposableDelegate {
+          readonly isDisposed = false;
+          constructor(callback: () => void) {}
+          dispose(): void {}
+        }
+        class Plain {
+          value = 1;
+        }
+        declare function two(
+          first: { payload: DisposableDelegate },
+          second: { payload: Plain }
+        ): void;
+
+        export function go(): void {
+          const leaked = new DisposableDelegate(() => undefined);
+          const secondBag = { payload: leaked as unknown as Plain };
+          two({ payload: new DisposableDelegate(() => undefined) }, secondBag);
+        }
+      `,
+      errors: [
+        { messageId: 'unmanagedDisposableVariable', data: { name: 'leaked' } }
+      ]
+    },
     {
       // A closure that captures the disposable but is not returned hands off
       // nothing, so the disposable is still unowned.

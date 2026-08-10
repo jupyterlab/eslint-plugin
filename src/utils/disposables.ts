@@ -1445,7 +1445,11 @@ function getParameterTypeForArgument(
       // into it rather than collapsing to the union of its elements.
       if (checker.isTupleType(type)) {
         const elements = checker.getTypeArguments(type as ts.TypeReference);
-        return elements[argumentIndex] ?? elements[elements.length - 1] ?? type;
+        // The rest parameter is always last, so `index` is its position and
+        // the argument lands at that offset into the tuple. Without this,
+        // `(a: number, ...rest: [D, X])` maps the first rest argument to `X`.
+        const offset = argumentIndex - index;
+        return elements[offset] ?? elements[elements.length - 1] ?? type;
       }
       return checker.getIndexTypeOfType(type, ts.IndexKind.Number) ?? type;
     }
@@ -1659,8 +1663,18 @@ function getObjectExpression(
  * declared type of its options parameter rather than from a table of known
  * JupyterLab classes.
  */
+/**
+ * The option names a call or constructor takes ownership of at one argument
+ * position, read from the declared type of that parameter rather than from a
+ * table of known JupyterLab classes.
+ *
+ * Scoped per argument: two parameters may both declare a `payload` property
+ * with only one of them disposable, and crediting the wrong one would suppress
+ * a real finding.
+ */
 function getManagedOptionNames(
   node: TSESTree.CallExpression | TSESTree.NewExpression,
+  argumentIndex: number,
   ownership: DisposableOwnershipContext
 ): string[] {
   const { checker } = ownership;
@@ -1668,34 +1682,30 @@ function getManagedOptionNames(
     return [];
   }
 
+  const type = getParameterTypeForArgument(node, argumentIndex, ownership);
+  if (!type) {
+    return [];
+  }
+
   const names: string[] = [];
-  node.arguments.forEach((_argument, index) => {
-    // Every parameter is inspected, not only inline object literals: the
-    // options bag is often held in a variable at the call site.
-    const type = getParameterTypeForArgument(node, index, ownership);
-    if (!type) {
-      return;
+  for (const property of type.getProperties()) {
+    const declaration = property.valueDeclaration ?? property.declarations?.[0];
+    if (!declaration) {
+      continue;
     }
-    for (const property of type.getProperties()) {
-      const declaration =
-        property.valueDeclaration ?? property.declarations?.[0];
-      if (!declaration) {
-        continue;
+    try {
+      if (
+        isDisposableTypeCached(
+          checker.getTypeOfSymbolAtLocation(property, declaration),
+          checker
+        )
+      ) {
+        names.push(property.getName());
       }
-      try {
-        if (
-          isDisposableTypeCached(
-            checker.getTypeOfSymbolAtLocation(property, declaration),
-            checker
-          )
-        ) {
-          names.push(property.getName());
-        }
-      } catch {
-        // Unresolvable property type: not an ownership claim.
-      }
+    } catch {
+      // Unresolvable property type: not an ownership claim.
     }
-  });
+  }
   return names;
 }
 
@@ -1704,19 +1714,19 @@ function markManagedKnownOptionVariables(
   node: TSESTree.CallExpression | TSESTree.NewExpression,
   ownership: DisposableOwnershipContext
 ): void {
-  const optionNames = getManagedOptionNames(node, ownership);
-  if (optionNames.length === 0) {
-    return;
-  }
-
-  for (const argument of node.arguments) {
+  node.arguments.forEach((argument, index) => {
     if (argument.type === 'ObjectExpression') {
-      continue;
+      return;
     }
 
     const object = getObjectExpression(ownership.sourceCode, argument);
     if (!object) {
-      continue;
+      return;
+    }
+
+    const optionNames = getManagedOptionNames(node, index, ownership);
+    if (optionNames.length === 0) {
+      return;
     }
 
     for (const property of object.properties) {
@@ -1727,7 +1737,7 @@ function markManagedKnownOptionVariables(
         markManagedVariables(pending, property.value, ownership);
       }
     }
-  }
+  });
 }
 
 function isOptionsObjectValueManaged(
