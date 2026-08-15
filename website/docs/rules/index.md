@@ -6,6 +6,7 @@ This section documents all rules currently provided by `eslint-plugin-jupyter`.
 
 - [command-described-by](./command-described-by)
 - [galata-prefer-filebrowser-helper](./galata-prefer-filebrowser-helper)
+- [galata-prefer-sidebar-activity-helper](./galata-prefer-sidebar-activity-helper)
 - [incorrect-translator-usage](./incorrect-translator-usage)
 - [no-dynamic-translation](./no-dynamic-translation)
 - [no-schema-enum](./no-schema-enum)
@@ -15,10 +16,10 @@ This section documents all rules currently provided by `eslint-plugin-jupyter`.
 - [plugin-activation-args](./plugin-activation-args)
 - [plugin-description](./plugin-description)
 - [prefer-signal-this-arg](./prefer-signal-this-arg)
-- [require-signal-cleanup](./require-signal-cleanup)
-- [require-signal-this-arg](./require-signal-this-arg)
 - [require-disposable-ownership](./require-disposable-ownership)
 - [require-disposable-transfer](./require-disposable-transfer)
+- [require-signal-cleanup](./require-signal-cleanup)
+- [require-signal-this-arg](./require-signal-this-arg)
 - [require-soft-assertions-before-snapshots](./require-soft-assertions-before-snapshots)
 - [token-format](./token-format)
 
@@ -44,12 +45,14 @@ The plugin ships with a recommended configuration that enables all current rules
 | [jupyter/require-signal-this-arg](./require-signal-this-arg)                                   | `error`  |
 | [jupyter/prefer-signal-this-arg](./prefer-signal-this-arg)                                     | `warn`   |
 | [jupyter/galata-prefer-filebrowser-helper](./galata-prefer-filebrowser-helper)                 | `warn` ¹ |
-| [jupyter/no-schema-enum](./no-schema-enum)                                                     | `warn` ² |
+| [jupyter/galata-prefer-sidebar-activity-helper](./galata-prefer-sidebar-activity-helper)       | `warn` ² |
+| [jupyter/no-schema-enum](./no-schema-enum)                                                     | `warn` ³ |
 | [jupyter/no-pageconfig-base-url](./no-pageconfig-base-url)                                     | `warn`   |
 | [jupyter/incorrect-translator-usage](./incorrect-translator-usage)                             | `warn`   |
 
 ¹ Applied only to `**/*.spec.{ts,js}` and `**/*.test.{ts,js}` files.
-² Applied only to `**/schema/*.json` files
+² Applied only to Galata test files, including `**/galata/test/**/*.{ts,js}`, `**/ui-tests/**/*.spec.ts`, and `**/ui-tests/**/*.test.ts`.
+³ Applied only to `**/schema/*.json` files.
 
 These defaults are the same in both `jupyterPlugin.configs.recommended` (flat config) and `plugin:@jupyter/eslint-plugin/recommended-legacy`.
 
