@@ -28,15 +28,6 @@ function getRawStringValue(node: TSESTree.Node): string | null {
   return null;
 }
 
-/**
- * Returns true if the node is a non-empty raw string literal that should be
- * wrapped in a translation call.
- */
-function isRawStringNode(node: TSESTree.Node): boolean {
-  const rawValue = getRawStringValue(node);
-  return rawValue !== null && rawValue.trim().length > 0;
-}
-
 function isSetAttributeCall(node: TSESTree.CallExpression): boolean {
   return (
     node.callee.type === 'MemberExpression' &&
@@ -73,9 +64,64 @@ function isDialogButtonCall(node: TSESTree.CallExpression): boolean {
 const MONITORED_COMMAND_PROPS = ['label', 'caption', 'usage'];
 const MONITORED_A11Y_ATTRS = ['aria-label', 'aria-description', 'title'];
 const MONITORED_SET_ATTRIBUTE_ATTRS = MONITORED_A11Y_ATTRS;
-const MONITORED_ASSIGNMENT_PROPS = ['title', 'ariaLabel'];
 const MONITORED_DIALOG_PROPS = ['title', 'body'];
-const MONITORED_JSX_ATTRS = MONITORED_A11Y_ATTRS;
+
+/** Object property names checked in any object literal. */
+const DEFAULT_CHECK_PROPERTIES = ['label', 'category'];
+/** JSX attribute names checked on any element. */
+const DEFAULT_CHECK_JSX_ATTRIBUTES = [...MONITORED_A11Y_ATTRS, 'label'];
+/**
+ * Property names checked on the left-hand side of an assignment. `label` and
+ * `caption` also cover Lumino widget titles (`this.title.label = '...'`).
+ */
+const DEFAULT_CHECK_ASSIGNMENTS = [
+  'title',
+  'ariaLabel',
+  'alt',
+  'textContent',
+  'label',
+  'caption'
+];
+
+interface Options {
+  enforcePunctuation?: boolean;
+  checkProperties?: string[];
+  checkJsxAttributes?: string[];
+  checkAssignments?: string[];
+}
+
+type MessageId =
+  | 'untranslatedCommandProp'
+  | 'untranslatedSetAttribute'
+  | 'untranslatedPropertyAssign'
+  | 'untranslatedDialogOption'
+  | 'untranslatedDialogButtonLabel'
+  | 'untranslatedJsxText'
+  | 'untranslatedJsxAttribute'
+  | 'untranslatedProperty';
+
+/**
+ * Returns the static name of a non-computed object property key, or null when
+ * the key is computed or not a plain identifier/string.
+ */
+function getPropertyKeyName(node: TSESTree.Property): string | null {
+  if (node.computed) {
+    return null;
+  }
+  if (node.key.type === 'Identifier') {
+    return node.key.name;
+  }
+  if (node.key.type === 'Literal' && typeof node.key.value === 'string') {
+    return node.key.value;
+  }
+  return null;
+}
+
+const NAME_LIST_SCHEMA = {
+  type: 'array' as const,
+  items: { type: 'string' as const },
+  uniqueItems: true
+};
 
 const noUntranslatedString = createRule({
   name: 'no-untranslated-string',
@@ -93,31 +139,101 @@ const noUntranslatedString = createRule({
         'setAttribute("{{ attr }}", ...) has an untranslated string literal. Wrap the value with trans.__().',
       untranslatedPropertyAssign:
         'Assignment to "{{ prop }}" has an untranslated string literal. Wrap it with trans.__().',
-      untranslatedTitleProp:
-        'Assignment to "title.{{ prop }}" has an untranslated string literal. Wrap it with trans.__().',
       untranslatedDialogOption:
         'Dialog/showDialog "{{ prop }}" option has an untranslated string literal. Wrap it with trans.__().',
       untranslatedDialogButtonLabel:
         'Dialog button "label" option has an untranslated string literal. Wrap it with trans.__().',
       untranslatedJsxText:
-        'JSX text content has an untranslated string literal. Wrap it with {trans.__(...)}'
+        'JSX text content has an untranslated string literal. Wrap it with {trans.__(...)}',
+      untranslatedJsxAttribute:
+        'JSX attribute "{{ prop }}" has an untranslated string literal. Wrap it with {trans.__(...)}',
+      untranslatedProperty:
+        'Property "{{ prop }}" has an untranslated string literal. Wrap it with trans.__().'
     },
     schema: [
       {
         type: 'object',
         properties: {
-          enforcePunctuation: { type: 'boolean' }
+          enforcePunctuation: { type: 'boolean' },
+          checkProperties: NAME_LIST_SCHEMA,
+          checkJsxAttributes: NAME_LIST_SCHEMA,
+          checkAssignments: NAME_LIST_SCHEMA
         },
         additionalProperties: false
       }
     ]
   },
-  defaultOptions: [{ enforcePunctuation: false }],
+  defaultOptions: [
+    {
+      enforcePunctuation: false,
+      checkProperties: DEFAULT_CHECK_PROPERTIES,
+      checkJsxAttributes: DEFAULT_CHECK_JSX_ATTRIBUTES,
+      checkAssignments: DEFAULT_CHECK_ASSIGNMENTS
+    }
+  ],
 
   create(context) {
-    const enforcePunctuation =
-      (context.options[0] as { enforcePunctuation?: boolean })
-        ?.enforcePunctuation ?? false;
+    const options = context.options[0] as Options | undefined;
+    const enforcePunctuation = options?.enforcePunctuation ?? false;
+    const checkProperties = new Set(
+      options?.checkProperties ?? DEFAULT_CHECK_PROPERTIES
+    );
+    const checkJsxAttributes = new Set(
+      options?.checkJsxAttributes ?? DEFAULT_CHECK_JSX_ATTRIBUTES
+    );
+    const checkAssignments = new Set(
+      options?.checkAssignments ?? DEFAULT_CHECK_ASSIGNMENTS
+    );
+
+    /**
+     * Returns true if the text should be wrapped in a translation call. Blank
+     * strings are never reported. Strings with no letters, such as '/' and '¶',
+     * are only reported when `enforcePunctuation` is on.
+     */
+    function isReportableText(value: string): boolean {
+      return (
+        value.trim().length > 0 && (enforcePunctuation || hasLetters(value))
+      );
+    }
+
+    /**
+     * Returns true if the node is a raw string literal (or a concise arrow
+     * returning one) whose text should be wrapped in a translation call.
+     */
+    function isReportableString(node: TSESTree.Node): boolean {
+      const value = getRawStringValue(node);
+      return value !== null && isReportableText(value);
+    }
+
+    // Nodes already reported by a more specific branch (e.g. addCommand or a
+    // Dialog button builder), so the generic `checkProperties` check does not
+    // duplicate them. Enclosing calls are visited before the properties they
+    // contain, so the specific branch always runs first.
+    const reportedNodes = new Set<TSESTree.Node>();
+
+    function report(
+      node: TSESTree.Node,
+      messageId: MessageId,
+      data?: Record<string, string>
+    ): void {
+      reportedNodes.add(node);
+      context.report({ node, messageId, data });
+    }
+
+    /**
+     * Reports a monitored JSX attribute whose value is a raw string.
+     */
+    function checkJsxAttributeValue(
+      attrName: string | null,
+      value: TSESTree.Node
+    ): void {
+      if (!attrName || !checkJsxAttributes.has(attrName)) {
+        return;
+      }
+      if (isReportableString(value)) {
+        report(value, 'untranslatedJsxAttribute', { prop: attrName });
+      }
+    }
 
     return {
       CallExpression(node) {
@@ -133,12 +249,8 @@ const noUntranslatedString = createRule({
           const properties = getObjectProperties(optionsArg);
           for (const propName of MONITORED_COMMAND_PROPS) {
             const prop = properties.get(propName);
-            if (prop && isRawStringNode(prop.value)) {
-              context.report({
-                node: prop.value,
-                messageId: 'untranslatedCommandProp',
-                data: { prop: propName }
-              });
+            if (prop && isReportableString(prop.value)) {
+              report(prop.value, 'untranslatedCommandProp', { prop: propName });
             }
           }
           return;
@@ -158,11 +270,9 @@ const noUntranslatedString = createRule({
             return;
           }
           const attrValueArg = node.arguments[1];
-          if (isRawStringNode(attrValueArg)) {
-            context.report({
-              node: attrValueArg,
-              messageId: 'untranslatedSetAttribute',
-              data: { attr: attrNameArg.value }
+          if (isReportableString(attrValueArg)) {
+            report(attrValueArg, 'untranslatedSetAttribute', {
+              attr: attrNameArg.value
             });
           }
           return;
@@ -180,11 +290,9 @@ const noUntranslatedString = createRule({
           const properties = getObjectProperties(optionsArg);
           for (const propName of MONITORED_DIALOG_PROPS) {
             const prop = properties.get(propName);
-            if (prop && isRawStringNode(prop.value)) {
-              context.report({
-                node: prop.value,
-                messageId: 'untranslatedDialogOption',
-                data: { prop: propName }
+            if (prop && isReportableString(prop.value)) {
+              report(prop.value, 'untranslatedDialogOption', {
+                prop: propName
               });
             }
           }
@@ -202,11 +310,8 @@ const noUntranslatedString = createRule({
           }
           const properties = getObjectProperties(optionsArg);
           const labelProp = properties.get('label');
-          if (labelProp && isRawStringNode(labelProp.value)) {
-            context.report({
-              node: labelProp.value,
-              messageId: 'untranslatedDialogButtonLabel'
-            });
+          if (labelProp && isReportableString(labelProp.value)) {
+            report(labelProp.value, 'untranslatedDialogButtonLabel');
           }
         }
       },
@@ -226,12 +331,8 @@ const noUntranslatedString = createRule({
         const properties = getObjectProperties(optionsArg);
         for (const propName of MONITORED_DIALOG_PROPS) {
           const prop = properties.get(propName);
-          if (prop && isRawStringNode(prop.value)) {
-            context.report({
-              node: prop.value,
-              messageId: 'untranslatedDialogOption',
-              data: { prop: propName }
-            });
+          if (prop && isReportableString(prop.value)) {
+            report(prop.value, 'untranslatedDialogOption', { prop: propName });
           }
         }
       },
@@ -249,65 +350,50 @@ const noUntranslatedString = createRule({
           return;
         }
 
-        // element.title = STRING  or  element.ariaLabel = STRING
+        // Any monitored assignment target: element.title = STRING,
+        // widget.label = STRING, this.label = STRING, node.textContent = STRING,
+        // and Lumino widget titles such as this.title.label = STRING
         if (
-          MONITORED_ASSIGNMENT_PROPS.includes(left.property.name) &&
-          isRawStringNode(node.right)
+          checkAssignments.has(left.property.name) &&
+          isReportableString(node.right)
         ) {
-          context.report({
-            node: node.right,
-            messageId: 'untranslatedPropertyAssign',
-            data: { prop: left.property.name }
-          });
-          return;
-        }
-
-        // *.title.label = STRING  or  *.title.caption = STRING
-        if (
-          (left.property.name === 'label' ||
-            left.property.name === 'caption') &&
-          left.object.type === 'MemberExpression' &&
-          !left.object.computed &&
-          left.object.property.type === 'Identifier' &&
-          left.object.property.name === 'title' &&
-          isRawStringNode(node.right)
-        ) {
-          context.report({
-            node: node.right,
-            messageId: 'untranslatedTitleProp',
-            data: { prop: left.property.name }
+          report(node.right, 'untranslatedPropertyAssign', {
+            prop: left.property.name
           });
         }
       },
 
-      // Accessibility attribute with a plain string: <span aria-label="text" />
+      // Any monitored object property: { label: 'raw string' }.
+      // Runs after the call-specific branches above, which mark the nodes they
+      // already reported so a property is never reported twice.
+      Property(node) {
+        if (node.shorthand) {
+          return;
+        }
+        const keyName = getPropertyKeyName(node);
+        if (!keyName || !checkProperties.has(keyName)) {
+          return;
+        }
+        if (reportedNodes.has(node.value) || !isReportableString(node.value)) {
+          return;
+        }
+        report(node.value, 'untranslatedProperty', { prop: keyName });
+      },
+
+      // Monitored attribute with a plain string: <span aria-label="text" />
       JSXAttribute(node) {
         if (!node.value || node.value.type === 'JSXExpressionContainer') {
           return;
         }
         const attrName =
           node.name.type === 'JSXIdentifier' ? node.name.name : null;
-        if (!attrName || !MONITORED_JSX_ATTRS.includes(attrName)) {
-          return;
-        }
-        if (isRawStringNode(node.value)) {
-          context.report({
-            node: node.value,
-            messageId: 'untranslatedJsxText'
-          });
-        }
+        checkJsxAttributeValue(attrName, node.value);
       },
 
       // Raw text between JSX tags: <span>Untranslated text</span>
       JSXText(node) {
-        if (
-          node.value.trim().length > 0 &&
-          (enforcePunctuation || hasLetters(node.value))
-        ) {
-          context.report({
-            node,
-            messageId: 'untranslatedJsxText'
-          });
+        if (isReportableText(node.value)) {
+          report(node, 'untranslatedJsxText');
         }
       },
 
@@ -321,28 +407,11 @@ const noUntranslatedString = createRule({
             node.parent.name.type === 'JSXIdentifier'
               ? node.parent.name.name
               : null;
-          if (!attrName || !MONITORED_JSX_ATTRS.includes(attrName)) {
-            return;
-          }
-          if (isRawStringNode(node.expression)) {
-            context.report({
-              node: node.expression,
-              messageId: 'untranslatedJsxText'
-            });
-          }
+          checkJsxAttributeValue(attrName, node.expression);
           return;
         }
-        if (isRawStringNode(node.expression)) {
-          const value = getRawStringValue(node.expression);
-          if (
-            value !== null &&
-            (enforcePunctuation ? value.trim().length > 0 : hasLetters(value))
-          ) {
-            context.report({
-              node: node.expression,
-              messageId: 'untranslatedJsxText'
-            });
-          }
+        if (isReportableString(node.expression)) {
+          report(node.expression, 'untranslatedJsxText');
         }
       }
     };
