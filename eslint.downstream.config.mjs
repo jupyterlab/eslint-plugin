@@ -94,7 +94,8 @@ function makeDisposableTestSeverityConfig(projectName) {
     ],
     rules: {
       'jupyter/require-disposable-ownership': 'warn',
-      'jupyter/require-disposable-transfer': 'warn'
+      'jupyter/require-disposable-transfer': 'warn',
+      'jupyter/prefer-lazy-imports': 'off'
     }
   };
 }

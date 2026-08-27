@@ -152,7 +152,7 @@ The manifest only ever adds to `allowedPackages`. Setting that option does not s
 
 ### `allowedPackages`
 
-Packages which the application loads eagerly anyway, so importing them at the top of a plugin module costs nothing. `*` matches any run of characters, and a `!` prefix denies a package matched by an earlier pattern. Subpath imports are matched against their owning package, so `@jupyterlab/*` covers `@jupyterlab/services/lib/kernel`.
+Packages which the application loads eagerly anyway, so importing them at the top of a plugin module costs nothing. `*` matches any run of characters, and a `!` prefix denies a package whatever else in the list matches it. Subpath imports are matched against their owning package, so `@jupyterlab/*` covers `@jupyterlab/services/lib/kernel`.
 
 Setting this option replaces the default list. The default is the singleton list from JupyterLab's `staging/package.json`, minus `@lumino/datagrid`.
 
@@ -215,7 +215,7 @@ Import specifiers to skip, matched with the same `*` wildcards:
 
 The smallest module worth deferring, in bytes, default `4096`. Set it to `0` to report every module whatever its size.
 
-The rule resolves a relative import on disk and measures the code in it, plus the code of everything it statically imports by relative path. Comments and type declarations are removed first, because TypeScript erases them and they never reach the bundle. This is what keeps a file of interfaces from being reported. Such a file can be several kilobytes of source and a few hundred bytes once compiled, and the rule sees the smaller figure.
+The rule resolves a relative import on disk, compiles it with TypeScript, and measures the emitted code plus the code of everything it statically imports by relative path. Comments and type declarations are gone from that output, so they never count. This is what keeps a file of interfaces from being reported. Such a file can be several kilobytes of source and a few hundred bytes once compiled, and the rule sees the smaller figure.
 
 Measuring the closure rather than the single file matters just as much in the other direction. A few hundred bytes of glue which imports a whole subsystem counts as the size of that subsystem.
 
@@ -228,13 +228,13 @@ Measured over JupyterLab core and a range of extensions:
 | `minimumSize` | Imports reported | Code covered |
 | ------------- | ---------------- | ------------ |
 | `0`           | 100%             | 100%         |
-| `1024`        | 86%              | 100%         |
-| `2048`        | 71%              | 99%          |
-| `4096`        | 51%              | 96%          |
-| `8192`        | 38%              | 93%          |
+| `1024`        | 82%              | 99%          |
+| `2048`        | 62%              | 98%          |
+| `4096`        | 46%              | 95%          |
+| `8192`        | 36%              | 92%          |
 | `16384`       | 17%              | 80%          |
 
-You can lower `minimumSize` to `1024` to increase the coverage, at the cost of roughly twice as many reports. Raising it to `8192` or higher allows to restrict the reports further to largest modules only.
+You can lower `minimumSize` to `1024` to increase the coverage, at the cost of roughly twice as many reports. Raising it to `8192` or higher lets you restrict the reports to the largest modules only.
 
 The shipped bytes behind one report are modest. At the `4096` boundary a report is worth roughly 2.5 KB minified and under a kilobyte gzipped. A few large modules carry most of the total, so the first few reports in a package are usually worth more than all the rest together.
 
@@ -266,6 +266,6 @@ Counting the other importers does not answer that. Some of them are tests, which
 
 So defer at the edge of a subsystem rather than one module at a time. When the same source is reported from several plugin files which all load at startup, defer it in all of them or in none.
 
-Sizes are an estimate. The rule counts source bytes after stripping comments and type declarations. That tracks the compiled output closely, but it is not the same as bundled and minified bytes. It also stops at package boundaries, so a small module which pulls in a large dependency is measured as small.
+Sizes are an estimate. The rule counts compiled bytes, which is not the same as bundled and minified bytes. It also stops at package boundaries, so a small module which pulls in a large dependency is measured as small.
 
 Value re-exports are not reported, only taken into account. Splitting an entry point which re-exports its own implementation is a larger refactor than this rule tries to describe.

@@ -5,8 +5,17 @@
 
 import * as fs from 'fs';
 import * as path from 'path';
+import * as ts from 'typescript';
+import { ALWAYS_IGNORED_IMPORTS, matchesPatterns } from './lazy-imports';
 
-const EXTENSIONS = ['.ts', '.tsx', '.js', '.jsx', '.mjs', '.cjs'];
+const CODE_EXTENSIONS = ['.ts', '.tsx', '.js', '.jsx', '.mjs', '.cjs'];
+
+/** Suffixes an ESM specifier may carry which the source file does not. */
+const OUTPUT_TO_SOURCE: Record<string, string[]> = {
+  '.js': ['.ts', '.tsx', '.js', '.jsx'],
+  '.mjs': ['.mts', '.mjs'],
+  '.cjs': ['.cts', '.cjs']
+};
 
 /** Stops a pathological import graph from dominating lint time. */
 const MAX_FILES = 300;
@@ -14,7 +23,7 @@ const MAX_DEPTH = 12;
 
 interface FileInfo {
   mtimeMs: number;
-  /** Bytes of code left once comments and type declarations are removed. */
+  /** Bytes of code left once TypeScript has compiled the module away. */
   size: number;
   /** Resolved paths of the statically imported relative modules. */
   dependencies: string[];
@@ -24,8 +33,9 @@ const fileCache = new Map<string, FileInfo | null>();
 
 /**
  * Resolves a relative import specifier to a file, trying the usual extensions
- * and an `index` file inside a directory. Returns null for a bare package
- * specifier, or when nothing matches.
+ * and an `index` file inside a directory. A specifier written for ESM output,
+ * such as `./widget.js`, also resolves to the source it was compiled from.
+ * Returns null for a bare package specifier, or when nothing matches.
  */
 export function resolveRelativeModule(
   specifier: string,
@@ -35,9 +45,22 @@ export function resolveRelativeModule(
     return null;
   }
   const base = path.resolve(path.dirname(fromFile), specifier);
+
+  const outputExtension = path.extname(base);
+  const sourceExtensions = OUTPUT_TO_SOURCE[outputExtension];
+  if (sourceExtensions) {
+    const withoutExtension = base.slice(0, -outputExtension.length);
+    for (const extension of sourceExtensions) {
+      const candidate = withoutExtension + extension;
+      if (isFile(candidate)) {
+        return candidate;
+      }
+    }
+  }
+
   const candidates = [
-    ...EXTENSIONS.map(extension => base + extension),
-    ...EXTENSIONS.map(extension => path.join(base, `index${extension}`))
+    ...CODE_EXTENSIONS.map(extension => base + extension),
+    ...CODE_EXTENSIONS.map(extension => path.join(base, `index${extension}`))
   ];
   for (const candidate of candidates) {
     if (isFile(candidate)) {
@@ -56,110 +79,77 @@ function isFile(candidate: string): boolean {
 }
 
 /**
- * Removes comments, leaving string and template literals untouched so that a
- * `//` inside a URL is not mistaken for one.
+ * Compiles a module and returns the bytes it contributes to a bundle. Comments
+ * and everything TypeScript erases are gone from the result, so a file of
+ * interface declarations measures near zero.
  */
-function stripComments(source: string): string {
-  let out = '';
-  let index = 0;
-  while (index < source.length) {
-    const char = source[index];
-    if (char === '/' && source[index + 1] === '*') {
-      const end = source.indexOf('*/', index + 2);
-      index = end < 0 ? source.length : end + 2;
-    } else if (char === '/' && source[index + 1] === '/') {
-      const end = source.indexOf('\n', index);
-      index = end < 0 ? source.length : end;
-    } else if (char === '"' || char === "'" || char === '`') {
-      let end = index + 1;
-      while (end < source.length) {
-        if (source[end] === '\\') {
-          end += 2;
-          continue;
-        }
-        if (source[end] === char) {
-          break;
-        }
-        end += 1;
+function compiledSize(filePath: string, source: string): number {
+  const isTsx = filePath.endsWith('.tsx') || filePath.endsWith('.jsx');
+  let emitted: string;
+  try {
+    emitted = ts.transpileModule(source, {
+      fileName: filePath,
+      reportDiagnostics: false,
+      compilerOptions: {
+        target: ts.ScriptTarget.ES2020,
+        module: ts.ModuleKind.ESNext,
+        removeComments: true,
+        isolatedModules: true,
+        jsx: isTsx ? ts.JsxEmit.Preserve : undefined
       }
-      out += source.slice(index, end + 1);
-      index = end + 1;
-    } else {
-      out += char;
-      index += 1;
-    }
+    }).outputText;
+  } catch {
+    emitted = source;
   }
-  return out;
+  return Buffer.byteLength(emitted.replace(/\s+/g, ' ').trim(), 'utf8');
 }
 
-const TYPE_DECLARATION =
-  /\b(?:export\s+)?(?:declare\s+)?(interface\s+\w|type\s+\w[\w\s,<>]*=)|\b(?:import|export)\s+type\s/g;
-
 /**
- * Removes interface bodies, type aliases and type-only imports, which
- * TypeScript erases and which therefore add nothing to the bundle.
+ * Collects the relative modules a file imports at run time. Type-only imports
+ * are skipped because TypeScript erases them, and so are dynamic imports,
+ * which are deferred already.
  */
-function stripTypeDeclarations(source: string): string {
-  let out = '';
-  let index = 0;
-  TYPE_DECLARATION.lastIndex = 0;
-  let match: RegExpExecArray | null;
-  while ((match = TYPE_DECLARATION.exec(source)) !== null) {
-    if (match.index < index) {
+function collectDependencies(filePath: string, source: string): string[] {
+  const dependencies: string[] = [];
+  let sourceFile: ts.SourceFile;
+  try {
+    sourceFile = ts.createSourceFile(
+      filePath,
+      source,
+      ts.ScriptTarget.ES2020,
+      false
+    );
+  } catch {
+    return dependencies;
+  }
+
+  for (const statement of sourceFile.statements) {
+    let specifier: ts.Expression | undefined;
+    if (ts.isImportDeclaration(statement)) {
+      if (statement.importClause?.isTypeOnly) {
+        continue;
+      }
+      specifier = statement.moduleSpecifier;
+    } else if (ts.isExportDeclaration(statement)) {
+      if (statement.isTypeOnly) {
+        continue;
+      }
+      specifier = statement.moduleSpecifier;
+    }
+    if (!specifier || !ts.isStringLiteral(specifier)) {
       continue;
     }
-    out += source.slice(index, match.index);
-    index = skipDeclaration(source, match);
-    TYPE_DECLARATION.lastIndex = index;
+    if (matchesPatterns(specifier.text, ALWAYS_IGNORED_IMPORTS)) {
+      // An asset the bundler turns into a URL adds nothing to the bundle.
+      continue;
+    }
+    const resolved = resolveRelativeModule(specifier.text, filePath);
+    if (resolved) {
+      dependencies.push(resolved);
+    }
   }
-  return out + source.slice(index);
+  return dependencies;
 }
-
-/**
- * Returns the offset just past the declaration which `match` starts.
- */
-function skipDeclaration(source: string, match: RegExpExecArray): number {
-  let index = match.index + match[0].length;
-  const isInterface = match[1]?.startsWith('interface');
-
-  if (isInterface) {
-    while (index < source.length && source[index] !== '{') {
-      index += 1;
-    }
-    let depth = 0;
-    while (index < source.length) {
-      if (source[index] === '{') {
-        depth += 1;
-      } else if (source[index] === '}') {
-        depth -= 1;
-        if (depth === 0) {
-          return index + 1;
-        }
-      }
-      index += 1;
-    }
-    return index;
-  }
-
-  // A type alias or a type-only import ends at the first `;` or line break
-  // which is not nested inside brackets.
-  let depth = 0;
-  while (index < source.length) {
-    const char = source[index];
-    if (char === '{' || char === '(' || char === '[' || char === '<') {
-      depth += 1;
-    } else if (char === '}' || char === ')' || char === ']' || char === '>') {
-      depth -= 1;
-    } else if (depth <= 0 && (char === ';' || char === '\n')) {
-      return char === ';' ? index + 1 : index;
-    }
-    index += 1;
-  }
-  return index;
-}
-
-const STATIC_IMPORT =
-  /(?:^|\n)\s*(?:import|export)\s+(?![\s]*type\s)(?:[\s\S]*?\sfrom\s+)?['"]([^'"]+)['"]/g;
 
 /**
  * Reads a file and records the size of its code and the relative modules it
@@ -181,7 +171,7 @@ function readFileInfo(filePath: string): FileInfo | null {
 
   // An asset inlined into the bundle, such as an SVG or a raw stylesheet,
   // contributes its bytes as they are and imports nothing.
-  if (!EXTENSIONS.includes(path.extname(filePath))) {
+  if (!CODE_EXTENSIONS.includes(path.extname(filePath))) {
     const info: FileInfo = { mtimeMs, size: stats.size, dependencies: [] };
     fileCache.set(filePath, info);
     return info;
@@ -195,21 +185,10 @@ function readFileInfo(filePath: string): FileInfo | null {
     return null;
   }
 
-  const code = stripTypeDeclarations(stripComments(source));
-  const dependencies: string[] = [];
-  STATIC_IMPORT.lastIndex = 0;
-  let match: RegExpExecArray | null;
-  while ((match = STATIC_IMPORT.exec(code)) !== null) {
-    const resolved = resolveRelativeModule(match[1], filePath);
-    if (resolved) {
-      dependencies.push(resolved);
-    }
-  }
-
   const info: FileInfo = {
     mtimeMs,
-    size: Buffer.byteLength(code.replace(/\s+/g, ' ').trim(), 'utf8'),
-    dependencies
+    size: compiledSize(filePath, source),
+    dependencies: collectDependencies(filePath, source)
   };
   fileCache.set(filePath, info);
   return info;
@@ -217,8 +196,7 @@ function readFileInfo(filePath: string): FileInfo | null {
 
 /**
  * Sums the code size of a module and of every relative module it statically
- * imports. Dynamic imports are left out because they are already deferred.
- * Returns null when the file cannot be read.
+ * imports. Returns null when the file cannot be read.
  */
 export function getTransitiveCodeSize(entry: string): number | null {
   const root = readFileInfo(entry);

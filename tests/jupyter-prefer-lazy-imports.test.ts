@@ -10,11 +10,16 @@ import { DEFAULT_ALLOWED_PACKAGES } from '../src/utils/lazy-imports';
 
 // Relative imports in these cases resolve against `tests/fixtures`, so the
 // rule can measure how much code they hold.
-const fixtureFilename = 'tests/fixtures/lazy-plugin.ts';
+const fixtureFilename = path.join(__dirname, 'fixtures', 'lazy-plugin.ts');
 
 // This directory holds a manifest whose `jupyterlab.sharedPackages` marks
 // `@myorg/host-provided` as supplied by the application.
-const sharedPkgFilename = 'tests/fixtures/shared-pkg/lazy-plugin.ts';
+const sharedPkgFilename = path.join(
+  __dirname,
+  'fixtures',
+  'shared-pkg',
+  'lazy-plugin.ts'
+);
 
 const ruleTester = new RuleTester({
   languageOptions: {
@@ -37,6 +42,83 @@ const tsxTester = new RuleTester({
       tsconfigRootDir: path.resolve(__dirname, '..')
     }
   }
+});
+
+// The recommended config applies this rule to plain JavaScript, which ESLint
+// parses with espree.
+const espreeTester = new RuleTester({
+  languageOptions: {
+    ecmaVersion: 2022,
+    sourceType: 'module'
+  }
+});
+
+// Resolving a renamed type import needs the TypeScript program.
+const typeAwareTester = new RuleTester({
+  languageOptions: {
+    parser: require('@typescript-eslint/parser'),
+    parserOptions: {
+      ecmaVersion: 2020,
+      sourceType: 'module',
+      projectService: {
+        allowDefaultProject: ['tests/*.ts'],
+        defaultProject: 'tsconfig.json'
+      },
+      tsconfigRootDir: path.resolve(__dirname, '..')
+    }
+  }
+});
+
+espreeTester.run('prefer-lazy-imports (javascript)', preferLazyImports, {
+  valid: [
+    {
+      filename: fixtureFilename,
+      code: `
+        import { CommandIDs } from './lazy-tiny';
+        export default {
+          id: 'test:plugin',
+          autoStart: true,
+          activate: () => CommandIDs.open
+        };
+      `
+    }
+  ],
+  invalid: [
+    // A plugin written in JavaScript is detected by its shape and reported.
+    {
+      filename: fixtureFilename,
+      code: `
+        import { HeavyTable } from './lazy-large';
+        export default {
+          id: 'test:plugin',
+          autoStart: true,
+          activate: () => new HeavyTable({ rows: 2, columns: 2 })
+        };
+      `,
+      errors: [{ messageId: 'preferLazyImport' }]
+    }
+  ]
+});
+
+typeAwareTester.run('prefer-lazy-imports (type-aware)', preferLazyImports, {
+  valid: [],
+  invalid: [
+    // The plugin type is renamed through an import alias, so only the checker
+    // can tell that this file declares a plugin.
+    {
+      filename: 'tests/type-aware-fixture.ts',
+      code: `
+        import { JupyterFrontEndPlugin as JFEP } from './fixtures/types';
+        import { HeavyWidget } from 'heavy-pkg';
+        const plugin: JFEP<void> = {
+          id: 'test:plugin',
+          autoStart: true,
+          activate: () => new HeavyWidget()
+        };
+      `,
+      errors: [{ messageId: 'preferLazyImport' }]
+    }
+  ]
 });
 
 ruleTester.run('prefer-lazy-imports', preferLazyImports, {
@@ -347,6 +429,79 @@ ruleTester.run('prefer-lazy-imports', preferLazyImports, {
         };
       `
     },
+    // `requires` on an unrelated options object does not pin the import.
+    // The reference is inside a function, so the import is still reported;
+    // this case guards the opposite mistake of suppressing it.
+    {
+      code: `
+        import { JupyterFrontEndPlugin } from '@jupyterlab/application';
+        import { ILayoutRestorer } from './layoutrestorer';
+        const plugin: JupyterFrontEndPlugin<void> = {
+          id: 'test:plugin',
+          optional: [ILayoutRestorer],
+          activate: (app, restorer) => restorer
+        };
+      `
+    },
+    // A function passed by name to a method which calls it straight away.
+    {
+      code: `
+        import { JupyterFrontEndPlugin } from '@jupyterlab/application';
+        import { transform } from 'some-lib';
+        const makeLabel = (value: number) => transform(value);
+        const labels = [1, 2].map(makeLabel);
+        const plugin: JupyterFrontEndPlugin<void> = {
+          id: 'test:plugin',
+          autoStart: true,
+          activate: () => labels
+        };
+      `
+    },
+    // A callback given to `new Promise` runs while the module is evaluated.
+    {
+      code: `
+        import { JupyterFrontEndPlugin } from '@jupyterlab/application';
+        import { connect } from 'some-lib';
+        const ready = new Promise(resolve => resolve(connect()));
+        const plugin: JupyterFrontEndPlugin<void> = {
+          id: 'test:plugin',
+          autoStart: true,
+          activate: () => ready
+        };
+      `
+    },
+    // `Array.from` calls its mapping function straight away.
+    {
+      code: `
+        import { JupyterFrontEndPlugin } from '@jupyterlab/application';
+        import { transform } from 'some-lib';
+        const values = Array.from([1, 2], value => transform(value));
+        const plugin: JupyterFrontEndPlugin<void> = {
+          id: 'test:plugin',
+          autoStart: true,
+          activate: () => values
+        };
+      `
+    },
+    // A helper reached through `.call` at module level runs at module level.
+    {
+      code: `
+        import { JupyterFrontEndPlugin } from '@jupyterlab/application';
+        import { transform } from 'some-lib';
+        function build() {
+          return transform(1);
+        }
+        const value = build.call(null);
+        const plugin: JupyterFrontEndPlugin<void> = {
+          id: 'test:plugin',
+          autoStart: true,
+          activate: () => value
+        };
+      `
+    },
+    // `typeof` is erased, so it is not a runtime use which pins the import.
+    // The remaining use is deferred, so this one is reported, not suppressed;
+    // see the invalid case which pairs with it.
     // A small icon is inlined into the bundle, but not enough of it to matter.
     {
       filename: fixtureFilename,
@@ -525,7 +680,7 @@ ruleTester.run('prefer-lazy-imports', preferLazyImports, {
       `,
       errors: [{ messageId: 'preferLazyImport' }]
     },
-    // `satisfies` and `as` annotations are recognised.
+    // An `as` annotation is recognised.
     {
       code: `
         import { JupyterFrontEndPlugin } from '@jupyterlab/application';
@@ -534,6 +689,18 @@ ruleTester.run('prefer-lazy-imports', preferLazyImports, {
           id: 'test:plugin',
           activate: () => new HeavyWidget()
         } as JupyterFrontEndPlugin<void>;
+      `,
+      errors: [{ messageId: 'preferLazyImport' }]
+    },
+    // A `satisfies` annotation is recognised too.
+    {
+      code: `
+        import { JupyterFrontEndPlugin } from '@jupyterlab/application';
+        import { HeavyWidget } from './widget';
+        export default {
+          id: 'test:plugin',
+          activate: () => new HeavyWidget()
+        } satisfies JupyterFrontEndPlugin<void>;
       `,
       errors: [{ messageId: 'preferLazyImport' }]
     },
@@ -764,6 +931,74 @@ ruleTester.run('prefer-lazy-imports', preferLazyImports, {
           activate: () => theme
         };
       `,
+      errors: [{ messageId: 'preferLazyImport' }]
+    },
+    // A module-level `typeof` does not make the import eager.
+    {
+      code: `
+        import { JupyterFrontEndPlugin } from '@jupyterlab/application';
+        import { HeavyWidget } from 'heavy-pkg';
+        type Widget = typeof HeavyWidget;
+        const plugin: JupyterFrontEndPlugin<void> = {
+          id: 'test:plugin',
+          autoStart: true,
+          activate: () => new HeavyWidget()
+        };
+      `,
+      errors: [{ messageId: 'preferLazyImport' }]
+    },
+    // `requires` on an object which is not a plugin does not pin the import.
+    {
+      code: `
+        import { JupyterFrontEndPlugin } from '@jupyterlab/application';
+        import { HeavyThing } from 'heavy-pkg';
+        const plugin: JupyterFrontEndPlugin<void> = {
+          id: 'test:plugin',
+          autoStart: true,
+          activate: () => {
+            registry.add({ requires: [HeavyThing] });
+          }
+        };
+      `,
+      errors: [{ messageId: 'preferLazyImport' }]
+    },
+    // A namespace beside other bindings has no single-line deferred form.
+    {
+      code: `
+        import { JupyterFrontEndPlugin } from '@jupyterlab/application';
+        import theme, * as helpers from 'heavy-pkg';
+        const plugin: JupyterFrontEndPlugin<void> = {
+          id: 'test:plugin',
+          autoStart: true,
+          activate: () => [theme, helpers]
+        };
+      `,
+      errors: [
+        {
+          messageId: 'preferLazyImport',
+          data: { source: 'heavy-pkg', snippet: "await import('heavy-pkg')" }
+        }
+      ]
+    },
+    // A user-supplied `!` entry denies a package the same list allows.
+    {
+      code: `
+        import { JupyterFrontEndPlugin } from '@jupyterlab/application';
+        import { Grid } from '@myorg/grid';
+        const plugin: JupyterFrontEndPlugin<void> = {
+          id: 'test:plugin',
+          autoStart: true,
+          activate: () => new Grid()
+        };
+      `,
+      options: [
+        {
+          allowedPackages: ['@jupyterlab/*', '@myorg/*', '!@myorg/grid'],
+          ignoreImports: [],
+          minimumSize: 4096,
+          reportModuleLevelUsage: false
+        }
+      ],
       errors: [{ messageId: 'preferLazyImport' }]
     },
     // Shared but bundled here, so this extension still ships it.

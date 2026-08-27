@@ -39,26 +39,16 @@ export function getJupyterPluginKind(
 
   // Slow path: resolve import aliases via the TS checker.
   if (checker && getTSNode && typeNode.typeName.type === 'Identifier') {
-    try {
-      const tsNameNode = getTSNode(typeNode.typeName);
-      if (tsNameNode) {
-        const symbol = checker.getSymbolAtLocation(tsNameNode);
-        if (symbol) {
-          const resolved =
-            symbol.flags & ts.SymbolFlags.Alias
-              ? checker.getAliasedSymbol(symbol)
-              : symbol;
-          const resolvedName = resolved.getName();
-          if (resolvedName === 'JupyterFrontEndPlugin') {
-            return 'frontend';
-          }
-          if (resolvedName === 'ServiceManagerPlugin') {
-            return 'service-manager';
-          }
-        }
-      }
-    } catch {
-      // Fall through if checker/mapper unavailable
+    const resolvedName = resolveTypeAlias(
+      typeNode.typeName,
+      checker,
+      getTSNode
+    );
+    if (resolvedName === 'JupyterFrontEndPlugin') {
+      return 'frontend';
+    }
+    if (resolvedName === 'ServiceManagerPlugin') {
+      return 'service-manager';
     }
   }
 
@@ -187,7 +177,7 @@ export function extractParameterType(
  * handling both simple Identifiers and qualified names (TSQualifiedName)
  * e.g. `IType` -> "IType", `JupyterFrontEnd.IPaths` -> "JupyterFrontEnd.IPaths"
  */
-export function extractTypeName(typeName: TSESTree.EntityName): string | null {
+function extractTypeName(typeName: TSESTree.EntityName): string | null {
   if (typeName.type === 'Identifier') {
     return typeName.name;
   }
@@ -241,7 +231,9 @@ export function typeMentionsJupyterPlugin(
         checker &&
         getTSNode &&
         typeNode.typeName.type === 'Identifier' &&
-        resolvesToPluginType(typeNode.typeName, checker, getTSNode)
+        isPluginTypeName(
+          resolveTypeAlias(typeNode.typeName, checker, getTSNode)
+        )
       ) {
         return true;
       }
@@ -287,30 +279,30 @@ export function typeMentionsJupyterPlugin(
 }
 
 /**
- * Resolves an identifier through the TypeScript checker to see whether it
- * aliases a plugin type, e.g. `import { JupyterFrontEndPlugin as JFEP }`.
+ * Resolves an identifier through the TypeScript checker to the name it aliases,
+ * e.g. `import { JupyterFrontEndPlugin as JFEP }` gives back the original name.
  */
-function resolvesToPluginType(
+function resolveTypeAlias(
   identifier: TSESTree.Identifier,
   checker: ts.TypeChecker,
   getTSNode: (n: TSESTree.Node) => ts.Node | undefined
-): boolean {
+): string | null {
   try {
     const tsNode = getTSNode(identifier);
     if (!tsNode) {
-      return false;
+      return null;
     }
     const symbol = checker.getSymbolAtLocation(tsNode);
     if (!symbol) {
-      return false;
+      return null;
     }
     const resolved =
       symbol.flags & ts.SymbolFlags.Alias
         ? checker.getAliasedSymbol(symbol)
         : symbol;
-    return isPluginTypeName(resolved.getName());
+    return resolved.getName();
   } catch {
-    return false;
+    return null;
   }
 }
 

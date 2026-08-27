@@ -16,7 +16,8 @@ interface ManifestInfo {
 }
 
 const manifestCache = new Map<string, ManifestInfo | null>();
-const directoryCache = new Map<string, string[]>();
+/** Directory to the manifest which governs it, or null when there is none. */
+const manifestPathCache = new Map<string, string | null>();
 
 /**
  * Reads the packages which `jupyterlab.sharedPackages` marks as provided by
@@ -83,20 +84,29 @@ function readManifest(manifestPath: string): ManifestInfo | null {
  * case outside a monorepo sharing packages between its extensions.
  */
 export function getHostProvidedPackages(fromFile: string): string[] {
-  let directory = path.dirname(path.resolve(fromFile));
+  const start = path.dirname(path.resolve(fromFile));
 
-  const cached = directoryCache.get(directory);
-  if (cached) {
-    return cached;
+  const cachedPath = manifestPathCache.get(start);
+  if (cachedPath !== undefined) {
+    // Re-enter the reader so an edited manifest is picked up.
+    return cachedPath === null
+      ? []
+      : (readManifest(cachedPath)?.hostProvided ?? []);
   }
 
   const visited: string[] = [];
-  let result: string[] = [];
+  let found: string | null = null;
+  let directory = start;
   for (let level = 0; level < MAX_LEVELS; level++) {
     visited.push(directory);
-    const info = readManifest(path.join(directory, 'package.json'));
-    if (info) {
-      result = info.hostProvided;
+    const manifestPath = path.join(directory, 'package.json');
+    if (readManifest(manifestPath)) {
+      found = manifestPath;
+      break;
+    }
+    // A repository root bounds the search, so an unrelated manifest further up
+    // cannot change what this extension is allowed to import.
+    if (fs.existsSync(path.join(directory, '.git'))) {
       break;
     }
     const parent = path.dirname(directory);
@@ -107,7 +117,7 @@ export function getHostProvidedPackages(fromFile: string): string[] {
   }
 
   for (const seen of visited) {
-    directoryCache.set(seen, result);
+    manifestPathCache.set(seen, found);
   }
-  return result;
+  return found === null ? [] : (readManifest(found)?.hostProvided ?? []);
 }

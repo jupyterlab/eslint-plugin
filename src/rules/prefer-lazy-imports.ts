@@ -53,7 +53,7 @@ const jupyterPreferLazyImports = createRule<[LazyImportOptions], string>({
         'Import it where it is used instead: `{{ snippet }}`',
       eagerModuleLevelUse:
         "'{{ source }}' is used at module level in a plugin module, so it loads before the application starts. " +
-        'Move the usage into a function and import it there with `await import({{ quotedSource }})`.'
+        "Move the usage into a function and import it there with `await import('{{ source }}')`."
     },
     schema: [
       {
@@ -94,11 +94,12 @@ const jupyterPreferLazyImports = createRule<[LazyImportOptions], string>({
   defaultOptions: [DEFAULT_OPTIONS],
 
   create(context, [options]) {
-    const allowedPackages =
-      options?.allowedPackages ?? DEFAULT_ALLOWED_PACKAGES;
-    const ignoreImports = options?.ignoreImports ?? [];
-    const minimumSize = options?.minimumSize ?? DEFAULT_MINIMUM_SIZE;
-    const reportModuleLevelUsage = options?.reportModuleLevelUsage ?? false;
+    const {
+      allowedPackages,
+      ignoreImports,
+      minimumSize,
+      reportModuleLevelUsage
+    } = options;
 
     let services: ParserServices | null = null;
     let checker: ts.TypeChecker | null = null;
@@ -128,8 +129,9 @@ const jupyterPreferLazyImports = createRule<[LazyImportOptions], string>({
 
     // Packages this extension declares as provided by the application, read
     // from `jupyterlab.sharedPackages` in its own manifest. They extend
-    // `allowedPackages` rather than replacing it.
-    const hostProvided = getHostProvidedPackages(context.filename);
+    // `allowedPackages` rather than replacing it, and are only looked up once
+    // the file turns out to be a plugin module.
+    let hostProvided: string[] | null = null;
 
     /**
      * Returns true when the specifier is exempt from the rule, either because
@@ -140,7 +142,7 @@ const jupyterPreferLazyImports = createRule<[LazyImportOptions], string>({
       return (
         matchesPatterns(source, ALWAYS_IGNORED_IMPORTS) ||
         matchesPatterns(source, allowedPackages) ||
-        matchesPatterns(source, hostProvided) ||
+        matchesPatterns(source, hostProvided ?? []) ||
         matchesPatterns(source, ignoreImports)
       );
     }
@@ -165,6 +167,21 @@ const jupyterPreferLazyImports = createRule<[LazyImportOptions], string>({
     }
 
     /**
+     * Returns true when an identifier sits inside `typeof X`, which TypeScript
+     * erases even though the scope manager records it as a value reference.
+     */
+    function isInTypeQuery(node: TSESTree.Node): boolean {
+      let current: TSESTree.Node | undefined = node;
+      while (current && current.type !== 'Program') {
+        if (current.type === 'TSTypeQuery') {
+          return true;
+        }
+        current = current.parent;
+      }
+      return false;
+    }
+
+    /**
      * Collects the value references of every runtime binding of an import
      * declaration. Type-only specifiers and type positions are left out
      * because TypeScript erases them.
@@ -184,7 +201,11 @@ const jupyterPreferLazyImports = createRule<[LazyImportOptions], string>({
           specifier
         )) {
           for (const reference of variable.references) {
-            if (reference.isValueReference) {
+            // `isValueReference` comes from the typescript-eslint scope
+            // manager. Under the default parser there are no type references,
+            // so every reference is a value reference.
+            const isValue = reference.isValueReference ?? true;
+            if (isValue && !isInTypeQuery(reference.identifier)) {
               references.push(reference);
             }
           }
@@ -202,17 +223,17 @@ const jupyterPreferLazyImports = createRule<[LazyImportOptions], string>({
       source: string,
       declarations: TSESTree.ImportDeclaration[]
     ): void {
-      if (
-        isExempt(source) ||
-        reExportedSources.has(source) ||
-        isTooSmall(source)
-      ) {
+      if (isExempt(source) || reExportedSources.has(source)) {
         return;
       }
 
       const references = declarations.flatMap(getValueReferences);
       if (references.length === 0) {
         // Unused, or used only in type positions which TypeScript erases.
+        return;
+      }
+
+      if (isTooSmall(source)) {
         return;
       }
 
@@ -243,11 +264,11 @@ const jupyterPreferLazyImports = createRule<[LazyImportOptions], string>({
         return;
       }
 
-      if (reportModuleLevelUsage && eager > 0) {
+      if (reportModuleLevelUsage && eager > 0 && tokenList === 0) {
         context.report({
           node: declarations[0],
           messageId: 'eagerModuleLevelUse',
-          data: { source, quotedSource: `'${source}'` }
+          data: { source }
         });
       }
     }
@@ -262,12 +283,9 @@ const jupyterPreferLazyImports = createRule<[LazyImportOptions], string>({
           isPluginModule = true;
         }
       },
-      TSAsExpression(node) {
-        if (!isPluginModule && mentionsPluginType(node.typeAnnotation)) {
-          isPluginModule = true;
-        }
-      },
-      TSSatisfiesExpression(node) {
+      'TSAsExpression, TSSatisfiesExpression'(
+        node: TSESTree.TSAsExpression | TSESTree.TSSatisfiesExpression
+      ) {
         if (!isPluginModule && mentionsPluginType(node.typeAnnotation)) {
           isPluginModule = true;
         }
@@ -322,6 +340,7 @@ const jupyterPreferLazyImports = createRule<[LazyImportOptions], string>({
         if (!isPluginModule) {
           return;
         }
+        hostProvided = getHostProvidedPackages(context.filename);
         const bySource = new Map<string, TSESTree.ImportDeclaration[]>();
         for (const declaration of importDeclarations) {
           const source = declaration.source.value;

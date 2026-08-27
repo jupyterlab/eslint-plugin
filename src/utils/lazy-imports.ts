@@ -5,6 +5,7 @@
 
 import { TSESTree } from '@typescript-eslint/types';
 import { TSESLint } from '@typescript-eslint/utils';
+import { getObjectProperties } from './plugin-utils';
 
 /*
  * The defaults below assume the build JupyterLab extensions normally use:
@@ -142,7 +143,7 @@ function compileGlob(pattern: string): RegExp {
  * or absolute path. Subpath imports resolve to their owning package, so
  * `@jupyterlab/services/lib/kernel` gives `@jupyterlab/services`.
  */
-export function getPackageName(specifier: string): string | null {
+function getPackageName(specifier: string): string | null {
   if (specifier.startsWith('.') || specifier.startsWith('/')) {
     return null;
   }
@@ -183,6 +184,33 @@ export function matchesPatterns(
 }
 
 /**
+ * Returns true when a call runs its callback argument before returning, as
+ * `list.map(fn)`, `Array.from(items, fn)` and `new Promise(fn)` all do.
+ */
+function invokesItsCallback(
+  call: TSESTree.CallExpression | TSESTree.NewExpression
+): boolean {
+  const callee = call.callee;
+  if (call.type === 'NewExpression') {
+    return callee.type === 'Identifier' && callee.name === 'Promise';
+  }
+  if (callee.type !== 'MemberExpression' || callee.computed) {
+    return false;
+  }
+  if (callee.property.type !== 'Identifier') {
+    return false;
+  }
+  if (
+    callee.object.type === 'Identifier' &&
+    callee.object.name === 'Array' &&
+    callee.property.name === 'from'
+  ) {
+    return true;
+  }
+  return IMMEDIATE_CALLBACK_METHODS.has(callee.property.name);
+}
+
+/**
  * Returns true when the function is called right away where it appears, so its
  * body runs at module load rather than later.
  */
@@ -197,18 +225,11 @@ function isImmediatelyInvoked(fn: FunctionNode): boolean {
   ) {
     return true;
   }
-  // `list.map(x => Heavy(x))` and friends run the callback straight away.
-  if (
-    parent.type === 'CallExpression' &&
+  return (
+    (parent.type === 'CallExpression' || parent.type === 'NewExpression') &&
     parent.arguments.includes(fn as TSESTree.CallExpressionArgument) &&
-    parent.callee.type === 'MemberExpression' &&
-    !parent.callee.computed &&
-    parent.callee.property.type === 'Identifier' &&
-    IMMEDIATE_CALLBACK_METHODS.has(parent.callee.property.name)
-  ) {
-    return true;
-  }
-  return false;
+    invokesItsCallback(parent)
+  );
 }
 
 /**
@@ -300,16 +321,60 @@ export function isEagerlyReached(
   return variable.references.some(reference => {
     const identifier = reference.identifier;
     const parent = identifier.parent;
-    // Only a call reaches the body; passing the function elsewhere does not
-    // say when, or whether, it runs.
-    if (parent?.type !== 'CallExpression' || parent.callee !== identifier) {
+    if (!parent) {
       return false;
     }
-    return isEagerlyReached(identifier, sourceCode, seen, depth + 1);
+    // `run()` and `new Runner()` reach the body directly.
+    if (
+      (parent.type === 'CallExpression' || parent.type === 'NewExpression') &&
+      parent.callee === identifier
+    ) {
+      return isEagerlyReached(identifier, sourceCode, seen, depth + 1);
+    }
+    // `run.call(...)` and `run.apply(...)` reach it as well.
+    if (
+      parent.type === 'MemberExpression' &&
+      parent.object === identifier &&
+      !parent.computed &&
+      parent.property.type === 'Identifier' &&
+      (parent.property.name === 'call' || parent.property.name === 'apply') &&
+      parent.parent?.type === 'CallExpression' &&
+      parent.parent.callee === parent
+    ) {
+      return isEagerlyReached(parent.parent, sourceCode, seen, depth + 1);
+    }
+    // `list.map(run)` passes it to something which calls it straight away.
+    if (
+      (parent.type === 'CallExpression' || parent.type === 'NewExpression') &&
+      parent.arguments.includes(
+        identifier as TSESTree.CallExpressionArgument
+      ) &&
+      invokesItsCallback(parent)
+    ) {
+      return isEagerlyReached(identifier, sourceCode, seen, depth + 1);
+    }
+    // Passing the function anywhere else does not say when, or whether, it runs.
+    return false;
   });
 }
 
 const PLUGIN_LIST_PROPERTIES = new Set(['requires', 'optional', 'provides']);
+
+/**
+ * Returns true when an object literal carrying `requires`, `optional` or
+ * `provides` is a plugin rather than an unrelated options bag which happens to
+ * use one of those names.
+ */
+function looksLikePluginList(node: TSESTree.ObjectExpression): boolean {
+  const properties = getObjectProperties(node);
+  if (properties.has('activate')) {
+    return true;
+  }
+  const id = properties.get('id');
+  return (
+    !!id && id.value.type === 'Literal' && typeof id.value.value === 'string'
+  );
+}
 
 /**
  * Returns true when the node sits in a plugin's `requires`, `optional` or
@@ -332,7 +397,12 @@ export function isInPluginTokenList(node: TSESTree.Node): boolean {
           : key.type === 'Literal' && typeof key.value === 'string'
             ? key.value
             : null;
-      if (name && PLUGIN_LIST_PROPERTIES.has(name)) {
+      if (
+        name &&
+        PLUGIN_LIST_PROPERTIES.has(name) &&
+        current.parent?.type === 'ObjectExpression' &&
+        looksLikePluginList(current.parent)
+      ) {
         return true;
       }
     }
@@ -356,6 +426,8 @@ export function buildDeferredImportSnippet(
   const named: string[] = [];
   let defaultName: string | null = null;
   let namespaceName: string | null = null;
+  // A name which is not a plain identifier cannot be destructured as written.
+  let unquotable = false;
 
   for (const declaration of declarations) {
     for (const specifier of declaration.specifiers) {
@@ -363,10 +435,11 @@ export function buildDeferredImportSnippet(
         if (specifier.importKind === 'type') {
           continue;
         }
-        const imported =
-          specifier.imported.type === 'Identifier'
-            ? specifier.imported.name
-            : String(specifier.imported.value);
+        if (specifier.imported.type !== 'Identifier') {
+          unquotable = true;
+          continue;
+        }
+        const imported = specifier.imported.name;
         const entry =
           imported === specifier.local.name
             ? imported
@@ -382,6 +455,11 @@ export function buildDeferredImportSnippet(
     }
   }
 
+  // A namespace next to other bindings, or a name needing quotes, has no
+  // single-line form, so suggest the import itself rather than broken code.
+  if (unquotable || (namespaceName && (defaultName || named.length > 0))) {
+    return `await import('${source}')`;
+  }
   if (namespaceName) {
     return `const ${namespaceName} = await import('${source}');`;
   }
