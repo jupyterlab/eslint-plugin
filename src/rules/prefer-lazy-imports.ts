@@ -28,6 +28,7 @@ import {
   getTransitiveCodeSize,
   resolveRelativeModule
 } from '../utils/module-size';
+import { getHostProvidedPackages } from '../utils/shared-packages';
 import { createRule } from '../utils/create-rule';
 
 const DEFAULT_OPTIONS: LazyImportOptions = {
@@ -125,6 +126,11 @@ const jupyterPreferLazyImports = createRule<[LazyImportOptions], string>({
       return typeMentionsJupyterPlugin(typeNode, checker, getTSNode);
     }
 
+    // Packages this extension declares as provided by the application, read
+    // from `jupyterlab.sharedPackages` in its own manifest. They extend
+    // `allowedPackages` rather than replacing it.
+    const hostProvided = getHostProvidedPackages(context.filename);
+
     /**
      * Returns true when the specifier is exempt from the rule, either because
      * the application loads it eagerly anyway or because it was ignored
@@ -134,6 +140,7 @@ const jupyterPreferLazyImports = createRule<[LazyImportOptions], string>({
       return (
         matchesPatterns(source, ALWAYS_IGNORED_IMPORTS) ||
         matchesPatterns(source, allowedPackages) ||
+        matchesPatterns(source, hostProvided) ||
         matchesPatterns(source, ignoreImports)
       );
     }

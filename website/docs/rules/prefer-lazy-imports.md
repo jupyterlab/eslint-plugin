@@ -16,7 +16,7 @@ In such a file, an import is reported when every runtime use of its bindings sit
 
 These never produce a report:
 
-- Packages the application already loads eagerly, listed under [Options](#options).
+- Packages the application already loads eagerly: the [`allowedPackages`](#allowedpackages) list, and whatever the manifest declares under [Shared packages](#shared-packages).
 - `import type`, type-only specifiers, and bindings used only in type positions. TypeScript erases all of them.
 - Side-effect imports such as `import '../style/index.css'`, which have no binding to move.
 - Assets which never become bundled bytes, described under [Assets](#assets).
@@ -44,6 +44,29 @@ An asset which is inlined into the JavaScript adds its full size to the startup 
 An asset which becomes a URL is never reported. Images and fonts (`.png`, `.jpg`, `.gif`, `.woff2`, `.ttf` and the rest) are `asset/resource`. They are always emitted as separate files, so the browser fetches them only when they are used. `.wasm` and `.html` are left alone for the same reason.
 
 A stylesheet is never reported either. `import '../style/index.css'` has no binding to move. A `.css` import which does have one goes through `style-loader`, which applies the styles at import time. Deferring it would change when the styles take effect rather than only what is downloaded.
+
+## Shared packages
+
+Besides `allowedPackages`, the rule reads `jupyterlab.sharedPackages` from the extension's own manifest. It walks up from the linted file to the nearest `package.json` carrying a `jupyterlab` key, and treats every package declared there with `bundled: false` as free to import at the top.
+
+That follows what `@jupyter/builder` does. `bundled: false` becomes `import: false`, which leaves the package to the application at runtime. Every other form stays in this extension's bundle and is still reported: `bundled: true`, an entry with no `bundled` key, and an entry set to `false`, which drops the package from the shared scope altogether.
+
+```json
+{
+  "jupyterlab": {
+    "sharedPackages": {
+      "@myorg/host-provided": { "singleton": true, "bundled": false },
+      "@myorg/bundled-here": { "singleton": true, "bundled": true }
+    }
+  }
+}
+```
+
+An import of `@myorg/host-provided` is exempt. One of `@myorg/bundled-here` is reported, because this extension ships it.
+
+This is read per package rather than per repository, which a fixed list cannot express. JupyterCAD declares `@jupytercad/base` with `bundled: false` in `jupytercad_lab` and `bundled: true` in `jupytercad_core`, so imports of it are exempt in the first and reported in the second.
+
+The manifest only ever adds to `allowedPackages`. Setting that option does not switch this off.
 
 ## Incorrect
 
@@ -147,7 +170,7 @@ Setting this option replaces the default list. The default is the singleton list
 
 `@lumino/datagrid` is denied because core defers it too, in `packages/csvviewer`.
 
-A monorepo which shares its own packages between extensions should add them, keeping the defaults it still needs. Check `bundled` in each package's `jupyterlab.sharedPackages` first. A shared package with `bundled: false` comes from another extension and belongs in this list, while one with `bundled: true` ships inside this extension and is worth deferring. JupyterCAD declares `@jupytercad/base` both ways in different packages, so the right setting there differs per package.
+A monorepo which shares its own packages between extensions usually does not need to list them here, because the rule reads them from the manifest. See [Shared packages](#shared-packages).
 
 ```ts
 {

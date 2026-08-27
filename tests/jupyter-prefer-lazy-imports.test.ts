@@ -12,6 +12,10 @@ import { DEFAULT_ALLOWED_PACKAGES } from '../src/utils/lazy-imports';
 // rule can measure how much code they hold.
 const fixtureFilename = 'tests/fixtures/lazy-plugin.ts';
 
+// This directory holds a manifest whose `jupyterlab.sharedPackages` marks
+// `@myorg/host-provided` as supplied by the application.
+const sharedPkgFilename = 'tests/fixtures/shared-pkg/lazy-plugin.ts';
+
 const ruleTester = new RuleTester({
   languageOptions: {
     parser: require('@typescript-eslint/parser'),
@@ -313,6 +317,33 @@ ruleTester.run('prefer-lazy-imports', preferLazyImports, {
           id: 'test:plugin',
           autoStart: true,
           activate: () => [logo, font, styles, wasmUrl]
+        };
+      `
+    },
+    // The manifest says the application provides this package, so importing it
+    // at the top adds nothing to this extension's bundle.
+    {
+      filename: sharedPkgFilename,
+      code: `
+        import { JupyterFrontEndPlugin } from '@jupyterlab/application';
+        import { Shared } from '@myorg/host-provided';
+        const plugin: JupyterFrontEndPlugin<void> = {
+          id: 'test:plugin',
+          autoStart: true,
+          activate: () => new Shared()
+        };
+      `
+    },
+    // A subpath import resolves to the same package.
+    {
+      filename: sharedPkgFilename,
+      code: `
+        import { JupyterFrontEndPlugin } from '@jupyterlab/application';
+        import { Shared } from '@myorg/host-provided/lib/shared';
+        const plugin: JupyterFrontEndPlugin<void> = {
+          id: 'test:plugin',
+          autoStart: true,
+          activate: () => new Shared()
         };
       `
     },
@@ -731,6 +762,48 @@ ruleTester.run('prefer-lazy-imports', preferLazyImports, {
           id: 'test:plugin',
           autoStart: true,
           activate: () => theme
+        };
+      `,
+      errors: [{ messageId: 'preferLazyImport' }]
+    },
+    // Shared but bundled here, so this extension still ships it.
+    {
+      filename: sharedPkgFilename,
+      code: `
+        import { JupyterFrontEndPlugin } from '@jupyterlab/application';
+        import { Bundled } from '@myorg/bundled-here';
+        const plugin: JupyterFrontEndPlugin<void> = {
+          id: 'test:plugin',
+          autoStart: true,
+          activate: () => new Bundled()
+        };
+      `,
+      errors: [{ messageId: 'preferLazyImport' }]
+    },
+    // Shared with no `bundled` key defaults to being bundled here.
+    {
+      filename: sharedPkgFilename,
+      code: `
+        import { JupyterFrontEndPlugin } from '@jupyterlab/application';
+        import { Defaulted } from '@myorg/shared-default';
+        const plugin: JupyterFrontEndPlugin<void> = {
+          id: 'test:plugin',
+          autoStart: true,
+          activate: () => new Defaulted()
+        };
+      `,
+      errors: [{ messageId: 'preferLazyImport' }]
+    },
+    // `false` removes the package from the shared scope altogether.
+    {
+      filename: sharedPkgFilename,
+      code: `
+        import { JupyterFrontEndPlugin } from '@jupyterlab/application';
+        import { Excluded } from '@myorg/not-shared';
+        const plugin: JupyterFrontEndPlugin<void> = {
+          id: 'test:plugin',
+          autoStart: true,
+          activate: () => new Excluded()
         };
       `,
       errors: [{ messageId: 'preferLazyImport' }]
