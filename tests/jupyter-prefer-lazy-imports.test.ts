@@ -6,6 +6,11 @@
 import { RuleTester } from '@typescript-eslint/rule-tester';
 import * as path from 'path';
 import preferLazyImports from '../src/rules/prefer-lazy-imports';
+import { DEFAULT_ALLOWED_PACKAGES } from '../src/utils/lazy-imports';
+
+// Relative imports in these cases resolve against `tests/fixtures`, so the
+// rule can measure how much code they hold.
+const fixtureFilename = 'tests/fixtures/lazy-plugin.ts';
 
 const ruleTester = new RuleTester({
   languageOptions: {
@@ -304,6 +309,32 @@ ruleTester.run('prefer-lazy-imports', preferLazyImports, {
           id: 'test:plugin',
           autoStart: true,
           activate: () => [scrollbarStyleText, tachometer, wasmUrl]
+        };
+      `
+    },
+    // A module of identifiers is too small for a separate chunk to pay off.
+    {
+      filename: fixtureFilename,
+      code: `
+        import { JupyterFrontEndPlugin } from '@jupyterlab/application';
+        import { CommandIDs } from './lazy-tiny';
+        const plugin: JupyterFrontEndPlugin<void> = {
+          id: 'test:plugin',
+          autoStart: true,
+          activate: () => CommandIDs.open
+        };
+      `
+    },
+    // Large as source, but nearly everything in it is erased by TypeScript.
+    {
+      filename: fixtureFilename,
+      code: `
+        import { JupyterFrontEndPlugin } from '@jupyterlab/application';
+        import { MODE_ID } from './lazy-type-heavy';
+        const plugin: JupyterFrontEndPlugin<void> = {
+          id: 'test:plugin',
+          autoStart: true,
+          activate: () => MODE_ID
         };
       `
     },
@@ -619,6 +650,72 @@ ruleTester.run('prefer-lazy-imports', preferLazyImports, {
           }
         }
       ]
+    },
+    // A module with enough code in it is reported.
+    {
+      filename: fixtureFilename,
+      code: `
+        import { JupyterFrontEndPlugin } from '@jupyterlab/application';
+        import { HeavyTable } from './lazy-large';
+        const plugin: JupyterFrontEndPlugin<void> = {
+          id: 'test:plugin',
+          autoStart: true,
+          activate: () => new HeavyTable({ rows: 2, columns: 2 })
+        };
+      `,
+      errors: [{ messageId: 'preferLazyImport' }]
+    },
+    // A small module counts the code of what it imports, so this one is over
+    // the threshold even though its own file is tiny.
+    {
+      filename: fixtureFilename,
+      code: `
+        import { JupyterFrontEndPlugin } from '@jupyterlab/application';
+        import { createTable } from './lazy-barrel';
+        const plugin: JupyterFrontEndPlugin<void> = {
+          id: 'test:plugin',
+          autoStart: true,
+          activate: () => createTable()
+        };
+      `,
+      errors: [{ messageId: 'preferLazyImport' }]
+    },
+    // Setting the threshold to zero reports every module regardless of size.
+    {
+      filename: fixtureFilename,
+      code: `
+        import { JupyterFrontEndPlugin } from '@jupyterlab/application';
+        import { CommandIDs } from './lazy-tiny';
+        const plugin: JupyterFrontEndPlugin<void> = {
+          id: 'test:plugin',
+          autoStart: true,
+          activate: () => CommandIDs.open
+        };
+      `,
+      options: [
+        {
+          allowedPackages: DEFAULT_ALLOWED_PACKAGES,
+          ignoreImports: [],
+          minimumSize: 0,
+          reportModuleLevelUsage: false
+        }
+      ],
+      errors: [{ messageId: 'preferLazyImport' }]
+    },
+    // A package which is not in the shared runtime is bundled into the
+    // extension, so it is reported without being measured.
+    {
+      filename: fixtureFilename,
+      code: `
+        import { JupyterFrontEndPlugin } from '@jupyterlab/application';
+        import { parse } from 'heavy-parser';
+        const plugin: JupyterFrontEndPlugin<void> = {
+          id: 'test:plugin',
+          autoStart: true,
+          activate: () => parse('')
+        };
+      `,
+      errors: [{ messageId: 'preferLazyImport' }]
     },
     // Subpath imports resolve to their owning package for allowlist checks.
     {

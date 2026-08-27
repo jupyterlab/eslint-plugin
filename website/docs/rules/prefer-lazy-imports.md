@@ -23,6 +23,7 @@ These never produce a report:
 - Tokens referenced in `requires`, `optional` or `provides`. JupyterLab reads those when the plugin is registered, so they can never be deferred.
 - Sources which the same file re-exports with `export { X } from '...'` or `export * from '...'`, since the re-export keeps them in the startup bundle.
 - Bindings whose only use is inside a helper which is itself called while the module is evaluated.
+- Modules holding less code than [`minimumSize`](#minimumsize), because a separate chunk costs more than it saves.
 
 A dynamic `import()` written at module level is reported separately, because it runs at load time and defers nothing.
 
@@ -147,11 +148,27 @@ A monorepo which shares its own packages between extensions should add them, kee
 
 ### `ignoreImports`
 
-Import specifiers to skip, matched with the same `*` wildcards. Use it for modules which are too small for a separate chunk to pay off, such as a file of command identifiers:
+Import specifiers to skip, matched with the same `*` wildcards:
 
 ```ts
 {
-  "ignoreImports": ["./commands", "./constants"]
+  "ignoreImports": ["./generated/*", "@myorg/internal"]
+}
+```
+
+### `minimumSize`
+
+The smallest module worth deferring, in bytes, default `1024`. Set it to `0` to report every module whatever its size.
+
+The rule resolves a relative import on disk and measures the code in it, plus the code of everything it statically imports by relative path. Comments and type declarations are removed first, because TypeScript erases them and they never reach the bundle. This is what keeps a file of interfaces from being reported: `shortcuts-extension/src/types.ts` is 7 KB of source but 968 bytes once compiled, and the rule measures 562 bytes.
+
+Measuring the closure rather than the single file matters just as much in the other direction. `shortcuts-extension/src/renderer.tsx` is 409 bytes on its own and 56 KB once its imports are counted.
+
+Bare package specifiers are not measured. A package which is not in `allowedPackages` is not in the shared runtime, so it is bundled into the extension and always counts as worth deferring. A module which cannot be read is reported too, so a missing file never hides a finding.
+
+```ts
+{
+  "minimumSize": 4096
 }
 ```
 
@@ -167,6 +184,8 @@ Off by default. When enabled, imports used while the module is evaluated are rep
 
 ## Limitations
 
-The rule sees one file at a time. If another module in the same bundle imports the same source eagerly, deferring it here moves nothing out of the startup chunk, and the rule cannot tell. It also cannot judge how large a module is, so a module of string constants is reported the same way as a widget; `ignoreImports` is the way to silence those.
+The rule sees one file at a time. If another module in the same bundle imports the same source eagerly, deferring it here moves nothing out of the startup chunk, and the rule cannot tell.
+
+Sizes are an estimate. The rule counts source bytes after stripping comments and type declarations, which tracks the compiled output closely but is not the same as bundled and minified bytes. It also stops at package boundaries, so a small module which pulls in a large dependency is measured as small.
 
 Value re-exports are not reported, only taken into account. Splitting an entry point which re-exports its own implementation is a larger refactor than this rule tries to describe.

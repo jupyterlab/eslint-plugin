@@ -14,8 +14,15 @@ type FunctionNode =
 export interface LazyImportOptions {
   allowedPackages: string[];
   ignoreImports: string[];
+  minimumSize: number;
   reportModuleLevelUsage: boolean;
 }
+
+/**
+ * Below this many bytes of code, a separate bundle chunk costs more than the
+ * bytes it saves.
+ */
+export const DEFAULT_MINIMUM_SIZE = 1024;
 
 /**
  * Packages which JupyterLab loads eagerly anyway, so importing them at the top

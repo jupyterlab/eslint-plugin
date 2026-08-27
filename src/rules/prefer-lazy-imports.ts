@@ -18,16 +18,22 @@ import {
   ALWAYS_IGNORED_IMPORTS,
   buildDeferredImportSnippet,
   DEFAULT_ALLOWED_PACKAGES,
+  DEFAULT_MINIMUM_SIZE,
   isEagerlyReached,
   isInPluginTokenList,
   LazyImportOptions,
   matchesPatterns
 } from '../utils/lazy-imports';
+import {
+  getTransitiveCodeSize,
+  resolveRelativeModule
+} from '../utils/module-size';
 import { createRule } from '../utils/create-rule';
 
 const DEFAULT_OPTIONS: LazyImportOptions = {
   allowedPackages: DEFAULT_ALLOWED_PACKAGES,
   ignoreImports: [],
+  minimumSize: DEFAULT_MINIMUM_SIZE,
   reportModuleLevelUsage: false
 };
 
@@ -69,6 +75,13 @@ const jupyterPreferLazyImports = createRule<[LazyImportOptions], string>({
             description:
               'Import specifiers to skip, matched with `*` wildcards, for example `./tokens` or `*.css`.'
           },
+          minimumSize: {
+            type: 'number',
+            minimum: 0,
+            default: DEFAULT_MINIMUM_SIZE,
+            description:
+              'Smallest module worth deferring, in bytes of code once comments and type declarations are removed, counted over the module and everything it statically imports by relative path. Set to 0 to report every module regardless of size.'
+          },
           reportModuleLevelUsage: {
             type: 'boolean',
             default: false,
@@ -86,6 +99,7 @@ const jupyterPreferLazyImports = createRule<[LazyImportOptions], string>({
     const allowedPackages =
       options?.allowedPackages ?? DEFAULT_ALLOWED_PACKAGES;
     const ignoreImports = options?.ignoreImports ?? [];
+    const minimumSize = options?.minimumSize ?? DEFAULT_MINIMUM_SIZE;
     const reportModuleLevelUsage = options?.reportModuleLevelUsage ?? false;
 
     let services: ParserServices | null = null;
@@ -129,6 +143,25 @@ const jupyterPreferLazyImports = createRule<[LazyImportOptions], string>({
     }
 
     /**
+     * Returns true when the module holds too little code for a separate chunk
+     * to pay off. Only relative imports can be measured; a package which is not
+     * in the shared runtime is bundled into the extension, so it always counts
+     * as worth deferring. An unreadable module counts as worth deferring too,
+     * so a missing file never hides a finding.
+     */
+    function isTooSmall(source: string): boolean {
+      if (minimumSize <= 0) {
+        return false;
+      }
+      const resolved = resolveRelativeModule(source, context.filename);
+      if (!resolved) {
+        return false;
+      }
+      const size = getTransitiveCodeSize(resolved);
+      return size !== null && size < minimumSize;
+    }
+
+    /**
      * Collects the value references of every runtime binding of an import
      * declaration. Type-only specifiers and type positions are left out
      * because TypeScript erases them.
@@ -166,7 +199,11 @@ const jupyterPreferLazyImports = createRule<[LazyImportOptions], string>({
       source: string,
       declarations: TSESTree.ImportDeclaration[]
     ): void {
-      if (isExempt(source) || reExportedSources.has(source)) {
+      if (
+        isExempt(source) ||
+        reExportedSources.has(source) ||
+        isTooSmall(source)
+      ) {
         return;
       }
 
