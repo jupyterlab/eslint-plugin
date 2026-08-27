@@ -113,6 +113,119 @@ export class HeavyTable {
     this._columns = rows;
   }
 
+  insertRow(at: number): void {
+    if (at < 0 || at > this._rows) {
+      throw new RangeError(`Cannot insert a row at ${at}`);
+    }
+    const line: string[] = [];
+    for (let column = 0; column < this._columns; column++) {
+      line.push('');
+    }
+    this._cells.splice(at, 0, line);
+    this._rows += 1;
+  }
+
+  removeRow(at: number): void {
+    if (at < 0 || at >= this._rows) {
+      throw new RangeError(`Cannot remove the row at ${at}`);
+    }
+    this._cells.splice(at, 1);
+    this._rows -= 1;
+  }
+
+  insertColumn(at: number): void {
+    if (at < 0 || at > this._columns) {
+      throw new RangeError(`Cannot insert a column at ${at}`);
+    }
+    for (const line of this._cells) {
+      line.splice(at, 0, '');
+    }
+    this._columns += 1;
+  }
+
+  removeColumn(at: number): void {
+    if (at < 0 || at >= this._columns) {
+      throw new RangeError(`Cannot remove the column at ${at}`);
+    }
+    for (const line of this._cells) {
+      line.splice(at, 1);
+    }
+    this._columns -= 1;
+  }
+
+  sortByColumn(column: number, descending = false): void {
+    if (column < 0 || column >= this._columns) {
+      throw new RangeError(`Column ${column} is outside the table`);
+    }
+    this._cells.sort((left, right) => {
+      const a = left[column] ?? '';
+      const b = right[column] ?? '';
+      const order = a.localeCompare(b, undefined, { numeric: true });
+      return descending ? -order : order;
+    });
+  }
+
+  find(query: string): Array<{ row: number; column: number }> {
+    const matches: Array<{ row: number; column: number }> = [];
+    for (let row = 0; row < this._rows; row++) {
+      for (let column = 0; column < this._columns; column++) {
+        if (this._cells[row][column].includes(query)) {
+          matches.push({ row, column });
+        }
+      }
+    }
+    return matches;
+  }
+
+  toMarkdown(): string {
+    const header = this._cells[0] ?? [];
+    const divider = header.map(() => '---');
+    const body = this._cells.slice(1);
+    const render = (line: string[]) => `| ${line.join(' | ')} |`;
+    return [render(header), render(divider), ...body.map(render)].join('\n');
+  }
+
+  columnWidths(): number[] {
+    const widths: number[] = [];
+    for (let column = 0; column < this._columns; column++) {
+      let widest = 0;
+      for (let row = 0; row < this._rows; row++) {
+        widest = Math.max(widest, (this._cells[row][column] ?? '').length);
+      }
+      widths.push(widest);
+    }
+    return widths;
+  }
+
+  fillDown(column: number): void {
+    if (column < 0 || column >= this._columns) {
+      throw new RangeError(`Column ${column} is outside the table`);
+    }
+    let last = '';
+    for (let row = 0; row < this._rows; row++) {
+      const value = this._cells[row][column];
+      if (value.length > 0) {
+        last = value;
+      } else {
+        this._cells[row][column] = last;
+      }
+    }
+  }
+
+  replaceAll(query: string, replacement: string): number {
+    let count = 0;
+    for (let row = 0; row < this._rows; row++) {
+      for (let column = 0; column < this._columns; column++) {
+        const cell = this._cells[row][column];
+        if (cell.includes(query)) {
+          this._cells[row][column] = cell.split(query).join(replacement);
+          count += 1;
+        }
+      }
+    }
+    return count;
+  }
+
   private _rows: number;
   private _columns: number;
   private _caption: string;

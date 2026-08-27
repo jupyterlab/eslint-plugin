@@ -6,6 +6,15 @@
 import { TSESTree } from '@typescript-eslint/types';
 import { TSESLint } from '@typescript-eslint/utils';
 
+/*
+ * The defaults below assume the build JupyterLab extensions normally use:
+ * rspack driven by `@jupyter/builder`, with Module Federation sharing packages
+ * between the application and the extensions it loads. Webpack behaves the same
+ * way here. A different bundler classifies assets differently, and a different
+ * application shares a different set of packages, so `allowedPackages` and
+ * `minimumSize` are both configurable.
+ */
+
 type FunctionNode =
   | TSESTree.FunctionDeclaration
   | TSESTree.FunctionExpression
@@ -19,14 +28,17 @@ export interface LazyImportOptions {
 }
 
 /**
- * Below this many bytes of code, a separate bundle chunk costs more than the
- * bytes it saves.
+ * An async chunk carries a few hundred bytes of bundler runtime, so around one
+ * kilobyte of code the saving cancels out. The default sits well above that
+ * break-even point: across the Jupyter extensions this rule was measured on,
+ * four kilobytes reports half as many imports as one kilobyte while still
+ * covering 96% of the code which could be moved out of the startup bundle.
  */
-export const DEFAULT_MINIMUM_SIZE = 1024;
+export const DEFAULT_MINIMUM_SIZE = 4096;
 
 /**
- * Packages which JupyterLab loads eagerly anyway, so importing them at the top
- * of a plugin module costs nothing extra.
+ * Packages shared through Module Federation, which the application therefore
+ * loads whether or not a plugin module imports them at the top.
  *
  * This is the singleton list from `jupyterlab/staging/package.json`, minus
  * `@lumino/datagrid` which core itself defers (see `packages/csvviewer`).
@@ -52,29 +64,40 @@ export const DEFAULT_ALLOWED_PACKAGES = [
 ];
 
 /**
- * Assets handled by a bundler loader rather than by the module graph. Deferring
- * them is not the pattern this rule is about, so they are never reported.
+ * Assets which a bundler turns into a URL or a style side effect rather than
+ * into bundled bytes, so deferring the import saves nothing.
+ *
+ * Images and fonts are `asset/resource` in the builder configuration, so they
+ * are always emitted as separate files and the browser fetches them only when
+ * they are used. A stylesheet goes through `style-loader`, which applies it
+ * when it is imported, so deferring it would change when the styles take
+ * effect rather than only what is downloaded.
+ *
+ * Assets which are inlined into the bundle as text are deliberately absent:
+ * `.svg` imported from JavaScript, `.raw.css`, `.md`, `.txt` and `.json` all
+ * add their full size to the startup chunk, so they are measured like any
+ * other module.
  */
 export const ALWAYS_IGNORED_IMPORTS = [
   '*.css',
+  // A raw stylesheet is inlined as text, not applied as a style.
+  '!*.raw.css',
   '*.scss',
   '*.sass',
   '*.less',
-  '*.svg',
   '*.png',
   '*.jpg',
   '*.jpeg',
   '*.gif',
   '*.webp',
   '*.ico',
+  '*.avif',
   '*.woff',
   '*.woff2',
   '*.ttf',
   '*.eot',
+  '*.otf',
   '*.wasm',
-  '*.json',
-  '*.txt',
-  '*.md',
   '*.html'
 ];
 

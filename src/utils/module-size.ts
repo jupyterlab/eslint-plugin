@@ -166,16 +166,25 @@ const STATIC_IMPORT =
  * imports. Cached until the file changes on disk.
  */
 function readFileInfo(filePath: string): FileInfo | null {
-  let mtimeMs: number;
+  let stats: fs.Stats;
   try {
-    mtimeMs = fs.statSync(filePath).mtimeMs;
+    stats = fs.statSync(filePath);
   } catch {
     return null;
   }
+  const mtimeMs = stats.mtimeMs;
 
   const cached = fileCache.get(filePath);
   if (cached && cached.mtimeMs === mtimeMs) {
     return cached;
+  }
+
+  // An asset inlined into the bundle, such as an SVG or a raw stylesheet,
+  // contributes its bytes as they are and imports nothing.
+  if (!EXTENSIONS.includes(path.extname(filePath))) {
+    const info: FileInfo = { mtimeMs, size: stats.size, dependencies: [] };
+    fileCache.set(filePath, info);
+    return info;
   }
 
   let source: string;

@@ -298,17 +298,34 @@ ruleTester.run('prefer-lazy-imports', preferLazyImports, {
         };
       `
     },
-    // Assets handled by a bundler loader are never reported.
+    // An image or a font becomes a URL once past the bundler's inline limit,
+    // so the browser already fetches the large ones on demand. A stylesheet is
+    // applied when imported, so deferring it would change behaviour.
     {
+      filename: fixtureFilename,
       code: `
         import { JupyterFrontEndPlugin } from '@jupyterlab/application';
-        import scrollbarStyleText from '../style/scrollbar.raw.css';
-        import tachometer from '../style/tachometer.svg';
+        import logo from '../style/logo.png';
+        import font from '../style/inter.woff2';
+        import styles from '../style/index.css';
         import wasmUrl from 'rtree-sql.js/dist/sql-wasm.wasm';
         const plugin: JupyterFrontEndPlugin<void> = {
           id: 'test:plugin',
           autoStart: true,
-          activate: () => [scrollbarStyleText, tachometer, wasmUrl]
+          activate: () => [logo, font, styles, wasmUrl]
+        };
+      `
+    },
+    // A small icon is inlined into the bundle, but not enough of it to matter.
+    {
+      filename: fixtureFilename,
+      code: `
+        import { JupyterFrontEndPlugin } from '@jupyterlab/application';
+        import icon from './lazy-icon.svg';
+        const plugin: JupyterFrontEndPlugin<void> = {
+          id: 'test:plugin',
+          autoStart: true,
+          activate: () => icon
         };
       `
     },
@@ -700,6 +717,35 @@ ruleTester.run('prefer-lazy-imports', preferLazyImports, {
           reportModuleLevelUsage: false
         }
       ],
+      errors: [{ messageId: 'preferLazyImport' }]
+    },
+    // An SVG imported from JavaScript is inlined into the bundle as text, so a
+    // large one belongs in a deferred chunk like any other module.
+    {
+      filename: fixtureFilename,
+      code: `
+        import { JupyterFrontEndPlugin } from '@jupyterlab/application';
+        import diagram from './lazy-diagram.svg';
+        const plugin: JupyterFrontEndPlugin<void> = {
+          id: 'test:plugin',
+          autoStart: true,
+          activate: () => diagram
+        };
+      `,
+      errors: [{ messageId: 'preferLazyImport' }]
+    },
+    // A raw stylesheet is inlined as text rather than applied as a style.
+    {
+      filename: fixtureFilename,
+      code: `
+        import { JupyterFrontEndPlugin } from '@jupyterlab/application';
+        import theme from './lazy-theme.raw.css';
+        const plugin: JupyterFrontEndPlugin<void> = {
+          id: 'test:plugin',
+          autoStart: true,
+          activate: () => theme
+        };
+      `,
       errors: [{ messageId: 'preferLazyImport' }]
     },
     // A package which is not in the shared runtime is bundled into the
