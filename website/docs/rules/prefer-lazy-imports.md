@@ -64,7 +64,7 @@ That follows what `@jupyter/builder` does. `bundled: false` becomes `import: fal
 
 An import of `@myorg/host-provided` is exempt. One of `@myorg/bundled-here` is reported, because this extension ships it.
 
-This is read per package rather than per repository, which a fixed list cannot express. JupyterCAD declares `@jupytercad/base` with `bundled: false` in `jupytercad_lab` and `bundled: true` in `jupytercad_core`, so imports of it are exempt in the first and reported in the second.
+The manifest is read per package, which a fixed list cannot match. A monorepo can bundle one of its own packages inside a first extension and let a second extension take that copy from the application. The same import is then reported in the first extension and exempt in the second.
 
 The manifest only ever adds to `allowedPackages`. Setting that option does not switch this off.
 
@@ -199,15 +199,15 @@ Import specifiers to skip, matched with the same `*` wildcards:
 
 The smallest module worth deferring, in bytes, default `4096`. Set it to `0` to report every module whatever its size.
 
-The rule resolves a relative import on disk and measures the code in it, plus the code of everything it statically imports by relative path. Comments and type declarations are removed first, because TypeScript erases them and they never reach the bundle. This is what keeps a file of interfaces from being reported: `shortcuts-extension/src/types.ts` is 7 KB of source but 968 bytes once compiled, and the rule measures 562 bytes.
+The rule resolves a relative import on disk and measures the code in it, plus the code of everything it statically imports by relative path. Comments and type declarations are removed first, because TypeScript erases them and they never reach the bundle. This is what keeps a file of interfaces from being reported. Such a file can be several kilobytes of source and a few hundred bytes once compiled, and the rule sees the smaller figure.
 
-Measuring the closure rather than the single file matters just as much in the other direction. `shortcuts-extension/src/renderer.tsx` is 409 bytes on its own and 56 KB once its imports are counted.
+Measuring the closure rather than the single file matters just as much in the other direction. A few hundred bytes of glue which imports a whole subsystem counts as the size of that subsystem.
 
 Bare package specifiers are not measured. A package which is not in `allowedPackages` is not in the shared runtime, so it is bundled into the extension and always counts as worth deferring. A module which cannot be read is reported too, so a missing file never hides a finding.
 
 The default is set where the benefit stops being worth the change. An async chunk carries a few hundred bytes of bundler runtime and costs one request, so at about a kilobyte the saving cancels out. Above that the gain per import falls away quickly, because a handful of large modules hold nearly all the weight.
 
-Analysis of 1621 files in core and 21 Jupyter extensions produced the following:
+Measured over JupyterLab core and a range of extensions:
 
 | `minimumSize` | Imports reported | Code covered |
 | ------------- | ---------------- | ------------ |
@@ -220,9 +220,9 @@ Analysis of 1621 files in core and 21 Jupyter extensions produced the following:
 
 You can lower `minimumSize` to `1024` to increase the coverage, at the cost of roughly twice as many reports. Raising it to `8192` or higher allows to restrict the reports further to largest modules only.
 
-The shipped bytes behind one report are modest. Measuring JupyterLab's compiled output through terser and gzip, a report at the `4096` boundary is worth about 2.5 KB minified and under a kilobyte gzipped, and a typical one lands between one and three kilobytes gzipped. The large ones carry the total: the startup chunk is 40 KB minified smaller without `shortcuts-extension/src/renderer.tsx`, which is half of everything the rule finds across core.
+The shipped bytes behind one report are modest. At the `4096` boundary a report is worth roughly 2.5 KB minified and under a kilobyte gzipped. A few large modules carry most of the total, so the first few reports in a package are usually worth more than all the rest together.
 
-Reports for packages are worth far more, which is why they are never filtered by size. `@codemirror/commands` is 82 KB and `@rjsf/validator-ajv8` drags in `ajv` at 287 KB, so one of those outweighs every relative import the rule reports in core put together.
+Reports for packages are worth far more, which is why they are never filtered by size. A third-party library and its dependencies run from tens to hundreds of kilobytes, so deferring one can save more than every relative import in the same extension put together.
 
 ```ts
 {
@@ -244,9 +244,9 @@ Off by default. When enabled, imports used while the module is evaluated are rep
 
 The rule sees one file at a time. If another module in the same bundle imports the same source eagerly, the startup chunk stays the same size whatever this file does, and the rule cannot tell.
 
-This is the main source of unhelpful reports, and it grows with how much a package shares internally. In `jupyterlab-lsp` the rule reports `virtual/console`, `context` and `converter` across several feature plugins. Each of those is imported by a dozen or so feature files which all load at startup, so deferring any one of them changes nothing.
+This is the main source of unhelpful reports, and it grows with how much a package shares internally. A helper used by every feature plugin gets reported in each of them, and deferring any one of them changes nothing while the others still load at startup.
 
-What matters is whether the other importers themselves stay in the startup chunk. Counting importers does not answer that. In `jupyterlab-git` the largest single report, `./model`, is imported by 23 files, yet deferring it works: eight of those are tests which are never bundled, and the rest sit in the same subtree which moves into the lazy chunk along with it.
+Counting the other importers does not answer that. Some of them are tests, which are never bundled at all. Others sit in the same subtree, and move into the lazy chunk along with the module.
 
 So defer at the edge of a subsystem rather than one module at a time. When the same source is reported from several plugin files which all load at startup, defer it in all of them or in none.
 
