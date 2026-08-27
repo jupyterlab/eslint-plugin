@@ -538,19 +538,6 @@ ruleTester.run('prefer-lazy-imports', preferLazyImports, {
       `,
       errors: [{ messageId: 'preferLazyImport' }]
     },
-    // A module level dynamic import defers nothing.
-    {
-      code: `
-        import { JupyterFrontEndPlugin } from '@jupyterlab/application';
-        const heavy = import('./widget');
-        const plugin: JupyterFrontEndPlugin<void> = {
-          id: 'test:plugin',
-          autoStart: true,
-          activate: async () => (await heavy).HeavyWidget
-        };
-      `,
-      errors: [{ messageId: 'topLevelDynamicImport' }]
-    },
     // The strict option reports module level use.
     {
       code: `

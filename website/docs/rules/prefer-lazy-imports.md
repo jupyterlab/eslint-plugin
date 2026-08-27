@@ -4,15 +4,15 @@ Prefer deferred imports for heavy dependencies of JupyterLab plugins.
 
 ## Why
 
-Everything a plugin module imports at the top is downloaded, parsed and evaluated before JupyterLab can start, even when the code is only needed after a user action. Moving such an import into the function which uses it puts it in a separate bundle chunk, which the browser fetches on demand.
+Everything a plugin module imports at the top is downloaded, parsed and evaluated before JupyterLab can start, even when the code is only needed after a user action. Moving such an import into the function which uses it puts it in a separate bundle chunk. The browser then fetches it on demand.
 
 Core JupyterLab uses this pattern, for example in `csvviewer` for `@lumino/datagrid`, in `codemirror-extension` for the settings form validator, and in `json-extension` for its own renderer module. Adopting it in third-party extensions is expected to cut cold load time noticeably, since every installed extension adds to the startup cost.
 
 ## Rule details
 
-The rule only looks at plugin modules: files which declare a value typed `JupyterFrontEndPlugin` or `ServiceManagerPlugin`, or which contain an object literal with the shape of a plugin. Array, union and `Promise` wrappers are recognised, as are `as` and `satisfies` casts, factory function return types, and type imports renamed through an alias.
+The rule only looks at plugin modules: files which declare a value typed `JupyterFrontEndPlugin` or `ServiceManagerPlugin`, or which contain an object literal with the shape of a plugin. Array, union and `Promise` wrappers are recognised, as are `as` casts, factory function return types, and type imports renamed through an alias.
 
-In such a file, an import is reported when every runtime use of its bindings sits inside a function body, a method, or an instance field initializer, so that turning it into `await import()` is a mechanical change. An import which is needed while the module is evaluated is left alone, because the module is fetched at startup regardless of how the other bindings are written.
+In such a file, an import is reported when every runtime use of its bindings sits inside a function body, a method, or an instance field initializer. Turning it into `await import()` is then a mechanical change. An import which is needed while the module is evaluated is left alone, because the module is fetched at startup regardless of how the other bindings are written.
 
 These never produce a report:
 
@@ -25,9 +25,7 @@ These never produce a report:
 - Bindings whose only use is inside a helper which is itself called while the module is evaluated.
 - Modules holding less code than [`minimumSize`](#minimumsize), because a separate chunk costs more than it saves.
 
-A dynamic `import()` written at module level is reported separately, because it runs at load time and defers nothing.
-
-The rule has no autofix. The enclosing function usually has to become `async`, which changes its signature, so the change is left to the author.
+The rule has no autofix. The enclosing function usually has to become `async`, and that changes its signature, so the edit is left to the author.
 
 ## Assumptions
 
@@ -41,11 +39,11 @@ Under a different bundler the asset handling below does not apply. Under a diffe
 
 Whether deferring an asset helps depends on what the bundler does with it.
 
-An asset which is inlined into the JavaScript adds its full size to the startup chunk, and is measured against `minimumSize` like any module. The builder loads `.svg` imported from JavaScript as `asset/source`, which means the whole file arrives as a string in the bundle. The same applies to `.raw.css`, `.md` and `.txt`, and to `.json`, which rspack parses into an object and inlines. A large illustration imported at the top of a plugin module is exactly the case this rule is for.
+An asset which is inlined into the JavaScript adds its full size to the startup chunk, and is measured against `minimumSize` like any module. The builder loads `.svg` imported from JavaScript as `asset/source`, so the whole file arrives as a string in the bundle. The same holds for `.raw.css`, `.md` and `.txt`. A `.json` import is parsed into an object and inlined too. A large illustration imported at the top of a plugin module is exactly the case this rule is for.
 
-An asset which becomes a URL is never reported. Images and fonts (`.png`, `.jpg`, `.gif`, `.woff2`, `.ttf` and the rest) are `asset/resource`, so they are always emitted as separate files and the browser fetches them only when they are used. `.wasm` and `.html` are left alone for the same reason.
+An asset which becomes a URL is never reported. Images and fonts (`.png`, `.jpg`, `.gif`, `.woff2`, `.ttf` and the rest) are `asset/resource`. They are always emitted as separate files, so the browser fetches them only when they are used. `.wasm` and `.html` are left alone for the same reason.
 
-A stylesheet is never reported either. `import '../style/index.css'` has no binding to move, and a `.css` import which does have one goes through `style-loader`, which applies it when it is imported. Deferring that would change when the styles take effect rather than only what is downloaded.
+A stylesheet is never reported either. `import '../style/index.css'` has no binding to move. A `.css` import which does have one goes through `style-loader`, which applies the styles at import time. Deferring it would change when the styles take effect rather than only what is downloaded.
 
 ## Incorrect
 
@@ -122,7 +120,7 @@ import type { HeavyWidget } from './widget';
 
 Packages which the application loads eagerly anyway, so importing them at the top of a plugin module costs nothing. `*` matches any run of characters, and a `!` prefix denies a package matched by an earlier pattern. Subpath imports are matched against their owning package, so `@jupyterlab/*` covers `@jupyterlab/services/lib/kernel`.
 
-Setting this option replaces the default list, which is the singleton list from JupyterLab's `staging/package.json` minus `@lumino/datagrid`:
+Setting this option replaces the default list. The default is the singleton list from JupyterLab's `staging/package.json`, minus `@lumino/datagrid`:
 
 ```ts
 {
@@ -219,6 +217,6 @@ Off by default. When enabled, imports used while the module is evaluated are rep
 
 The rule sees one file at a time. If another module in the same bundle imports the same source eagerly, deferring it here moves nothing out of the startup chunk, and the rule cannot tell.
 
-Sizes are an estimate. The rule counts source bytes after stripping comments and type declarations, which tracks the compiled output closely but is not the same as bundled and minified bytes. It also stops at package boundaries, so a small module which pulls in a large dependency is measured as small.
+Sizes are an estimate. The rule counts source bytes after stripping comments and type declarations. That tracks the compiled output closely, but it is not the same as bundled and minified bytes. It also stops at package boundaries, so a small module which pulls in a large dependency is measured as small.
 
 Value re-exports are not reported, only taken into account. Splitting an entry point which re-exports its own implementation is a larger refactor than this rule tries to describe.

@@ -52,10 +52,7 @@ const jupyterPreferLazyImports = createRule<[LazyImportOptions], string>({
         'Import it where it is used instead: `{{ snippet }}`',
       eagerModuleLevelUse:
         "'{{ source }}' is used at module level in a plugin module, so it loads before the application starts. " +
-        'Move the usage into a function and import it there with `await import({{ quotedSource }})`.',
-      topLevelDynamicImport:
-        'import({{ quotedSource }}) at module level still runs at load time and defers nothing. ' +
-        'Move it inside the function which needs it.'
+        'Move the usage into a function and import it there with `await import({{ quotedSource }})`.'
     },
     schema: [
       {
@@ -119,7 +116,6 @@ const jupyterPreferLazyImports = createRule<[LazyImportOptions], string>({
 
     let isPluginModule = false;
     const importDeclarations: TSESTree.ImportDeclaration[] = [];
-    const topLevelDynamicImports: TSESTree.ImportExpression[] = [];
     // Sources kept in the startup bundle by a value re-export.
     const reExportedSources = new Set<string>();
 
@@ -315,15 +311,6 @@ const jupyterPreferLazyImports = createRule<[LazyImportOptions], string>({
           reExportedSources.add(node.source.value);
         }
       },
-      ImportExpression(node) {
-        if (
-          node.source.type === 'Literal' &&
-          typeof node.source.value === 'string' &&
-          isEagerlyReached(node, context.sourceCode)
-        ) {
-          topLevelDynamicImports.push(node);
-        }
-      },
       'Program:exit'() {
         if (!isPluginModule) {
           return;
@@ -340,18 +327,6 @@ const jupyterPreferLazyImports = createRule<[LazyImportOptions], string>({
         }
         for (const [source, declarations] of bySource) {
           checkSource(source, declarations);
-        }
-        for (const expression of topLevelDynamicImports) {
-          const source = (expression.source as TSESTree.Literal)
-            .value as string;
-          if (isExempt(source)) {
-            continue;
-          }
-          context.report({
-            node: expression,
-            messageId: 'topLevelDynamicImport',
-            data: { quotedSource: `'${source}'` }
-          });
         }
       }
     };
