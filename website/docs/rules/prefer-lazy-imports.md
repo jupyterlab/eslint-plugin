@@ -147,7 +147,7 @@ Setting this option replaces the default list. The default is the singleton list
 
 `@lumino/datagrid` is denied because core defers it too, in `packages/csvviewer`.
 
-A monorepo which shares its own packages between extensions should add them, keeping the defaults it still needs:
+A monorepo which shares its own packages between extensions should add them, keeping the defaults it still needs. Check `bundled` in each package's `jupyterlab.sharedPackages` first. A shared package with `bundled: false` comes from another extension and belongs in this list, while one with `bundled: true` ships inside this extension and is worth deferring. JupyterCAD declares `@jupytercad/base` both ways in different packages, so the right setting there differs per package.
 
 ```ts
 {
@@ -195,7 +195,11 @@ Analysis of 1621 files in core and 21 Jupyter extensions produced the following:
 | `8192`        | 38%              | 93%          |
 | `16384`       | 17%              | 80%          |
 
-You can lower `minimumSize` to `1024` to increase the coverage, at the cost of roughly twice as many reports. Raising it to `8192` or higher allowsd to restrict the repots further to largest modules only.
+You can lower `minimumSize` to `1024` to increase the coverage, at the cost of roughly twice as many reports. Raising it to `8192` or higher allows to restrict the reports further to largest modules only.
+
+The shipped bytes behind one report are modest. Measuring JupyterLab's compiled output through terser and gzip, a report at the `4096` boundary is worth about 2.5 KB minified and under a kilobyte gzipped, and a typical one lands between one and three kilobytes gzipped. The large ones carry the total: the startup chunk is 40 KB minified smaller without `shortcuts-extension/src/renderer.tsx`, which is half of everything the rule finds across core.
+
+Reports for packages are worth far more, which is why they are never filtered by size. `@codemirror/commands` is 82 KB and `@rjsf/validator-ajv8` drags in `ajv` at 287 KB, so one of those outweighs every relative import the rule reports in core put together.
 
 ```ts
 {
@@ -215,7 +219,9 @@ Off by default. When enabled, imports used while the module is evaluated are rep
 
 ## Limitations
 
-The rule sees one file at a time. If another module in the same bundle imports the same source eagerly, deferring it here moves nothing out of the startup chunk, and the rule cannot tell.
+The rule sees one file at a time. If another module in the same bundle imports the same source eagerly, the startup chunk stays the same size whatever this file does, and the rule cannot tell.
+
+This is the main source of unhelpful reports, and it grows with how much a package shares internally. In `jupyterlab-lsp` the rule reports `virtual/console`, `context`, `converter` and `virtual/document` across several feature plugins, but each of those modules is imported by eleven to seventeen files in the same package, so something else already pulls them into the startup chunk. When one source is reported from several plugin files at once, check who else imports it before moving any of them.
 
 Sizes are an estimate. The rule counts source bytes after stripping comments and type declarations. That tracks the compiled output closely, but it is not the same as bundled and minified bytes. It also stops at package boundaries, so a small module which pulls in a large dependency is measured as small.
 
