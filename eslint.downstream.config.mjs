@@ -53,7 +53,8 @@ function makeProjectConfig(projectName) {
       'jupyter/prefer-signal-this-arg': 'error',
       'jupyter/require-disposable-ownership': 'error',
       'jupyter/require-disposable-transfer': 'error',
-      'jupyter/incorrect-translator-usage': 'error'
+      'jupyter/incorrect-translator-usage': 'error',
+      'jupyter/prefer-lazy-imports': 'error'
     },
     languageOptions: {
       parser: resolvedParser,
