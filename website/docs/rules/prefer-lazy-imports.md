@@ -244,7 +244,11 @@ Off by default. When enabled, imports used while the module is evaluated are rep
 
 The rule sees one file at a time. If another module in the same bundle imports the same source eagerly, the startup chunk stays the same size whatever this file does, and the rule cannot tell.
 
-This is the main source of unhelpful reports, and it grows with how much a package shares internally. In `jupyterlab-lsp` the rule reports `virtual/console`, `context`, `converter` and `virtual/document` across several feature plugins, but each of those modules is imported by eleven to seventeen files in the same package, so something else already pulls them into the startup chunk. When one source is reported from several plugin files at once, check who else imports it before moving any of them.
+This is the main source of unhelpful reports, and it grows with how much a package shares internally. In `jupyterlab-lsp` the rule reports `virtual/console`, `context` and `converter` across several feature plugins. Each of those is imported by a dozen or so feature files which all load at startup, so deferring any one of them changes nothing.
+
+What matters is whether the other importers themselves stay in the startup chunk. Counting importers does not answer that. In `jupyterlab-git` the largest single report, `./model`, is imported by 23 files, yet deferring it works: eight of those are tests which are never bundled, and the rest sit in the same subtree which moves into the lazy chunk along with it.
+
+So defer at the edge of a subsystem rather than one module at a time. When the same source is reported from several plugin files which all load at startup, defer it in all of them or in none.
 
 Sizes are an estimate. The rule counts source bytes after stripping comments and type declarations. That tracks the compiled output closely, but it is not the same as bundled and minified bytes. It also stops at package boundaries, so a small module which pulls in a large dependency is measured as small.
 
