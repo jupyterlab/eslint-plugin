@@ -81,7 +81,7 @@ import type { HeavyWidget } from './widget';
 
 ## Rule details
 
-The rule only looks at plugin modules, meaning files which define a JupyterLab plugin. [Which files count](#which-files-count) lists the forms it recognises.
+The rule only looks at plugin modules, meaning files which define a JupyterLab plugin. [Which files count](#which-files-count) lists the forms it recognises. [`reportInteractionCallbacks`](#reportinteractioncallbacks) extends it to the remaining modules, with a stricter trigger.
 
 In such a file, an import is reported when every runtime use of its bindings sits inside a function body, a method, or an instance field initializer. Turning it into `await import()` is then a mechanical change. An import which is needed while the module is evaluated is left alone, because the imported module is fetched at startup regardless of how the other bindings are written.
 
@@ -266,6 +266,47 @@ Reports for packages are never filtered by size, because they are worth far more
 ```json
 {
   "minimumSize": 1024
+}
+```
+
+### `reportInteractionCallbacks`
+
+Off by default. When enabled, the rule also checks modules which do not define a plugin, and reports an import there when every use sits inside a user-interaction handler: a command `execute` implementation, a listener for an interaction event such as `click`, or a JSX handler prop such as `onClick`.
+
+Outside a plugin module, an import being used only inside functions proves nothing, because an ordinary function may run while the application starts. A widget's `render` is called as soon as the widget is shown, and making it `async` would break its signature. An interaction handler holds on both counts. It cannot run before the user acts, and it is safe to make `async`, because a command may return a promise and the return value of an event listener is ignored.
+
+```ts
+import { saveAs } from 'file-saver';
+
+export function addCommands(commands: CommandRegistry): void {
+  commands.addCommand(CommandIDs.export, {
+    execute: async () => {
+      saveAs(await renderReport());
+    }
+  });
+}
+```
+
+The deferred form is the same as in a plugin module:
+
+```ts
+export function addCommands(commands: CommandRegistry): void {
+  commands.addCommand(CommandIDs.export, {
+    execute: async () => {
+      const { saveAs } = await import('file-saver');
+      saveAs(await renderReport());
+    }
+  });
+}
+```
+
+Only positions which name the user directly count: `execute`, a listener registered for an interaction event, a JSX `on*` interaction prop, or a DOM `on*` assignment. A command `label` renders whenever the command is shown, which can be at startup, so it does not count, and neither does an event such as `load`.
+
+Measured over the same corpus as `minimumSize`, this adds 19 reports on top of the 50 the rule finds by default. The single-file limitation weighs more here than in plugin modules: a module used only on click is often reachable through the same file's other imports, and then the chunk shrinks only once those defer it too. [Limitations](#limitations) describes this.
+
+```ts
+{
+  "reportInteractionCallbacks": true
 }
 ```
 

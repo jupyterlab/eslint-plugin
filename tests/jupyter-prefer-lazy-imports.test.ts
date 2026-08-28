@@ -1128,6 +1128,271 @@ ruleTester.run('prefer-lazy-imports', preferLazyImports, {
   ]
 });
 
+ruleTester.run(
+  'prefer-lazy-imports (interaction callbacks)',
+  preferLazyImports,
+  {
+    valid: [
+      // Off by default: a module without a plugin is not checked.
+      {
+        code: `
+        import { saveAs } from 'file-saver';
+        export function setup(button: HTMLElement) {
+          button.addEventListener('click', () => saveAs(new Blob([])));
+        }
+      `
+      },
+      // An ordinary function proves nothing about when it runs.
+      {
+        code: `
+        import { parse } from 'heavy-parser';
+        export class Renderer {
+          render(source: string) {
+            return parse(source);
+          }
+        }
+      `,
+        options: [{ reportInteractionCallbacks: true }]
+      },
+      // One use outside a handler keeps the import where it is.
+      {
+        code: `
+        import { saveAs } from 'file-saver';
+        export function setup(button: HTMLElement) {
+          button.addEventListener('click', () => saveAs(new Blob([])));
+        }
+        export function exportNow() {
+          saveAs(new Blob([]));
+        }
+      `,
+        options: [{ reportInteractionCallbacks: true }]
+      },
+      // A command label renders whenever the command is shown, which can be at
+      // startup, so only `execute` counts as a handler.
+      {
+        code: `
+        import { formatLabel } from 'heavy-pkg';
+        export function addCommands(commands: any) {
+          commands.addCommand('test:open', {
+            label: () => formatLabel(),
+            execute: () => undefined
+          });
+        }
+      `,
+        options: [{ reportInteractionCallbacks: true }]
+      },
+      // `load` fires while the page starts, so it is not an interaction event.
+      {
+        code: `
+        import { init } from 'heavy-pkg';
+        export function setup(img: HTMLElement) {
+          img.addEventListener('load', () => init());
+        }
+      `,
+        options: [{ reportInteractionCallbacks: true }]
+      },
+      // Packages in the shared runtime stay exempt.
+      {
+        code: `
+        import { Widget } from '@lumino/widgets';
+        export function setup(button: HTMLElement) {
+          button.addEventListener('click', () => new Widget());
+        }
+      `,
+        options: [{ reportInteractionCallbacks: true }]
+      },
+      // The size threshold applies here as well.
+      {
+        filename: fixtureFilename,
+        code: `
+        import { CommandIDs } from './lazy-tiny';
+        export function addCommands(commands: any) {
+          commands.addCommand('test:open', {
+            execute: () => CommandIDs.open
+          });
+        }
+      `,
+        options: [{ reportInteractionCallbacks: true }]
+      },
+      // A value re-export keeps the source in the bundle here too.
+      {
+        code: `
+        import { NotebookDiff } from './diff';
+        export { NotebookDiff } from './diff';
+        export function addCommands(commands: any) {
+          commands.addCommand('test:diff', {
+            execute: () => new NotebookDiff()
+          });
+        }
+      `,
+        options: [{ reportInteractionCallbacks: true }]
+      },
+      // A plugin module keeps its usual trigger: module level use stays silent.
+      {
+        code: `
+        import { JupyterFrontEndPlugin } from '@jupyterlab/application';
+        import { compute } from 'some-lib';
+        const value = compute();
+        const plugin: JupyterFrontEndPlugin<void> = {
+          id: 'test:plugin',
+          autoStart: true,
+          activate: () => value
+        };
+      `,
+        options: [{ reportInteractionCallbacks: true }]
+      }
+    ],
+    invalid: [
+      // A listener for an interaction event cannot run before the user acts.
+      {
+        code: `
+        import { saveAs } from 'file-saver';
+        export function setup(button: HTMLElement) {
+          button.addEventListener('click', () => saveAs(new Blob([])));
+        }
+      `,
+        options: [{ reportInteractionCallbacks: true }],
+        errors: [
+          {
+            messageId: 'preferLazyImportInteraction',
+            data: {
+              source: 'file-saver',
+              snippet: "const { saveAs } = await import('file-saver');"
+            }
+          }
+        ]
+      },
+      // A command body only runs when the command is invoked.
+      {
+        code: `
+        import { ProcessingDialog } from 'heavy-dialogs';
+        export function addCommands(commands: any) {
+          commands.addCommand('test:process', {
+            execute: async () => new ProcessingDialog()
+          });
+        }
+      `,
+        options: [{ reportInteractionCallbacks: true }],
+        errors: [{ messageId: 'preferLazyImportInteraction' }]
+      },
+      // A closure nested inside a handler waits for the user as well.
+      {
+        code: `
+        import { parse } from 'heavy-parser';
+        export function addCommands(commands: any) {
+          commands.addCommand('test:parse', {
+            execute: async () => {
+              const run = () => parse('');
+              return run();
+            }
+          });
+        }
+      `,
+        options: [{ reportInteractionCallbacks: true }],
+        errors: [{ messageId: 'preferLazyImportInteraction' }]
+      },
+      // Method shorthand for `execute` counts too.
+      {
+        code: `
+        import { parse } from 'heavy-parser';
+        export function addCommands(commands: any) {
+          commands.addCommand('test:parse', {
+            execute() {
+              return parse('');
+            }
+          });
+        }
+      `,
+        options: [{ reportInteractionCallbacks: true }],
+        errors: [{ messageId: 'preferLazyImportInteraction' }]
+      },
+      // A DOM `on*` assignment is a handler position as well.
+      {
+        code: `
+        import { saveAs } from 'file-saver';
+        export function setup(button: HTMLButtonElement) {
+          button.onclick = () => saveAs(new Blob([]));
+        }
+      `,
+        options: [{ reportInteractionCallbacks: true }],
+        errors: [{ messageId: 'preferLazyImportInteraction' }]
+      },
+      // In a plugin module the usual trigger takes precedence, so a click-only
+      // import is reported with the plugin message.
+      {
+        code: `
+        import { JupyterFrontEndPlugin } from '@jupyterlab/application';
+        import { saveAs } from 'file-saver';
+        const plugin: JupyterFrontEndPlugin<void> = {
+          id: 'test:plugin',
+          autoStart: true,
+          activate: () => {
+            const button = document.createElement('button');
+            button.addEventListener('click', () => saveAs(new Blob([])));
+          }
+        };
+      `,
+        options: [{ reportInteractionCallbacks: true }],
+        errors: [{ messageId: 'preferLazyImport' }]
+      }
+    ]
+  }
+);
+
+espreeTester.run(
+  'prefer-lazy-imports (interaction callbacks, javascript)',
+  preferLazyImports,
+  {
+    valid: [],
+    invalid: [
+      {
+        code: `
+          import { saveAs } from 'file-saver';
+          export function setup(button) {
+            button.addEventListener('click', () => saveAs(new Blob([])));
+          }
+        `,
+        options: [{ reportInteractionCallbacks: true }],
+        errors: [{ messageId: 'preferLazyImportInteraction' }]
+      }
+    ]
+  }
+);
+
+tsxTester.run(
+  'prefer-lazy-imports (interaction callbacks, tsx)',
+  preferLazyImports,
+  {
+    valid: [
+      // A prop which is not an interaction handler proves nothing.
+      {
+        code: `
+          import * as React from 'react';
+          import { renderCell } from 'heavy-grid';
+          export function Grid() {
+            return <div render={() => renderCell()} />;
+          }
+        `,
+        options: [{ reportInteractionCallbacks: true }]
+      }
+    ],
+    invalid: [
+      // A JSX interaction handler prop waits for the user.
+      {
+        code: `
+          import * as React from 'react';
+          import { exportChart } from 'heavy-charts';
+          export function ExportButton() {
+            return <button onClick={() => exportChart()} />;
+          }
+        `,
+        options: [{ reportInteractionCallbacks: true }],
+        errors: [{ messageId: 'preferLazyImportInteraction' }]
+      }
+    ]
+  }
+);
+
 tsxTester.run('prefer-lazy-imports (tsx)', preferLazyImports, {
   valid: [
     // React is loaded eagerly by the application.

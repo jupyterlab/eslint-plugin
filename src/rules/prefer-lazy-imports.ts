@@ -20,6 +20,7 @@ import {
   DEFAULT_ALLOWED_PACKAGES,
   DEFAULT_MINIMUM_SIZE,
   isEagerlyReached,
+  isInInteractionCallback,
   isInPluginTokenList,
   LazyImportOptions,
   matchesPatterns
@@ -35,6 +36,7 @@ const DEFAULT_OPTIONS: LazyImportOptions = {
   allowedPackages: DEFAULT_ALLOWED_PACKAGES,
   ignoreImports: [],
   minimumSize: DEFAULT_MINIMUM_SIZE,
+  reportInteractionCallbacks: false,
   reportModuleLevelUsage: false
 };
 
@@ -53,7 +55,10 @@ const jupyterPreferLazyImports = createRule<[LazyImportOptions], string>({
         'Import it where it is used instead: `{{ snippet }}`',
       eagerModuleLevelUse:
         "'{{ source }}' is used at module level in a plugin module, so it loads before the application starts. " +
-        "Move the usage into a function and import it there with `await import('{{ source }}')`."
+        "Move the usage into a function and import it there with `await import('{{ source }}')`.",
+      preferLazyImportInteraction:
+        "'{{ source }}' is only used inside user-interaction handlers, so it is not needed until the user acts. " +
+        'Import it where it is used instead: `{{ snippet }}`'
     },
     schema: [
       {
@@ -80,6 +85,12 @@ const jupyterPreferLazyImports = createRule<[LazyImportOptions], string>({
             description:
               'Smallest module worth deferring, in bytes of code once comments and type declarations are removed, counted over the module and everything it statically imports by relative path. Set to 0 to report every module regardless of size.'
           },
+          reportInteractionCallbacks: {
+            type: 'boolean',
+            default: false,
+            description:
+              'Also check modules which do not define a plugin, reporting an import there when every use sits inside a user-interaction handler: a command `execute` implementation, a listener for an interaction event such as `click`, or a JSX handler prop such as `onClick`.'
+          },
           reportModuleLevelUsage: {
             type: 'boolean',
             default: false,
@@ -98,6 +109,7 @@ const jupyterPreferLazyImports = createRule<[LazyImportOptions], string>({
       allowedPackages,
       ignoreImports,
       minimumSize,
+      reportInteractionCallbacks,
       reportModuleLevelUsage
     } = options;
 
@@ -130,7 +142,7 @@ const jupyterPreferLazyImports = createRule<[LazyImportOptions], string>({
     // Packages this extension declares as provided by the application, read
     // from `jupyterlab.sharedPackages` in its own manifest. They extend
     // `allowedPackages` rather than replacing it, and are only looked up once
-    // the file turns out to be a plugin module.
+    // the file turns out to need checking.
     let hostProvided: string[] | null = null;
 
     /**
@@ -237,6 +249,27 @@ const jupyterPreferLazyImports = createRule<[LazyImportOptions], string>({
         return;
       }
 
+      if (!isPluginModule) {
+        // Outside a plugin module an ordinary function proves nothing, since
+        // it may run while the application starts. Only a position which
+        // provably waits for the user shows the import can load later.
+        if (
+          references.every(({ identifier }) =>
+            isInInteractionCallback(identifier)
+          )
+        ) {
+          context.report({
+            node: declarations[0],
+            messageId: 'preferLazyImportInteraction',
+            data: {
+              source,
+              snippet: buildDeferredImportSnippet(declarations)
+            }
+          });
+        }
+        return;
+      }
+
       let deferrable = 0;
       let eager = 0;
       let tokenList = 0;
@@ -337,7 +370,7 @@ const jupyterPreferLazyImports = createRule<[LazyImportOptions], string>({
         }
       },
       'Program:exit'() {
-        if (!isPluginModule) {
+        if (!isPluginModule && !reportInteractionCallbacks) {
           return;
         }
         hostProvided = getHostProvidedPackages(context.filename);

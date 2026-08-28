@@ -25,6 +25,7 @@ export interface LazyImportOptions {
   allowedPackages: string[];
   ignoreImports: string[];
   minimumSize: number;
+  reportInteractionCallbacks: boolean;
   reportModuleLevelUsage: boolean;
 }
 
@@ -356,6 +357,145 @@ export function isEagerlyReached(
     // Passing the function anywhere else does not say when, or whether, it runs.
     return false;
   });
+}
+
+/**
+ * DOM events which only fire on a user action, so a listener for one of them
+ * cannot run while the application starts.
+ */
+const INTERACTION_EVENTS = new Set([
+  'auxclick',
+  'click',
+  'contextmenu',
+  'dblclick',
+  'mousedown',
+  'mouseup',
+  'pointerdown',
+  'pointerup',
+  'touchstart',
+  'touchend',
+  'keydown',
+  'keypress',
+  'keyup',
+  'change',
+  'input',
+  'submit',
+  'copy',
+  'cut',
+  'paste',
+  'drop',
+  'wheel'
+]);
+
+/** The same events assigned as DOM `on*` properties. */
+const INTERACTION_ON_PROPERTIES = new Set(
+  [...INTERACTION_EVENTS].map(event => `on${event}`)
+);
+
+/** The same events as JSX handler props. */
+const JSX_INTERACTION_HANDLERS = new Set([
+  'onAuxClick',
+  'onClick',
+  'onContextMenu',
+  'onDoubleClick',
+  'onMouseDown',
+  'onMouseUp',
+  'onPointerDown',
+  'onPointerUp',
+  'onTouchStart',
+  'onTouchEnd',
+  'onKeyDown',
+  'onKeyPress',
+  'onKeyUp',
+  'onChange',
+  'onInput',
+  'onSubmit',
+  'onCopy',
+  'onCut',
+  'onPaste',
+  'onDrop',
+  'onWheel'
+]);
+
+/**
+ * Returns true when a function's own position marks it as a user-interaction
+ * handler: a command `execute` implementation, a listener for an interaction
+ * event, or a JSX interaction handler prop. Each position requires the
+ * function to be the direct value, so a call producing a handler never counts.
+ */
+function isInteractionHandler(fn: FunctionNode): boolean {
+  const parent = fn.parent;
+  if (!parent) {
+    return false;
+  }
+  // `execute: () => {}` and `execute() {}` in command options.
+  if (
+    parent.type === 'Property' &&
+    !parent.computed &&
+    parent.value === fn &&
+    ((parent.key.type === 'Identifier' && parent.key.name === 'execute') ||
+      (parent.key.type === 'Literal' && parent.key.value === 'execute'))
+  ) {
+    return true;
+  }
+  // `node.addEventListener('click', () => {})`
+  if (
+    parent.type === 'CallExpression' &&
+    parent.callee.type === 'MemberExpression' &&
+    !parent.callee.computed &&
+    parent.callee.property.type === 'Identifier' &&
+    parent.callee.property.name === 'addEventListener' &&
+    parent.arguments[1] === fn &&
+    parent.arguments[0]?.type === 'Literal' &&
+    typeof parent.arguments[0].value === 'string' &&
+    INTERACTION_EVENTS.has(parent.arguments[0].value)
+  ) {
+    return true;
+  }
+  // `element.onclick = () => {}`
+  if (
+    parent.type === 'AssignmentExpression' &&
+    parent.operator === '=' &&
+    parent.right === fn &&
+    parent.left.type === 'MemberExpression' &&
+    !parent.left.computed &&
+    parent.left.property.type === 'Identifier' &&
+    INTERACTION_ON_PROPERTIES.has(parent.left.property.name)
+  ) {
+    return true;
+  }
+  // `<button onClick={() => {}} />`
+  if (
+    parent.type === 'JSXExpressionContainer' &&
+    parent.parent?.type === 'JSXAttribute' &&
+    parent.parent.name.type === 'JSXIdentifier' &&
+    JSX_INTERACTION_HANDLERS.has(parent.parent.name.name)
+  ) {
+    return true;
+  }
+  return false;
+}
+
+/**
+ * Returns true when the node sits inside a user-interaction handler, so it
+ * cannot run until the user acts, however the module itself is loaded. The
+ * closure only exists once the enclosing handler runs, so anything nested
+ * deeper inside it waits for the user as well.
+ */
+export function isInInteractionCallback(node: TSESTree.Node): boolean {
+  let current: TSESTree.Node | undefined = node;
+  while (current && current.type !== 'Program') {
+    if (
+      (current.type === 'FunctionDeclaration' ||
+        current.type === 'FunctionExpression' ||
+        current.type === 'ArrowFunctionExpression') &&
+      isInteractionHandler(current)
+    ) {
+      return true;
+    }
+    current = current.parent;
+  }
+  return false;
 }
 
 const PLUGIN_LIST_PROPERTIES = new Set(['requires', 'optional', 'provides']);

@@ -54,7 +54,10 @@ function makeProjectConfig(projectName) {
       'jupyter/require-disposable-ownership': 'error',
       'jupyter/require-disposable-transfer': 'error',
       'jupyter/incorrect-translator-usage': 'error',
-      'jupyter/prefer-lazy-imports': 'error'
+      'jupyter/prefer-lazy-imports': [
+        'error',
+        { reportInteractionCallbacks: true }
+      ]
     },
     languageOptions: {
       parser: resolvedParser,
