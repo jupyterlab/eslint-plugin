@@ -71,7 +71,7 @@ const jupyterPreferLazyImports = createRule<[LazyImportOptions], string>({
             items: { type: 'string' },
             default: [],
             description:
-              'Import specifiers to skip, matched with `*` wildcards, for example `./tokens` or `*.css`.'
+              'Import specifiers to skip, matched the same way as `allowedPackages`: `*` wildcards, `!` to deny a specifier whatever else in the list matches it, and a bare specifier tested both as written and against its owning package. For example `./tokens` or `*.css`.'
           },
           minimumSize: {
             type: 'number',

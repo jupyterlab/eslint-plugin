@@ -51,7 +51,8 @@ The plugin ships with a recommended configuration that enables all current rules
 | [jupyter/prefer-lazy-imports](./prefer-lazy-imports)                                           | `warn` ³ |
 
 ¹ Applied only to `**/*.spec.{ts,js}` and `**/*.test.{ts,js}` files.
-² Applied only to `**/schema/*.json` files
+
+² Applied only to `**/schema/*.json` files.
 
 ³ Turned off for `**/*.spec.{ts,js}` and `**/*.test.{ts,js}` files, where mock plugins would otherwise be reported.
 

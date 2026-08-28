@@ -196,8 +196,9 @@ function extractTypeName(typeName: TSESTree.EntityName): string | null {
 const PLUGIN_TYPE_NAMES = ['JupyterFrontEndPlugin', 'ServiceManagerPlugin'];
 
 /**
- * Returns true when a type name refers to a JupyterLab plugin type, including
- * the namespaced spellings such as `JupyterFrontEnd.IPlugin`.
+ * Returns true when a type name refers to a JupyterLab plugin type. Only the
+ * last segment is compared, so a namespaced spelling such as
+ * `Private.JupyterFrontEndPlugin` matches too.
  */
 function isPluginTypeName(name: string | null): boolean {
   if (!name) {

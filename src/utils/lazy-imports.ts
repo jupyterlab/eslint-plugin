@@ -8,7 +8,7 @@ import { TSESLint } from '@typescript-eslint/utils';
 import { getObjectProperties, isCallableProperty } from './plugin-utils';
 
 /*
- * The defaults below assume the build JupyterLab extensions normally use:
+ * The defaults below assume the build that JupyterLab extensions normally use:
  * rspack driven by `@jupyter/builder`, with Module Federation sharing packages
  * between the application and the extensions it loads. Webpack behaves the same
  * way here. A different bundler classifies assets differently, and a different
