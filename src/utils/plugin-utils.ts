@@ -315,6 +315,27 @@ const PLUGIN_SHAPE_PROPERTIES = [
 ];
 
 /**
+ * Returns true when a property holds something callable: a function written in
+ * place, or a name referring to one declared elsewhere.
+ */
+export function isCallableProperty(
+  property: TSESTree.Property | undefined
+): boolean {
+  if (!property) {
+    return false;
+  }
+  switch (property.value.type) {
+    case 'FunctionExpression':
+    case 'ArrowFunctionExpression':
+    case 'Identifier':
+    case 'MemberExpression':
+      return true;
+    default:
+      return false;
+  }
+}
+
+/**
  * Returns true when an object literal has the shape of a JupyterLab plugin:
  * a string `id`, an `activate` function, and at least one of the properties
  * which only plugins carry. Used for plugin objects written without a type
@@ -334,8 +355,7 @@ export function looksLikePluginObject(
     return false;
   }
 
-  const activate = properties.get('activate');
-  if (!activate) {
+  if (!isCallableProperty(properties.get('activate'))) {
     return false;
   }
 

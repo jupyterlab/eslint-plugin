@@ -214,7 +214,9 @@ export function getTransitiveCodeSize(entry: string): number | null {
     const { file, depth } = queue.shift()!;
     const info = readFileInfo(file);
     if (!info) {
-      continue;
+      // The size is unknown rather than small, and a module which cannot be
+      // measured is reported rather than filtered out.
+      return null;
     }
     total += info.size;
     if (depth >= MAX_DEPTH || seen.size >= MAX_FILES) {

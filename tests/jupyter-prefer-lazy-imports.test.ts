@@ -502,6 +502,32 @@ ruleTester.run('prefer-lazy-imports', preferLazyImports, {
     // `typeof` is erased, so it is not a runtime use which pins the import.
     // The remaining use is deferred, so this one is reported, not suppressed;
     // see the invalid case which pairs with it.
+    // `activate` which is not callable is not a plugin, whatever else it has.
+    {
+      code: `
+        import { HeavyWidget } from './widget';
+        export default {
+          id: 'test:plugin',
+          autoStart: true,
+          activate: true,
+          widget: new HeavyWidget()
+        };
+      `
+    },
+    // A partial options object is merged with the defaults, so the packages
+    // the application provides stay exempt.
+    {
+      code: `
+        import { JupyterFrontEndPlugin } from '@jupyterlab/application';
+        import { Widget } from '@lumino/widgets';
+        const plugin: JupyterFrontEndPlugin<void> = {
+          id: 'test:plugin',
+          autoStart: true,
+          activate: () => new Widget()
+        };
+      `,
+      options: [{ ignoreImports: ['./nothing'] }]
+    },
     // A small icon is inlined into the bundle, but not enough of it to matter.
     {
       filename: fixtureFilename,
@@ -999,6 +1025,34 @@ ruleTester.run('prefer-lazy-imports', preferLazyImports, {
           reportModuleLevelUsage: false
         }
       ],
+      errors: [{ messageId: 'preferLazyImport' }]
+    },
+    // A partial options object keeps the other defaults, so this one is still
+    // measured and reported.
+    {
+      filename: fixtureFilename,
+      code: `
+        import { JupyterFrontEndPlugin } from '@jupyterlab/application';
+        import { HeavyTable } from './lazy-large';
+        const plugin: JupyterFrontEndPlugin<void> = {
+          id: 'test:plugin',
+          autoStart: true,
+          activate: () => new HeavyTable({ rows: 2, columns: 2 })
+        };
+      `,
+      options: [{ reportModuleLevelUsage: false }],
+      errors: [{ messageId: 'preferLazyImport' }]
+    },
+    // A shorthand `activate` naming a function declared elsewhere is callable.
+    {
+      filename: fixtureFilename,
+      code: `
+        import { HeavyTable } from './lazy-large';
+        function activate() {
+          return new HeavyTable({ rows: 1, columns: 1 });
+        }
+        export default { id: 'test:plugin', autoStart: true, activate };
+      `,
       errors: [{ messageId: 'preferLazyImport' }]
     },
     // Shared but bundled here, so this extension still ships it.

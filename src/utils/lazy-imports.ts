@@ -5,7 +5,7 @@
 
 import { TSESTree } from '@typescript-eslint/types';
 import { TSESLint } from '@typescript-eslint/utils';
-import { getObjectProperties } from './plugin-utils';
+import { getObjectProperties, isCallableProperty } from './plugin-utils';
 
 /*
  * The defaults below assume the build JupyterLab extensions normally use:
@@ -367,7 +367,7 @@ const PLUGIN_LIST_PROPERTIES = new Set(['requires', 'optional', 'provides']);
  */
 function looksLikePluginList(node: TSESTree.ObjectExpression): boolean {
   const properties = getObjectProperties(node);
-  if (properties.has('activate')) {
+  if (isCallableProperty(properties.get('activate'))) {
     return true;
   }
   const id = properties.get('id');
