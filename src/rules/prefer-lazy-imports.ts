@@ -64,7 +64,7 @@ const jupyterPreferLazyImports = createRule<[LazyImportOptions], string>({
             items: { type: 'string' },
             default: DEFAULT_ALLOWED_PACKAGES,
             description:
-              'Packages already loaded eagerly by the application, which are therefore free to import at the top of a plugin module. Supports `*` wildcards, and `!` to deny a package matched by an earlier pattern. Replaces the default list.'
+              'Packages already loaded eagerly by the application, which are therefore free to import at the top of a plugin module. Supports `*` wildcards, and `!` to deny a package whatever else in the list matches it. Replaces the default list.'
           },
           ignoreImports: {
             type: 'array',

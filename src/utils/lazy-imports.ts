@@ -33,7 +33,7 @@ export interface LazyImportOptions {
  * kilobyte of code the saving cancels out. The default sits well above that
  * break-even point: across the Jupyter extensions this rule was measured on,
  * four kilobytes reports half as many imports as one kilobyte while still
- * covering 96% of the code which could be deferred.
+ * covering 95% of the code which could be deferred.
  */
 export const DEFAULT_MINIMUM_SIZE = 4096;
 

@@ -784,7 +784,7 @@ ruleTester.run('prefer-lazy-imports', preferLazyImports, {
       errors: [
         {
           messageId: 'eagerModuleLevelUse',
-          data: { source: 'some-lib', quotedSource: "'some-lib'" }
+          data: { source: 'some-lib' }
         }
       ]
     },
