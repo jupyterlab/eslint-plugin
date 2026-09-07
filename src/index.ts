@@ -18,10 +18,13 @@ import requireSignalCleanup from './rules/require-signal-cleanup';
 import requireSignalThisArg from './rules/require-signal-this-arg';
 import preferSignalThisArg from './rules/prefer-signal-this-arg';
 import galataPreferFilebrowserHelper from './rules/galata-prefer-filebrowser-helper';
+import galataPreferMenuHelper from './rules/galata-prefer-menu-helper';
+import galataPreferNotebookCellHelper from './rules/galata-prefer-notebook-cell-helper';
 import requireDisposableOwnership from './rules/require-disposable-ownership';
 import requireDisposableTransfer from './rules/require-disposable-transfer';
 import incorrectTranslatorUsage from './rules/incorrect-translator-usage';
 import galataPreferSidebarActivityHelper from './rules/galata-prefer-sidebar-activity-helper';
+import preferLazyImports from './rules/prefer-lazy-imports';
 
 const plugin = {
   rules: {
@@ -40,10 +43,13 @@ const plugin = {
     'require-signal-this-arg': requireSignalThisArg,
     'prefer-signal-this-arg': preferSignalThisArg,
     'galata-prefer-filebrowser-helper': galataPreferFilebrowserHelper,
+    'galata-prefer-menu-helper': galataPreferMenuHelper,
+    'galata-prefer-notebook-cell-helper': galataPreferNotebookCellHelper,
     'require-disposable-ownership': requireDisposableOwnership,
     'require-disposable-transfer': requireDisposableTransfer,
     'incorrect-translator-usage': incorrectTranslatorUsage,
-    'galata-prefer-sidebar-activity-helper': galataPreferSidebarActivityHelper
+    'galata-prefer-sidebar-activity-helper': galataPreferSidebarActivityHelper,
+    'prefer-lazy-imports': preferLazyImports
   },
   configs: {
     recommended: [
@@ -63,7 +69,8 @@ const plugin = {
           'jupyter/prefer-signal-this-arg': 'warn',
           'jupyter/require-disposable-ownership': 'warn',
           'jupyter/require-disposable-transfer': 'warn',
-          'jupyter/incorrect-translator-usage': 'warn'
+          'jupyter/incorrect-translator-usage': 'warn',
+          'jupyter/prefer-lazy-imports': 'warn'
         }
       },
       {
@@ -77,7 +84,11 @@ const plugin = {
         files: ['**/*.spec.ts', '**/*.spec.js', '**/*.test.ts', '**/*.test.js'],
         rules: {
           'jupyter/require-soft-assertions-before-snapshots': 'warn',
-          'jupyter/galata-prefer-filebrowser-helper': 'warn'
+          'jupyter/galata-prefer-filebrowser-helper': 'warn',
+          'jupyter/galata-prefer-menu-helper': 'warn',
+          'jupyter/galata-prefer-notebook-cell-helper': 'warn',
+          // Test files declare mock plugins; deferring their imports is pointless.
+          'jupyter/prefer-lazy-imports': 'off'
         }
       },
       {
@@ -108,7 +119,8 @@ const plugin = {
         'jupyter/prefer-signal-this-arg': 'warn',
         'jupyter/require-disposable-ownership': 'warn',
         'jupyter/require-disposable-transfer': 'warn',
-        'jupyter/incorrect-translator-usage': 'warn'
+        'jupyter/incorrect-translator-usage': 'warn',
+        'jupyter/prefer-lazy-imports': 'warn'
       },
       overrides: [
         {
@@ -120,7 +132,10 @@ const plugin = {
           ],
           rules: {
             'jupyter/require-soft-assertions-before-snapshots': 'warn',
-            'jupyter/galata-prefer-filebrowser-helper': 'warn'
+            'jupyter/galata-prefer-filebrowser-helper': 'warn',
+            'jupyter/galata-prefer-menu-helper': 'warn',
+            'jupyter/galata-prefer-notebook-cell-helper': 'warn',
+            'jupyter/prefer-lazy-imports': 'off'
           }
         },
         {

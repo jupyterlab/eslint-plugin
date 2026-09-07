@@ -6,6 +6,8 @@ This section documents all rules currently provided by `eslint-plugin-jupyter`.
 
 - [command-described-by](./command-described-by)
 - [galata-prefer-filebrowser-helper](./galata-prefer-filebrowser-helper)
+- [galata-prefer-menu-helper](./galata-prefer-menu-helper)
+- [galata-prefer-notebook-cell-helper](./galata-prefer-notebook-cell-helper)
 - [galata-prefer-sidebar-activity-helper](./galata-prefer-sidebar-activity-helper)
 - [incorrect-translator-usage](./incorrect-translator-usage)
 - [no-dynamic-translation](./no-dynamic-translation)
@@ -15,6 +17,7 @@ This section documents all rules currently provided by `eslint-plugin-jupyter`.
 - [no-untranslated-string](./no-untranslated-string)
 - [plugin-activation-args](./plugin-activation-args)
 - [plugin-description](./plugin-description)
+- [prefer-lazy-imports](./prefer-lazy-imports)
 - [prefer-signal-this-arg](./prefer-signal-this-arg)
 - [require-disposable-ownership](./require-disposable-ownership)
 - [require-disposable-transfer](./require-disposable-transfer)
@@ -45,14 +48,21 @@ The plugin ships with a recommended configuration that enables all current rules
 | [jupyter/require-signal-this-arg](./require-signal-this-arg)                                   | `error`  |
 | [jupyter/prefer-signal-this-arg](./prefer-signal-this-arg)                                     | `warn`   |
 | [jupyter/galata-prefer-filebrowser-helper](./galata-prefer-filebrowser-helper)                 | `warn` ¹ |
+| [jupyter/galata-prefer-menu-helper](./galata-prefer-menu-helper)                               | `warn` ¹ |
+| [jupyter/galata-prefer-notebook-cell-helper](./galata-prefer-notebook-cell-helper)             | `warn` ¹ |
 | [jupyter/galata-prefer-sidebar-activity-helper](./galata-prefer-sidebar-activity-helper)       | `warn` ² |
 | [jupyter/no-schema-enum](./no-schema-enum)                                                     | `warn` ³ |
 | [jupyter/no-pageconfig-base-url](./no-pageconfig-base-url)                                     | `warn`   |
 | [jupyter/incorrect-translator-usage](./incorrect-translator-usage)                             | `warn`   |
+| [jupyter/prefer-lazy-imports](./prefer-lazy-imports)                                           | `warn` ⁴ |
 
 ¹ Applied only to `**/*.spec.{ts,js}` and `**/*.test.{ts,js}` files.
+
 ² Applied only to Galata test files, including `**/galata/test/**/*.{ts,js}`, `**/ui-tests/**/*.spec.ts`, and `**/ui-tests/**/*.test.ts`.
+
 ³ Applied only to `**/schema/*.json` files.
+
+⁴ Turned off for `**/*.spec.{ts,js}` and `**/*.test.{ts,js}` files, where mock plugins would otherwise be reported.
 
 These defaults are the same in both `jupyterPlugin.configs.recommended` (flat config) and `plugin:@jupyter/eslint-plugin/recommended-legacy`.
 
