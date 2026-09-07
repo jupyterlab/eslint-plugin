@@ -202,6 +202,29 @@ ruleTester.run('no-schema-enum', noSchemaEnum as any, {
   }
 }`,
       errors: [{ messageId: 'requireStringType' }]
+    },
+    // The autofix keeps the spacing of an object held on a single line, which is
+    // what Prettier emits when the object fits within the print width.
+    {
+      filename: SCHEMA_FILENAME,
+      code: `{
+  "properties": {
+    "mode": { "title": "M", "oneOf": [{ "const": "a" }] }
+  }
+}`,
+      output: `{
+  "properties": {
+    "mode": { "title": "M", "type": "string", "oneOf": [{ "const": "a" }] }
+  }
+}`,
+      errors: [{ messageId: 'requireStringType' }]
+    },
+    // A whole file on one line with no spacing keeps that style too
+    {
+      filename: SCHEMA_FILENAME,
+      code: '{"mode":{"title":"M","oneOf":[{"const":"a"}]}}',
+      output: '{"mode":{"title":"M","type":"string","oneOf":[{"const":"a"}]}}',
+      errors: [{ messageId: 'requireStringType' }]
     }
   ]
 });

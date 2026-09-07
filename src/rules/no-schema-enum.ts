@@ -81,20 +81,20 @@ function getStringTypeInsertion(
 ): string {
   const beforeNode = sourceCode.text.slice(0, node.range[0]);
   const lastNewline = beforeNode.lastIndexOf('\n');
+  const lineStart = beforeNode.slice(lastNewline + 1);
 
-  if (lastNewline === -1) {
-    return '"type":"string",';
+  if (lastNewline !== -1 && /^[ \t]*$/.test(lineStart)) {
+    const lineBreak = sourceCode.text.includes('\r\n') ? '\r\n' : '\n';
+
+    return `"type": "string",${lineBreak}${lineStart}`;
   }
 
-  const indentation = beforeNode.slice(lastNewline + 1);
+  // The property shares its line with an earlier token, so the new property has
+  // to go on that line too. Repeat the spacing that already separates the
+  // properties, which keeps a Prettier-formatted single-line object formatted.
+  const spacing = /[ \t]*$/.exec(beforeNode)?.[0] ?? '';
 
-  if (!/^[ \t]*$/.test(indentation)) {
-    return '"type":"string",';
-  }
-
-  const lineBreak = sourceCode.text.includes('\r\n') ? '\r\n' : '\n';
-
-  return `"type": "string",${lineBreak}${indentation}`;
+  return spacing ? `"type": "string",${spacing}` : '"type":"string",';
 }
 
 const noSchemaEnum = createRule({
