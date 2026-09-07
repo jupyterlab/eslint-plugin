@@ -20,10 +20,10 @@ import preferSignalThisArg from './rules/prefer-signal-this-arg';
 import galataPreferFilebrowserHelper from './rules/galata-prefer-filebrowser-helper';
 import galataPreferMenuHelper from './rules/galata-prefer-menu-helper';
 import galataPreferNotebookCellHelper from './rules/galata-prefer-notebook-cell-helper';
+import galataPreferSidebarActivityHelper from './rules/galata-prefer-sidebar-activity-helper';
 import requireDisposableOwnership from './rules/require-disposable-ownership';
 import requireDisposableTransfer from './rules/require-disposable-transfer';
 import incorrectTranslatorUsage from './rules/incorrect-translator-usage';
-import galataPreferSidebarActivityHelper from './rules/galata-prefer-sidebar-activity-helper';
 import preferLazyImports from './rules/prefer-lazy-imports';
 
 const plugin = {
@@ -45,10 +45,10 @@ const plugin = {
     'galata-prefer-filebrowser-helper': galataPreferFilebrowserHelper,
     'galata-prefer-menu-helper': galataPreferMenuHelper,
     'galata-prefer-notebook-cell-helper': galataPreferNotebookCellHelper,
+    'galata-prefer-sidebar-activity-helper': galataPreferSidebarActivityHelper,
     'require-disposable-ownership': requireDisposableOwnership,
     'require-disposable-transfer': requireDisposableTransfer,
     'incorrect-translator-usage': incorrectTranslatorUsage,
-    'galata-prefer-sidebar-activity-helper': galataPreferSidebarActivityHelper,
     'prefer-lazy-imports': preferLazyImports
   },
   configs: {
