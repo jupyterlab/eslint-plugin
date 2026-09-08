@@ -27,13 +27,26 @@ interface SelectorSource {
   value: string;
 }
 
-const SIDEBAR_TITLE_TO_ID = new Map<string, string>([
-  ['Debugger', 'jp-debugger-sidebar'],
-  ['Extension Manager', 'extensionmanager.main-view'],
-  ['File Browser', 'filebrowser'],
-  ['Property Inspector', 'jp-property-inspector'],
-  ['Running Terminals and Kernels', 'jp-running-sessions'],
-  ['Table of Contents', 'table-of-contents']
+interface SidebarTab {
+  id: string;
+  /**
+   * The side JupyterLab adds the panel to, from the `shell.add` call in the
+   * owning extension. A test can move a tab, and `page.sidebar.close` takes a
+   * side rather than a tab id, so the message names the default.
+   */
+  side: 'left' | 'right';
+}
+
+const SIDEBAR_TITLE_TO_TAB = new Map<string, SidebarTab>([
+  ['Debugger', { id: 'jp-debugger-sidebar', side: 'right' }],
+  ['Extension Manager', { id: 'extensionmanager.main-view', side: 'left' }],
+  ['File Browser', { id: 'filebrowser', side: 'left' }],
+  ['Property Inspector', { id: 'jp-property-inspector', side: 'right' }],
+  [
+    'Running Terminals and Kernels',
+    { id: 'jp-running-sessions', side: 'left' }
+  ],
+  ['Table of Contents', { id: 'table-of-contents', side: 'left' }]
 ]);
 
 const TITLE_ATTRIBUTE_PATTERN =
@@ -94,20 +107,20 @@ function getSelectorSource(
 
 function findSidebarTitle(
   source: SelectorSource
-): { title: string; id: string } | null {
+): (SidebarTab & { title: string }) | null {
   if (source.kind === 'title') {
     // `getByTitle` and `getByRole(..., { name })` both match on a substring of
     // normalized whitespace, so a caller may pad the name.
     const title = source.value.trim();
-    const id = SIDEBAR_TITLE_TO_ID.get(title);
-    return id ? { title, id } : null;
+    const tab = SIDEBAR_TITLE_TO_TAB.get(title);
+    return tab ? { title, ...tab } : null;
   }
 
   for (const match of source.value.matchAll(TITLE_ATTRIBUTE_PATTERN)) {
     const title = match[1] ?? match[2];
-    const id = SIDEBAR_TITLE_TO_ID.get(title);
-    if (id) {
-      return { title, id };
+    const tab = SIDEBAR_TITLE_TO_TAB.get(title);
+    if (tab) {
+      return { title, ...tab };
     }
   }
 
@@ -149,7 +162,7 @@ const galataPreferSidebarActivityHelper = createRule<Options, MessageIds>({
     },
     messages: {
       preferSidebarHelper:
-        'Use page.sidebar.openTab("{{ id }}") to open the "{{ title }}" sidebar tab, or page.sidebar.close(...) if this click is closing it.',
+        'Use page.sidebar.openTab("{{ id }}") to open the "{{ title }}" sidebar tab, or page.sidebar.close("{{ side }}"), its default side, if this click is closing the sidebar.',
       preferActivityHelper:
         'Use page.activity.activateTab("{{ tabName }}") instead of clicking a main area tab by text.'
     },
@@ -164,7 +177,7 @@ const galataPreferSidebarActivityHelper = createRule<Options, MessageIds>({
         context.report({
           node: source.node,
           messageId: 'preferSidebarHelper',
-          data: sidebar
+          data: { title: sidebar.title, id: sidebar.id, side: sidebar.side }
         });
         return;
       }

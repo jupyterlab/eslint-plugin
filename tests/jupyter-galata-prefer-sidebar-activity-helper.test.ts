@@ -96,7 +96,8 @@ ruleTester.run('galata-prefer-sidebar-activity-helper', rule, {
           messageId: 'preferSidebarHelper',
           data: {
             title: 'Running Terminals and Kernels',
-            id: 'jp-running-sessions'
+            id: 'jp-running-sessions',
+            side: 'left'
           }
         }
       ]
@@ -108,7 +109,8 @@ ruleTester.run('galata-prefer-sidebar-activity-helper', rule, {
           messageId: 'preferSidebarHelper',
           data: {
             title: 'Property Inspector',
-            id: 'jp-property-inspector'
+            id: 'jp-property-inspector',
+            side: 'right'
           }
         }
       ]
@@ -120,7 +122,8 @@ ruleTester.run('galata-prefer-sidebar-activity-helper', rule, {
           messageId: 'preferSidebarHelper',
           data: {
             title: 'Table of Contents',
-            id: 'table-of-contents'
+            id: 'table-of-contents',
+            side: 'left'
           }
         }
       ]
@@ -132,7 +135,8 @@ ruleTester.run('galata-prefer-sidebar-activity-helper', rule, {
           messageId: 'preferSidebarHelper',
           data: {
             title: 'Debugger',
-            id: 'jp-debugger-sidebar'
+            id: 'jp-debugger-sidebar',
+            side: 'right'
           }
         }
       ]
@@ -148,7 +152,8 @@ ruleTester.run('galata-prefer-sidebar-activity-helper', rule, {
           column: 7,
           data: {
             title: 'Debugger',
-            id: 'jp-debugger-sidebar'
+            id: 'jp-debugger-sidebar',
+            side: 'right'
           }
         }
       ]
@@ -160,7 +165,8 @@ ruleTester.run('galata-prefer-sidebar-activity-helper', rule, {
           messageId: 'preferSidebarHelper',
           data: {
             title: 'File Browser',
-            id: 'filebrowser'
+            id: 'filebrowser',
+            side: 'left'
           }
         }
       ]
@@ -174,7 +180,8 @@ ruleTester.run('galata-prefer-sidebar-activity-helper', rule, {
           messageId: 'preferSidebarHelper',
           data: {
             title: 'File Browser',
-            id: 'filebrowser'
+            id: 'filebrowser',
+            side: 'left'
           }
         }
       ]
@@ -191,7 +198,8 @@ ruleTester.run('galata-prefer-sidebar-activity-helper', rule, {
           column: 7,
           data: {
             title: 'Debugger',
-            id: 'jp-debugger-sidebar'
+            id: 'jp-debugger-sidebar',
+            side: 'right'
           }
         }
       ]
@@ -206,7 +214,8 @@ ruleTester.run('galata-prefer-sidebar-activity-helper', rule, {
           messageId: 'preferSidebarHelper',
           data: {
             title: 'Property Inspector',
-            id: 'jp-property-inspector'
+            id: 'jp-property-inspector',
+            side: 'right'
           }
         }
       ]
