@@ -145,8 +145,7 @@ const galataPreferSidebarActivityHelper = createRule<Options, MessageIds>({
     type: 'suggestion',
     docs: {
       description:
-        'Prefer Galata sidebar and activity helpers over raw Playwright tab selectors',
-      url: 'https://eslint-plugin.readthedocs.io/en/latest/rules/galata-prefer-sidebar-activity-helper/'
+        'Prefer Galata sidebar and activity helpers over raw Playwright tab selectors'
     },
     messages: {
       preferSidebarHelper:
