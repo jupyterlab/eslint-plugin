@@ -49,6 +49,46 @@ const SIDEBAR_TITLE_TO_TAB = new Map<string, SidebarTab>([
   ['Table of Contents', { id: 'table-of-contents', side: 'left' }]
 ]);
 
+// Options that change only how long Playwright waits, never what the gesture
+// does, so the helper still reproduces it. Every other key changes it:
+// `button` opens a context menu, `clickCount` opens and then closes the tab,
+// `modifiers` makes a different gesture, `force` skips the actionability
+// checks `openTab` relies on, and `position` aims at a point inside the tab.
+const NEUTRAL_OPTION_KEYS: ReadonlySet<string> = new Set([
+  'timeout',
+  'noWaitAfter',
+  'delay'
+]);
+
+/**
+ * True when the click carries an option the sidebar and activity helpers
+ * cannot reproduce, so that only the plain gesture is ever reported. A
+ * computed key or a spread could carry any of them, so both count as
+ * unsupported.
+ */
+function hasUnsupportedOptions(node: TSESTree.CallExpression): boolean {
+  for (const arg of node.arguments) {
+    if (arg.type !== 'ObjectExpression') {
+      continue;
+    }
+    for (const prop of arg.properties) {
+      if (prop.type === 'SpreadElement' || prop.computed) {
+        return true;
+      }
+      const key =
+        prop.key.type === 'Identifier'
+          ? prop.key.name
+          : prop.key.type === 'Literal'
+            ? prop.key.value
+            : null;
+      if (typeof key !== 'string' || !NEUTRAL_OPTION_KEYS.has(key)) {
+        return true;
+      }
+    }
+  }
+  return false;
+}
+
 const TITLE_ATTRIBUTE_PATTERN =
   /\[\s*title\s*=\s*(?:"([^"]+)"|'([^']+)')\s*\]/g;
 const MAIN_AREA_PATTERN =
@@ -62,7 +102,10 @@ const FILE_LIKE_ACTIVITY_NAME_PATTERN = /\.[A-Za-z0-9][\w-]*(?:\s*\*)?$/;
 function getSelectorSource(
   match: SelectorInteractionMatch
 ): SelectorSource | null {
-  if (match.interactionMethod !== 'click' || match.isRightClick) {
+  if (
+    match.interactionMethod !== 'click' ||
+    hasUnsupportedOptions(match.callNode)
+  ) {
     return null;
   }
 

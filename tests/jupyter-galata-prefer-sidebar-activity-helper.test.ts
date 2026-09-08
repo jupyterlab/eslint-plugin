@@ -37,6 +37,24 @@ ruleTester.run('galata-prefer-sidebar-activity-helper', rule, {
       code: `await page.locator('[title="Property Inspector"]').click({ button: 'right' });`
     },
     {
+      // A double click opens and then closes the tab.
+      code: `await page.getByTitle('Debugger').click({ clickCount: 2 });`
+    },
+    {
+      code: `await page.getByTitle('Debugger').click({ modifiers: ['Shift'] });`
+    },
+    {
+      // `force` skips the actionability checks `openTab` relies on.
+      code: `await page.getByTitle('Debugger').click({ force: true });`
+    },
+    {
+      code: `await page.getByTitle('Debugger').click({ position: { x: 5, y: 5 } });`
+    },
+    {
+      // A spread could carry any of the options above.
+      code: `await page.getByTitle('Debugger').click({ ...options });`
+    },
+    {
       code: `await page.dblclick('[title="Property Inspector"]');`
     },
     {
@@ -150,6 +168,20 @@ ruleTester.run('galata-prefer-sidebar-activity-helper', rule, {
           messageId: 'preferSidebarHelper',
           line: 2,
           column: 7,
+          data: {
+            title: 'Debugger',
+            id: 'jp-debugger-sidebar',
+            side: 'right'
+          }
+        }
+      ]
+    },
+    {
+      // `timeout` changes only how long Playwright waits for the tab.
+      code: `await page.getByTitle('Debugger').click({ timeout: 100 });`,
+      errors: [
+        {
+          messageId: 'preferSidebarHelper',
           data: {
             title: 'Debugger',
             id: 'jp-debugger-sidebar',
