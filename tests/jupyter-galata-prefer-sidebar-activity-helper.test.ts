@@ -67,6 +67,31 @@ ruleTester.run('galata-prefer-sidebar-activity-helper', rule, {
       code: `await page.click('[title="Some Extension Sidebar"]');`
     },
     {
+      // `$=`, `~=` and `|=` match the end of the caption, which the file
+      // browser shortcut leaves unknown.
+      code: `await page.click('[title$="File Browser"]');`
+    },
+    {
+      code: `await page.click('[title~="Debugger"]');`
+    },
+    {
+      code: `await page.click('[title|="Debugger"]');`
+    },
+    {
+      // The value has to fit inside the caption, not the other way round.
+      code: `await page.click('[title^="Debugger Console"]');`
+    },
+    {
+      code: `await page.click('[title*="Close Debugger"]');`
+    },
+    {
+      // A value that fits two captions names neither.
+      code: `await page.click('[title*="e"]');`
+    },
+    {
+      code: `await page.click('#jp-main-dock-panel [title^="File Browser"]');`
+    },
+    {
       // A widget moved to the main area keeps its caption on the new tab.
       code: `await page.click('#jp-main-dock-panel [title="Table of Contents"]');`
     },
@@ -206,6 +231,61 @@ ruleTester.run('galata-prefer-sidebar-activity-helper', rule, {
             title: 'Debugger',
             id: 'jp-debugger-sidebar',
             side: 'right'
+          }
+        }
+      ]
+    },
+    {
+      // The file browser caption carries the keyboard shortcut, so the exact
+      // form selects nothing and tests reach the tab by prefix.
+      code: `await page.click('[title^="File Browser"]');`,
+      errors: [
+        {
+          messageId: 'preferSidebarHelper',
+          data: {
+            title: 'File Browser',
+            id: 'filebrowser',
+            side: 'left'
+          }
+        }
+      ]
+    },
+    {
+      code: `await page.click('[title*="Property Inspector"]');`,
+      errors: [
+        {
+          messageId: 'preferSidebarHelper',
+          data: {
+            title: 'Property Inspector',
+            id: 'jp-property-inspector',
+            side: 'right'
+          }
+        }
+      ]
+    },
+    {
+      code: `await page.click("[title ^= 'Table of Contents']");`,
+      errors: [
+        {
+          messageId: 'preferSidebarHelper',
+          data: {
+            title: 'Table of Contents',
+            id: 'table-of-contents',
+            side: 'left'
+          }
+        }
+      ]
+    },
+    {
+      // A prefix that fits one caption and no other.
+      code: `await page.click('[title^="Extension"]');`,
+      errors: [
+        {
+          messageId: 'preferSidebarHelper',
+          data: {
+            title: 'Extension Manager',
+            id: 'extensionmanager.main-view',
+            side: 'left'
           }
         }
       ]

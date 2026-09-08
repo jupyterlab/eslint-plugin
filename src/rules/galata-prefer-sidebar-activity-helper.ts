@@ -37,6 +37,10 @@ interface SidebarTab {
   side: 'left' | 'right';
 }
 
+// Keyed by the start of the caption the widget puts in `title.caption`, which
+// is what Lumino renders into the `title` attribute of the tab. Five of the six
+// captions are exactly the key; the file browser appends its keyboard shortcut,
+// so its caption reads `File Browser (Ctrl+Shift+F)`.
 const SIDEBAR_TITLE_TO_TAB = new Map<string, SidebarTab>([
   ['Debugger', { id: 'jp-debugger-sidebar', side: 'right' }],
   ['Extension Manager', { id: 'extensionmanager.main-view', side: 'left' }],
@@ -97,8 +101,11 @@ const SIDEBAR_ID_TO_TAB = new Map(
 
 const DATA_ID_ATTRIBUTE_PATTERN =
   /\[\s*data-id\s*=\s*(?:"([^"]+)"|'([^']+)')\s*\]/g;
+// The operator is captured so that `[title^="File Browser"]`, which is how the
+// file browser tab has to be selected once its caption carries the shortcut, is
+// read as well as the exact form.
 const TITLE_ATTRIBUTE_PATTERN =
-  /\[\s*title\s*=\s*(?:"([^"]+)"|'([^']+)')\s*\]/g;
+  /\[\s*title\s*([~^$*|]?=)\s*(?:"([^"]+)"|'([^']+)')\s*\]/g;
 const MAIN_AREA_PATTERN =
   /(?:^|[\s>])(?:div)?\s*\[\s*role\s*=\s*(?:"main"|'main'|main)\s*\]/;
 // The main area and the down area are Lumino tab bars too, so a widget moved
@@ -166,6 +173,55 @@ function getSelectorSource(
   };
 }
 
+/**
+ * True when `[title <operator> "<value>"]` names the tab whose caption starts
+ * with `title`.
+ *
+ * Only the three operators that the start of the caption settles are read.
+ * `$=`, `~=` and `|=` are matched against its end, which the file browser
+ * shortcut leaves unknown, so a selector using one of them is left alone. The
+ * value has to fit inside the caption, never the other way round: a title such
+ * as `Close Debugger` contains a caption without naming the tab that holds it.
+ */
+function titleValueNamesTab(
+  operator: string,
+  value: string,
+  title: string
+): boolean {
+  switch (operator) {
+    case '=':
+      return value === title;
+    case '^=':
+      return title.startsWith(value);
+    case '*=':
+      return title.includes(value);
+    default:
+      return false;
+  }
+}
+
+/**
+ * The single sidebar tab an attribute value names, or null when it names none
+ * or more than one. A short prefix such as `[title^="P"]` fits one caption and
+ * is taken; one that fits two is dropped rather than resolved arbitrarily.
+ */
+function findTabByTitleAttribute(
+  operator: string,
+  value: string
+): (SidebarTab & { title: string }) | null {
+  let found: (SidebarTab & { title: string }) | null = null;
+  for (const [title, tab] of SIDEBAR_TITLE_TO_TAB) {
+    if (!titleValueNamesTab(operator, value, title)) {
+      continue;
+    }
+    if (found) {
+      return null;
+    }
+    found = { title, ...tab };
+  }
+  return found;
+}
+
 function findSidebarTitle(
   source: SelectorSource
 ): (SidebarTab & { title: string }) | null {
@@ -185,10 +241,9 @@ function findSidebarTitle(
   }
 
   for (const match of source.value.matchAll(TITLE_ATTRIBUTE_PATTERN)) {
-    const title = match[1] ?? match[2];
-    const tab = SIDEBAR_TITLE_TO_TAB.get(title);
+    const tab = findTabByTitleAttribute(match[1], match[2] ?? match[3]);
     if (tab) {
-      return { title, ...tab };
+      return tab;
     }
   }
 
