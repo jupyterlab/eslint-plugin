@@ -99,6 +99,22 @@ ruleTester.run('galata-prefer-sidebar-activity-helper', rule, {
       code: `await page.click('#jp-down-stack [title="Running Terminals and Kernels"]');`
     },
     {
+      // The dock panel and the down area name their own tab bars, so the class
+      // rules out a sidebar tab just as the stack node id does.
+      code: `await page.click('.lm-DockPanel-tabBar [title="Table of Contents"]');`
+    },
+    {
+      code: `await page.click('.lm-TabPanel-tabBar [title="Debugger"]');`
+    },
+    {
+      code: `await page.locator('.lm-DockPanel-tabBar .lm-TabBar-tab[data-id="filebrowser"]').click();`
+    },
+    {
+      // The down area is not under `[role="main"]`, so no activity helper
+      // reaches its tabs either.
+      code: `await page.click('.lm-TabPanel-tabBar .lm-TabBar-tab >> text=Log Console');`
+    },
+    {
       code: `await page.click('[role="main"] [title="File Browser"]');`
     },
     {
@@ -310,6 +326,17 @@ ruleTester.run('galata-prefer-sidebar-activity-helper', rule, {
         {
           messageId: 'preferActivityHelper',
           data: { tabName: 'lorenz.py' }
+        }
+      ]
+    },
+    {
+      // The dock panel tab bar is the main area, so its tabs still reach the
+      // activity helper even though they never reach the sidebar one.
+      code: `await page.click('.lm-DockPanel-tabBar .lm-TabBar-tab >> text=Notebook.ipynb');`,
+      errors: [
+        {
+          messageId: 'preferActivityHelper',
+          data: { tabName: 'Notebook.ipynb' }
         }
       ]
     },

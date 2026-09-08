@@ -110,8 +110,13 @@ const MAIN_AREA_PATTERN =
   /(?:^|[\s>])(?:div)?\s*\[\s*role\s*=\s*(?:"main"|'main'|main)\s*\]/;
 // The main area and the down area are Lumino tab bars too, so a widget moved
 // out of the sidebar carries the same title attribute on its new tab. A
-// selector that names one of those areas is not selecting a sidebar tab.
-const DOCK_AREA_PATTERN = /#jp-main-dock-panel|#jp-down-stack/;
+// selector that names one of those areas is not selecting a sidebar tab, and it
+// can name one either by the stack node id or by the class the owning panel adds
+// to its own tab bar: `DockPanel` adds `lm-DockPanel-tabBar` and `TabPanel`,
+// which the down area is, adds `lm-TabPanel-tabBar`. The side bars are bare
+// `TabBar` widgets and carry neither.
+const DOCK_AREA_PATTERN =
+  /#jp-main-dock-panel|#jp-down-stack|\.lm-DockPanel-tabBar|\.lm-TabPanel-tabBar/;
 const TEXT_SELECTOR_PATTERN =
   /(?:^|>>)\s*text\s*=\s*(?:"([^"]+)"|'([^']+)'|(.+?))\s*(?:$|>>)/;
 const TEXT_IS_PATTERN = /:text-is\(\s*(?:"([^"]+)"|'([^']+)')\s*\)/;
@@ -120,9 +125,11 @@ const ACTIVITY_TAB_SELECTOR_PATTERN =
 const FILE_LIKE_ACTIVITY_NAME_PATTERN = /\.[A-Za-z0-9][\w-]*(?:\s*\*)?$/;
 
 // The sidebar and the down area are Lumino tab bars too, so a tab token alone
-// only proves a main area tab once these are ruled out.
+// only proves a main area tab once these are ruled out. `page.activity` reaches
+// only what sits under `[role="main"]`, which neither of them does, and the down
+// area is named by its stack node id or by its `TabPanel` tab bar class.
 const SIDE_TABBAR_PATTERN =
-  /\.jp-SideBar|#jp-left-stack|#jp-right-stack|#jp-down-stack/;
+  /\.jp-SideBar|#jp-left-stack|#jp-right-stack|#jp-down-stack|\.lm-TabPanel-tabBar/;
 
 function getSelectorSource(
   match: SelectorInteractionMatch
