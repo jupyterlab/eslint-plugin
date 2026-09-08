@@ -77,6 +77,14 @@ ruleTester.run('galata-prefer-sidebar-activity-helper', rule, {
       code: `await page.click('[role="main"] [title="File Browser"]');`
     },
     {
+      // A sidebar tab bar is a Lumino tab bar too, so a tab token there does
+      // not make it a main area tab.
+      code: `await page.click('.jp-SideBar .lm-TabBar-tab >> text=Debugger');`
+    },
+    {
+      code: `await page.click('#jp-down-stack .lm-TabBar-tab >> text=Log Console');`
+    },
+    {
       // An extension sidebar tab: the rule cannot derive its id from the name.
       code: `await page.getByRole('tab', { name: 'Git' }).click();`
     },
@@ -183,6 +191,16 @@ ruleTester.run('galata-prefer-sidebar-activity-helper', rule, {
             id: 'jp-debugger-sidebar',
             side: 'right'
           }
+        }
+      ]
+    },
+    {
+      // A tab token proves the target is a tab without `[role="main"]`.
+      code: `await page.locator('div.lm-TabBar-tabLabel >> text=Notebook.ipynb').click();`,
+      errors: [
+        {
+          messageId: 'preferActivityHelper',
+          data: { tabName: 'Notebook.ipynb' }
         }
       ]
     },

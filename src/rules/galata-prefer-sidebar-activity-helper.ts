@@ -103,6 +103,11 @@ const ACTIVITY_TAB_SELECTOR_PATTERN =
   /(?:\[\s*role\s*=\s*(?:"tab"|'tab'|tab)\s*\]|\.lm-TabBar-tab(?:\b|[.:[\s>])|\.lm-TabBar-tabLabel(?:\b|[.:[\s>]))/;
 const FILE_LIKE_ACTIVITY_NAME_PATTERN = /\.[A-Za-z0-9][\w-]*(?:\s*\*)?$/;
 
+// The sidebar and the down area are Lumino tab bars too, so a tab token alone
+// only proves a main area tab once these are ruled out.
+const SIDE_TABBAR_PATTERN =
+  /\.jp-SideBar|#jp-left-stack|#jp-right-stack|#jp-down-stack/;
+
 function getSelectorSource(
   match: SelectorInteractionMatch
 ): SelectorSource | null {
@@ -182,7 +187,7 @@ function findSidebarTitle(
 }
 
 function getActivityTabName(source: SelectorSource): string | null {
-  if (source.kind !== 'selector' || !MAIN_AREA_PATTERN.test(source.value)) {
+  if (source.kind !== 'selector') {
     return null;
   }
 
@@ -196,14 +201,18 @@ function getActivityTabName(source: SelectorSource): string | null {
     return null;
   }
 
-  if (
-    !ACTIVITY_TAB_SELECTOR_PATTERN.test(source.value) &&
-    !FILE_LIKE_ACTIVITY_NAME_PATTERN.test(tabName)
-  ) {
-    return null;
-  }
+  // A tab token proves the target is a tab wherever it is written. Without one
+  // the only evidence is the main area plus a name shaped like a file, which
+  // the dock panel node also covers the widget content with, so that path
+  // stays the fallback.
+  const namesTab =
+    ACTIVITY_TAB_SELECTOR_PATTERN.test(source.value) &&
+    !SIDE_TABBAR_PATTERN.test(source.value);
+  const looksLikeADocumentInTheMainArea =
+    MAIN_AREA_PATTERN.test(source.value) &&
+    FILE_LIKE_ACTIVITY_NAME_PATTERN.test(tabName);
 
-  return tabName;
+  return namesTab || looksLikeADocumentInTheMainArea ? tabName : null;
 }
 
 const galataPreferSidebarActivityHelper = createRule<Options, MessageIds>({
