@@ -50,19 +50,17 @@ The plugin ships with a recommended configuration that enables all current rules
 | [jupyter/galata-prefer-filebrowser-helper](./galata-prefer-filebrowser-helper)                 | `warn` ¹ |
 | [jupyter/galata-prefer-menu-helper](./galata-prefer-menu-helper)                               | `warn` ¹ |
 | [jupyter/galata-prefer-notebook-cell-helper](./galata-prefer-notebook-cell-helper)             | `warn` ¹ |
-| [jupyter/galata-prefer-sidebar-activity-helper](./galata-prefer-sidebar-activity-helper)       | `warn` ² |
-| [jupyter/no-schema-enum](./no-schema-enum)                                                     | `warn` ³ |
+| [jupyter/galata-prefer-sidebar-activity-helper](./galata-prefer-sidebar-activity-helper)       | `warn` ¹ |
+| [jupyter/no-schema-enum](./no-schema-enum)                                                     | `warn` ² |
 | [jupyter/no-pageconfig-base-url](./no-pageconfig-base-url)                                     | `warn`   |
 | [jupyter/incorrect-translator-usage](./incorrect-translator-usage)                             | `warn`   |
-| [jupyter/prefer-lazy-imports](./prefer-lazy-imports)                                           | `warn` ⁴ |
+| [jupyter/prefer-lazy-imports](./prefer-lazy-imports)                                           | `warn` ³ |
 
 ¹ Applied only to `**/*.spec.{ts,js}` and `**/*.test.{ts,js}` files.
 
-² Applied only to Galata test files, including `**/galata/test/**/*.{ts,js}`, `**/ui-tests/**/*.spec.ts`, and `**/ui-tests/**/*.test.ts`.
+² Applied only to `**/schema/*.json` files.
 
-³ Applied only to `**/schema/*.json` files.
-
-⁴ Turned off for `**/*.spec.{ts,js}` and `**/*.test.{ts,js}` files, where mock plugins would otherwise be reported.
+³ Turned off for `**/*.spec.{ts,js}` and `**/*.test.{ts,js}` files, where mock plugins would otherwise be reported.
 
 These defaults are the same in both `jupyterPlugin.configs.recommended` (flat config) and `plugin:@jupyter/eslint-plugin/recommended-legacy`.
 

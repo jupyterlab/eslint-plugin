@@ -87,19 +87,9 @@ const plugin = {
           'jupyter/galata-prefer-filebrowser-helper': 'warn',
           'jupyter/galata-prefer-menu-helper': 'warn',
           'jupyter/galata-prefer-notebook-cell-helper': 'warn',
+          'jupyter/galata-prefer-sidebar-activity-helper': 'warn',
           // Test files declare mock plugins; deferring their imports is pointless.
           'jupyter/prefer-lazy-imports': 'off'
-        }
-      },
-      {
-        files: [
-          '**/galata/test/**/*.ts',
-          '**/galata/test/**/*.js',
-          '**/ui-tests/**/*.spec.ts',
-          '**/ui-tests/**/*.test.ts'
-        ],
-        rules: {
-          'jupyter/galata-prefer-sidebar-activity-helper': 'warn'
         }
       }
     ],
@@ -135,18 +125,8 @@ const plugin = {
             'jupyter/galata-prefer-filebrowser-helper': 'warn',
             'jupyter/galata-prefer-menu-helper': 'warn',
             'jupyter/galata-prefer-notebook-cell-helper': 'warn',
+            'jupyter/galata-prefer-sidebar-activity-helper': 'warn',
             'jupyter/prefer-lazy-imports': 'off'
-          }
-        },
-        {
-          files: [
-            '**/galata/test/**/*.ts',
-            '**/galata/test/**/*.js',
-            '**/ui-tests/**/*.spec.ts',
-            '**/ui-tests/**/*.test.ts'
-          ],
-          rules: {
-            'jupyter/galata-prefer-sidebar-activity-helper': 'warn'
           }
         }
       ]
