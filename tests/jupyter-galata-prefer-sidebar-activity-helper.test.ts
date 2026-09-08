@@ -85,10 +85,6 @@ ruleTester.run('galata-prefer-sidebar-activity-helper', rule, {
     },
     {
       code: `await page.click(\`div[role="main"] >> text=\${name}.ipynb\`);`
-    },
-    {
-      code: `await page.click('[title="Property Inspector"]');`,
-      filename: '/workspace/jupyterlab/galata/src/helpers/sidebar.ts'
     }
   ],
 

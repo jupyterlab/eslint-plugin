@@ -139,10 +139,6 @@ function getActivityTabName(source: SelectorSource): string | null {
   return tabName;
 }
 
-function isGalataHelperImplementation(filename: string): boolean {
-  return filename.replace(/\\/g, '/').includes('/galata/src/helpers/');
-}
-
 const galataPreferSidebarActivityHelper = createRule<Options, MessageIds>({
   name: 'galata-prefer-sidebar-activity-helper',
   meta: {
@@ -163,10 +159,6 @@ const galataPreferSidebarActivityHelper = createRule<Options, MessageIds>({
   defaultOptions: [],
 
   create(context) {
-    if (isGalataHelperImplementation(context.filename)) {
-      return {};
-    }
-
     function reportSelectorSource(source: SelectorSource): void {
       const sidebar = findSidebarTitle(source);
       if (sidebar) {
