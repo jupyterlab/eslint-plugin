@@ -49,6 +49,22 @@ ruleTester.run('galata-prefer-sidebar-activity-helper', rule, {
       code: `await page.click('[title="Some Extension Sidebar"]');`
     },
     {
+      // An extension sidebar tab: the rule cannot derive its id from the name.
+      code: `await page.getByRole('tab', { name: 'Git' }).click();`
+    },
+    {
+      code: `await page.getByRole('tab', { name: /Results/ }).click();`
+    },
+    {
+      code: `await page.getByRole('tab').click();`
+    },
+    {
+      code: `await page.getByRole('button', { name: 'Debugger' }).click();`
+    },
+    {
+      code: `await page.getByRole('tablist', { name: 'Debugger' }).click();`
+    },
+    {
       code: `await page.click('[title="Sessions and Tabs"]');`
     },
     {
@@ -117,6 +133,32 @@ ruleTester.run('galata-prefer-sidebar-activity-helper', rule, {
           data: {
             title: 'Debugger',
             id: 'jp-debugger-sidebar'
+          }
+        }
+      ]
+    },
+    {
+      code: `await page.getByRole('tab', { name: 'File Browser' }).click();`,
+      errors: [
+        {
+          messageId: 'preferSidebarHelper',
+          data: {
+            title: 'File Browser',
+            id: 'filebrowser'
+          }
+        }
+      ]
+    },
+    {
+      // `getByRole(..., { name })` matches a substring of normalized
+      // whitespace, so a padded name still selects the same tab.
+      code: `await page.getByRole('tab', { name: 'File Browser ' }).click();`,
+      errors: [
+        {
+          messageId: 'preferSidebarHelper',
+          data: {
+            title: 'File Browser',
+            id: 'filebrowser'
           }
         }
       ]

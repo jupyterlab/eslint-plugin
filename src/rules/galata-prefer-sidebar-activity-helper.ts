@@ -57,6 +57,26 @@ function getSelectorSource(
   }
 
   const [part] = match.selectorParts;
+
+  // `getByRole('tab', { name })` selects the same element as `[title="..."]`.
+  // Lumino renders a tab as `<li role="tab" title="{caption}">`, and a sidebar
+  // widget sets `title.caption` but no `title.label`, so the accessible name
+  // falls back to that same caption.
+  if (part.method === 'getByRole') {
+    const role = extractStaticSelectorText(part.argNode, {
+      allowPartialTemplate: false
+    });
+    if (role !== 'tab' || !part.nameArgNode) {
+      return null;
+    }
+    const name = extractStaticSelectorText(part.nameArgNode, {
+      allowPartialTemplate: false
+    });
+    return name === null
+      ? null
+      : { node: match.callNode, kind: 'title', value: name };
+  }
+
   const selector = extractStaticSelectorText(part.argNode, {
     allowPartialTemplate: false
   });
@@ -75,8 +95,11 @@ function findSidebarTitle(
   source: SelectorSource
 ): { title: string; id: string } | null {
   if (source.kind === 'title') {
-    const id = SIDEBAR_TITLE_TO_ID.get(source.value);
-    return id ? { title: source.value, id } : null;
+    // `getByTitle` and `getByRole(..., { name })` both match on a substring of
+    // normalized whitespace, so a caller may pad the name.
+    const title = source.value.trim();
+    const id = SIDEBAR_TITLE_TO_ID.get(title);
+    return id ? { title, id } : null;
   }
 
   for (const match of source.value.matchAll(TITLE_ATTRIBUTE_PATTERN)) {
