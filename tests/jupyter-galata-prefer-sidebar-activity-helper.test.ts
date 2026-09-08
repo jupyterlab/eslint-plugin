@@ -67,6 +67,16 @@ ruleTester.run('galata-prefer-sidebar-activity-helper', rule, {
       code: `await page.click('[title="Some Extension Sidebar"]');`
     },
     {
+      // A widget moved to the main area keeps its caption on the new tab.
+      code: `await page.click('#jp-main-dock-panel [title="Table of Contents"]');`
+    },
+    {
+      code: `await page.click('#jp-down-stack [title="Running Terminals and Kernels"]');`
+    },
+    {
+      code: `await page.click('[role="main"] [title="File Browser"]');`
+    },
+    {
       // An extension sidebar tab: the rule cannot derive its id from the name.
       code: `await page.getByRole('tab', { name: 'Git' }).click();`
     },
@@ -173,6 +183,32 @@ ruleTester.run('galata-prefer-sidebar-activity-helper', rule, {
             id: 'jp-debugger-sidebar',
             side: 'right'
           }
+        }
+      ]
+    },
+    {
+      // A sidebar scope in the selector is fine: only the main area and the
+      // down area rule the tab out.
+      code: `await page.click('#jp-left-stack [title="Table of Contents"]');`,
+      errors: [
+        {
+          messageId: 'preferSidebarHelper',
+          data: {
+            title: 'Table of Contents',
+            id: 'table-of-contents',
+            side: 'left'
+          }
+        }
+      ]
+    },
+    {
+      // Ruled out as a sidebar tab, the main area selector reaches the
+      // activity message instead.
+      code: `await page.click('#jp-main-dock-panel [role="main"] [title="File Browser"] >> text=x.ipynb');`,
+      errors: [
+        {
+          messageId: 'preferActivityHelper',
+          data: { tabName: 'x.ipynb' }
         }
       ]
     },

@@ -93,6 +93,10 @@ const TITLE_ATTRIBUTE_PATTERN =
   /\[\s*title\s*=\s*(?:"([^"]+)"|'([^']+)')\s*\]/g;
 const MAIN_AREA_PATTERN =
   /(?:^|[\s>])(?:div)?\s*\[\s*role\s*=\s*(?:"main"|'main'|main)\s*\]/;
+// The main area and the down area are Lumino tab bars too, so a widget moved
+// out of the sidebar carries the same title attribute on its new tab. A
+// selector that names one of those areas is not selecting a sidebar tab.
+const DOCK_AREA_PATTERN = /#jp-main-dock-panel|#jp-down-stack/;
 const TEXT_SELECTOR_PATTERN =
   /(?:^|>>)\s*text\s*=\s*(?:"([^"]+)"|'([^']+)'|(.+?))\s*(?:$|>>)/;
 const ACTIVITY_TAB_SELECTOR_PATTERN =
@@ -157,6 +161,13 @@ function findSidebarTitle(
     const title = source.value.trim();
     const tab = SIDEBAR_TITLE_TO_TAB.get(title);
     return tab ? { title, ...tab } : null;
+  }
+
+  if (
+    MAIN_AREA_PATTERN.test(source.value) ||
+    DOCK_AREA_PATTERN.test(source.value)
+  ) {
+    return null;
   }
 
   for (const match of source.value.matchAll(TITLE_ATTRIBUTE_PATTERN)) {
