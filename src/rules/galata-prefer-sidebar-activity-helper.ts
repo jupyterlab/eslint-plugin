@@ -15,7 +15,13 @@ type MessageIds = 'preferSidebarHelper' | 'preferActivityHelper';
 type Options = [];
 
 interface SelectorSource {
-  node: TSESTree.Expression;
+  /**
+   * The interaction call, used as the report anchor. The sibling
+   * `galata-prefer-*-helper` rules report on the call too, so a
+   * `// eslint-disable-next-line` above the statement suppresses all of them
+   * even when the locator chain is written across several lines.
+   */
+  node: TSESTree.CallExpression;
   kind: 'selector' | 'title';
   value: string;
 }
@@ -59,7 +65,7 @@ function getSelectorSource(
   }
 
   return {
-    node: part.argNode,
+    node: match.callNode,
     kind: part.method === 'getByTitle' ? 'title' : 'selector',
     value: selector
   };

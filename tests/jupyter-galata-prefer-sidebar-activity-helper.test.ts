@@ -122,6 +122,23 @@ ruleTester.run('galata-prefer-sidebar-activity-helper', rule, {
       ]
     },
     {
+      // The report is anchored on the interaction call, like the sibling
+      // galata rules, so `// eslint-disable-next-line` above the statement
+      // still works once prettier splits the chain over several lines.
+      code: `await page\n  .getByTitle('Debugger')\n  .click();`,
+      errors: [
+        {
+          messageId: 'preferSidebarHelper',
+          line: 1,
+          column: 7,
+          data: {
+            title: 'Debugger',
+            id: 'jp-debugger-sidebar'
+          }
+        }
+      ]
+    },
+    {
       code: `
         // Close the sidebar
         await page.locator('[title="Property Inspector"]').click();
