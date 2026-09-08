@@ -89,6 +89,14 @@ function hasUnsupportedOptions(node: TSESTree.CallExpression): boolean {
   return false;
 }
 
+// Galata's own `buildTabSelector` picks a sidebar tab by `data-id`, so a test
+// written against it names the id rather than the caption.
+const SIDEBAR_ID_TO_TAB = new Map(
+  [...SIDEBAR_TITLE_TO_TAB].map(([title, tab]) => [tab.id, { title, ...tab }])
+);
+
+const DATA_ID_ATTRIBUTE_PATTERN =
+  /\[\s*data-id\s*=\s*(?:"([^"]+)"|'([^']+)')\s*\]/g;
 const TITLE_ATTRIBUTE_PATTERN =
   /\[\s*title\s*=\s*(?:"([^"]+)"|'([^']+)')\s*\]/g;
 const MAIN_AREA_PATTERN =
@@ -99,6 +107,7 @@ const MAIN_AREA_PATTERN =
 const DOCK_AREA_PATTERN = /#jp-main-dock-panel|#jp-down-stack/;
 const TEXT_SELECTOR_PATTERN =
   /(?:^|>>)\s*text\s*=\s*(?:"([^"]+)"|'([^']+)'|(.+?))\s*(?:$|>>)/;
+const TEXT_IS_PATTERN = /:text-is\(\s*(?:"([^"]+)"|'([^']+)')\s*\)/;
 const ACTIVITY_TAB_SELECTOR_PATTERN =
   /(?:\[\s*role\s*=\s*(?:"tab"|'tab'|tab)\s*\]|\.lm-TabBar-tab(?:\b|[.:[\s>])|\.lm-TabBar-tabLabel(?:\b|[.:[\s>]))/;
 const FILE_LIKE_ACTIVITY_NAME_PATTERN = /\.[A-Za-z0-9][\w-]*(?:\s*\*)?$/;
@@ -183,7 +192,24 @@ function findSidebarTitle(
     }
   }
 
+  for (const match of source.value.matchAll(DATA_ID_ATTRIBUTE_PATTERN)) {
+    const tab = SIDEBAR_ID_TO_TAB.get(match[1] ?? match[2]);
+    if (tab) {
+      return tab;
+    }
+  }
+
   return null;
+}
+
+/** The text a selector matches on, written as `text=` or as `:text-is()`. */
+function activityTextFrom(selector: string): string | null {
+  const text = TEXT_SELECTOR_PATTERN.exec(selector);
+  if (text) {
+    return (text[1] ?? text[2] ?? text[3]).trim();
+  }
+  const exact = TEXT_IS_PATTERN.exec(selector);
+  return exact ? (exact[1] ?? exact[2]).trim() : null;
 }
 
 function getActivityTabName(source: SelectorSource): string | null {
@@ -191,13 +217,8 @@ function getActivityTabName(source: SelectorSource): string | null {
     return null;
   }
 
-  const match = TEXT_SELECTOR_PATTERN.exec(source.value);
-  if (!match) {
-    return null;
-  }
-
-  const tabName = (match[1] ?? match[2] ?? match[3]).trim();
-  if (tabName.length === 0) {
+  const tabName = activityTextFrom(source.value);
+  if (tabName === null || tabName.length === 0) {
     return null;
   }
 

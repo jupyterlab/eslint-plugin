@@ -85,6 +85,22 @@ ruleTester.run('galata-prefer-sidebar-activity-helper', rule, {
       code: `await page.click('#jp-down-stack .lm-TabBar-tab >> text=Log Console');`
     },
     {
+      // An extension tab id the rule cannot map to a helper call.
+      code: `await page.click('.lm-TabBar-tab[data-id="jupytercad::rightControlPanel"]');`
+    },
+    {
+      code: `await page.click('#jp-main-dock-panel .lm-TabBar-tab[data-id="filebrowser"]');`
+    },
+    {
+      // `:text-is` in a file listing names no tab and no main area.
+      code: `await page.click('span.jp-DirListing-itemText > span:text-is("a.txt")');`
+    },
+    {
+      // `:has-text` is a containment filter, so the tab it picks is ambiguous
+      // when more than one matches.
+      code: `await page.click('.lm-DockPanel-tabBar .lm-TabBar-tab:has-text("Terminal")');`
+    },
+    {
       // An extension sidebar tab: the rule cannot derive its id from the name.
       code: `await page.getByRole('tab', { name: 'Git' }).click();`
     },
@@ -191,6 +207,29 @@ ruleTester.run('galata-prefer-sidebar-activity-helper', rule, {
             id: 'jp-debugger-sidebar',
             side: 'right'
           }
+        }
+      ]
+    },
+    {
+      // Galata's own `buildTabSelector` picks the tab by `data-id`.
+      code: `await page.click('.lm-TabBar.jp-SideBar .lm-TabBar-tab[data-id="filebrowser"]');`,
+      errors: [
+        {
+          messageId: 'preferSidebarHelper',
+          data: {
+            title: 'File Browser',
+            id: 'filebrowser',
+            side: 'left'
+          }
+        }
+      ]
+    },
+    {
+      code: `await page.locator('.lm-TabBar-tabLabel:text-is("lorenz.py")').click();`,
+      errors: [
+        {
+          messageId: 'preferActivityHelper',
+          data: { tabName: 'lorenz.py' }
         }
       ]
     },
