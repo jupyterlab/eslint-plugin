@@ -146,6 +146,31 @@ ruleTester.run('galata-prefer-sidebar-activity-helper', rule, {
       code: `await page.getByRole('tab', { name: 'Git' }).click();`
     },
     {
+      // An accessible name says nothing about which area holds the tab, so on
+      // its own it never reaches the activity helper.
+      code: `await page.getByRole('tab', { name: 'Settings' }).click();`
+    },
+    {
+      code: `await page.getByRole('tablist', { name: 'alternate sidebar' }).getByRole('tab', { name: 'Extension Panel' }).click();`
+    },
+    {
+      // The settings editor plugin list carries `role="tab"` on every entry,
+      // so the role alone does not make a main area tab.
+      code: `await page.getByRole('tab', { name: 'Text Editor' }).getByText('Text Editor').click();`
+    },
+    {
+      code: `await page.click('.jp-SettingsPanel [role="tab"] >> text=Text Editor');`
+    },
+    {
+      // A scope written earlier in the chain rules the sidebar tab out too.
+      code: `await page.locator('#jp-main-dock-panel').getByTitle('Debugger').click();`
+    },
+    {
+      // One dynamic link could carry the token that rules the tab out, so the
+      // whole chain is dropped.
+      code: `await page.locator(\`.\${scope}\`).getByTitle('Debugger').click();`
+    },
+    {
       code: `await page.getByRole('tab', { name: /Results/ }).click();`
     },
     {
@@ -458,6 +483,63 @@ ruleTester.run('galata-prefer-sidebar-activity-helper', rule, {
         {
           messageId: 'preferActivityHelper',
           data: { tabName: 'Lorenz.ipynb' }
+        }
+      ]
+    },
+    {
+      // `page.activity.getTabLocator` is written this way, so a chain that
+      // spells it out reaches the helper it is imitating.
+      code: `await page.getByRole('main').getByRole('tab', { name: 'Settings' }).click();`,
+      errors: [
+        {
+          messageId: 'preferActivityHelper',
+          data: { tabName: 'Settings' }
+        }
+      ]
+    },
+    {
+      code: `await page.getByRole('main').getByText('Notebook.ipynb').click();`,
+      errors: [
+        {
+          messageId: 'preferActivityHelper',
+          data: { tabName: 'Notebook.ipynb' }
+        }
+      ]
+    },
+    {
+      // A sidebar widget moved to the main area is an activity, so the main
+      // area scope wins over the caption.
+      code: `await page.getByRole('main').getByRole('tab', { name: 'File Browser' }).click();`,
+      errors: [
+        {
+          messageId: 'preferActivityHelper',
+          data: { tabName: 'File Browser' }
+        }
+      ]
+    },
+    {
+      code: `await page.locator('.lm-TabBar.jp-SideBar').locator('[data-id="filebrowser"]').click();`,
+      errors: [
+        {
+          messageId: 'preferSidebarHelper',
+          data: {
+            title: 'File Browser',
+            id: 'filebrowser',
+            side: 'left'
+          }
+        }
+      ]
+    },
+    {
+      code: `await page.locator('.jp-SideBar').getByTitle('Property Inspector').click();`,
+      errors: [
+        {
+          messageId: 'preferSidebarHelper',
+          data: {
+            title: 'Property Inspector',
+            id: 'jp-property-inspector',
+            side: 'right'
+          }
         }
       ]
     },

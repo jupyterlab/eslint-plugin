@@ -9,7 +9,8 @@ import {
   extractStaticSelectorText,
   matchSelectorInteraction,
   resolveLocatorBinding,
-  SelectorInteractionMatch
+  SelectorInteractionMatch,
+  SelectorPart
 } from '../utils/playwright-selectors';
 
 type MessageIds = 'preferSidebarHelper' | 'preferActivityHelper';
@@ -23,8 +24,18 @@ interface SelectorSource {
    * even when the locator chain is written across several lines.
    */
   node: TSESTree.CallExpression;
-  kind: 'selector' | 'title';
-  value: string;
+  /**
+   * Every part of the locator chain folded into one Playwright selector, root
+   * to tip, so that `page.getByRole('main').locator(x)` reads as
+   * `[role="main"] >> x` and the area patterns see the whole chain.
+   */
+  selector: string;
+  /**
+   * The accessible name of a `getByRole('tab', { name })` tip, trimmed. It
+   * names a tab without saying which area holds it, so only the sidebar map
+   * and, once the main area is named too, the activity helper may take it.
+   */
+  tabRoleName: string | null;
 }
 
 interface SidebarTab {
@@ -120,8 +131,13 @@ const DOCK_AREA_PATTERN =
 const TEXT_SELECTOR_PATTERN =
   /(?:^|>>)\s*text\s*=\s*(?:"([^"]+)"|'([^']+)'|(.+?))\s*(?:$|>>)/;
 const TEXT_IS_PATTERN = /:text-is\(\s*(?:"([^"]+)"|'([^']+)')\s*\)/;
-const ACTIVITY_TAB_SELECTOR_PATTERN =
-  /(?:\[\s*role\s*=\s*(?:"tab"|'tab'|tab)\s*\]|\.lm-TabBar-tab(?:\b|[.:[\s>])|\.lm-TabBar-tabLabel(?:\b|[.:[\s>]))/;
+// A Lumino tab bar class only ever sits on a tab bar, so it proves the target
+// is a tab wherever it is written. `role="tab"` is the generic ARIA role, which
+// the settings editor plugin list carries on every `.jp-PluginList-entry`, so it
+// proves one only once the main area is named as well.
+const LUMINO_TAB_CLASS_PATTERN =
+  /\.lm-TabBar-tab(?:\b|[.:[\s>])|\.lm-TabBar-tabLabel(?:\b|[.:[\s>])/;
+const TAB_ROLE_PATTERN = /\[\s*role\s*=\s*(?:"tab"|'tab'|tab)\s*\]/;
 const FILE_LIKE_ACTIVITY_NAME_PATTERN = /\.[A-Za-z0-9][\w-]*(?:\s*\*)?$/;
 
 // The sidebar and the down area are Lumino tab bars too, so a tab token alone
@@ -130,6 +146,69 @@ const FILE_LIKE_ACTIVITY_NAME_PATTERN = /\.[A-Za-z0-9][\w-]*(?:\s*\*)?$/;
 // area is named by its stack node id or by its `TabPanel` tab bar class.
 const SIDE_TABBAR_PATTERN =
   /\.jp-SideBar|#jp-left-stack|#jp-right-stack|#jp-down-stack|\.lm-TabPanel-tabBar/;
+
+// The attribute each `getByX` locator matches on. Playwright compares them by
+// substring, so `*=` is the operator that says the same thing.
+const LOCATOR_METHOD_ATTRIBUTE: ReadonlyMap<string, string> = new Map([
+  ['getByTitle', 'title'],
+  ['getByLabel', 'aria-label'],
+  ['getByPlaceholder', 'placeholder'],
+  ['getByAltText', 'alt'],
+  ['getByTestId', 'data-testid']
+]);
+
+/**
+ * One link of a locator chain, written as the selector that picks the same
+ * element, or null when its argument is not static.
+ *
+ * A `getByRole` link keeps only its role: the accessible name is not an
+ * attribute, and folding it into `text=` would let a bare
+ * `getByRole('tab', { name })` look like a main area tab when the same call
+ * selects a sidebar tab just as well.
+ */
+function foldSelectorPart(part: SelectorPart): string | null {
+  const text = extractStaticSelectorText(part.argNode, {
+    allowPartialTemplate: false
+  });
+  if (text === null) {
+    return null;
+  }
+  if (part.method === 'getByRole') {
+    return `[role="${text}"]`;
+  }
+  if (part.method === 'getByText') {
+    return `text=${text}`;
+  }
+  const attribute = LOCATOR_METHOD_ATTRIBUTE.get(part.method);
+  // Anything left is `locator(selector)` or the selector `page.click` takes,
+  // both of which are already Playwright selectors.
+  return attribute ? `[${attribute}*="${text.trim()}"]` : text;
+}
+
+/**
+ * The accessible name a `getByRole('tab', { name })` tip matches on.
+ *
+ * Lumino renders a tab as `<li role="tab" title="{caption}">`, and a sidebar
+ * widget sets `title.caption` but no `title.label`, so the accessible name
+ * falls back to that same caption.
+ */
+function tabRoleNameOf(part: SelectorPart): string | null {
+  if (part.method !== 'getByRole' || !part.nameArgNode) {
+    return null;
+  }
+  const role = extractStaticSelectorText(part.argNode, {
+    allowPartialTemplate: false
+  });
+  if (role !== 'tab') {
+    return null;
+  }
+  // `getByRole(..., { name })` matches a substring of normalized whitespace,
+  // so a caller may pad the name.
+  const name = extractStaticSelectorText(part.nameArgNode, {
+    allowPartialTemplate: false
+  });
+  return name === null ? null : name.trim();
+}
 
 function getSelectorSource(
   match: SelectorInteractionMatch
@@ -141,42 +220,23 @@ function getSelectorSource(
     return null;
   }
 
-  if (match.selectorParts.length !== 1) {
-    return null;
-  }
-
-  const [part] = match.selectorParts;
-
-  // `getByRole('tab', { name })` selects the same element as `[title="..."]`.
-  // Lumino renders a tab as `<li role="tab" title="{caption}">`, and a sidebar
-  // widget sets `title.caption` but no `title.label`, so the accessible name
-  // falls back to that same caption.
-  if (part.method === 'getByRole') {
-    const role = extractStaticSelectorText(part.argNode, {
-      allowPartialTemplate: false
-    });
-    if (role !== 'tab' || !part.nameArgNode) {
+  const parts: string[] = [];
+  for (const part of match.selectorParts) {
+    const folded = foldSelectorPart(part);
+    // A link that cannot be read could carry the very token that rules the tab
+    // out, so a chain is read only when every link of it is static.
+    if (folded === null) {
       return null;
     }
-    const name = extractStaticSelectorText(part.nameArgNode, {
-      allowPartialTemplate: false
-    });
-    return name === null
-      ? null
-      : { node: match.callNode, kind: 'title', value: name };
-  }
-
-  const selector = extractStaticSelectorText(part.argNode, {
-    allowPartialTemplate: false
-  });
-  if (selector === null) {
-    return null;
+    parts.push(folded);
   }
 
   return {
     node: match.callNode,
-    kind: part.method === 'getByTitle' ? 'title' : 'selector',
-    value: selector
+    selector: parts.join(' >> '),
+    tabRoleName: tabRoleNameOf(
+      match.selectorParts[match.selectorParts.length - 1]
+    )
   };
 }
 
@@ -232,29 +292,39 @@ function findTabByTitleAttribute(
 function findSidebarTitle(
   source: SelectorSource
 ): (SidebarTab & { title: string }) | null {
-  if (source.kind === 'title') {
-    // `getByTitle` and `getByRole(..., { name })` both match on a substring of
-    // normalized whitespace, so a caller may pad the name.
-    const title = source.value.trim();
-    const tab = SIDEBAR_TITLE_TO_TAB.get(title);
-    return tab ? { title, ...tab } : null;
-  }
-
+  // Every way a selector can name a sidebar tab spells one of these out, and
+  // most interactions in a Galata suite spell out neither, so the substring
+  // test keeps the pattern scans off the common path.
   if (
-    MAIN_AREA_PATTERN.test(source.value) ||
-    DOCK_AREA_PATTERN.test(source.value)
+    source.tabRoleName === null &&
+    !source.selector.includes('title') &&
+    !source.selector.includes('data-id')
   ) {
     return null;
   }
 
-  for (const match of source.value.matchAll(TITLE_ATTRIBUTE_PATTERN)) {
+  if (
+    MAIN_AREA_PATTERN.test(source.selector) ||
+    DOCK_AREA_PATTERN.test(source.selector)
+  ) {
+    return null;
+  }
+
+  if (source.tabRoleName !== null) {
+    const tab = SIDEBAR_TITLE_TO_TAB.get(source.tabRoleName);
+    if (tab) {
+      return { title: source.tabRoleName, ...tab };
+    }
+  }
+
+  for (const match of source.selector.matchAll(TITLE_ATTRIBUTE_PATTERN)) {
     const tab = findTabByTitleAttribute(match[1], match[2] ?? match[3]);
     if (tab) {
       return tab;
     }
   }
 
-  for (const match of source.value.matchAll(DATA_ID_ATTRIBUTE_PATTERN)) {
+  for (const match of source.selector.matchAll(DATA_ID_ATTRIBUTE_PATTERN)) {
     const tab = SIDEBAR_ID_TO_TAB.get(match[1] ?? match[2]);
     if (tab) {
       return tab;
@@ -275,25 +345,38 @@ function activityTextFrom(selector: string): string | null {
 }
 
 function getActivityTabName(source: SelectorSource): string | null {
-  if (source.kind !== 'selector') {
+  const { selector } = source;
+  // The name comes from `text=`, from `:text-is()` or from the role name, so
+  // without either there is nothing to put in the message. Same reason as the
+  // guard in `findSidebarTitle`.
+  if (source.tabRoleName === null && !selector.includes('text')) {
     return null;
   }
 
-  const tabName = activityTextFrom(source.value);
-  if (tabName === null || tabName.length === 0) {
+  if (SIDE_TABBAR_PATTERN.test(selector)) {
     return null;
   }
 
+  const inMainArea = MAIN_AREA_PATTERN.test(selector);
   // A tab token proves the target is a tab wherever it is written. Without one
   // the only evidence is the main area plus a name shaped like a file, which
   // the dock panel node also covers the widget content with, so that path
   // stays the fallback.
   const namesTab =
-    ACTIVITY_TAB_SELECTOR_PATTERN.test(source.value) &&
-    !SIDE_TABBAR_PATTERN.test(source.value);
+    LUMINO_TAB_CLASS_PATTERN.test(selector) ||
+    (TAB_ROLE_PATTERN.test(selector) && inMainArea);
+
+  // Galata builds its own tab locator as
+  // `page.getByRole('main').getByRole('tab', { name })`, so a chain written
+  // that way names the activity outright.
+  const tabName =
+    activityTextFrom(selector) ?? (inMainArea ? source.tabRoleName : null);
+  if (tabName === null || tabName.length === 0) {
+    return null;
+  }
+
   const looksLikeADocumentInTheMainArea =
-    MAIN_AREA_PATTERN.test(source.value) &&
-    FILE_LIKE_ACTIVITY_NAME_PATTERN.test(tabName);
+    inMainArea && FILE_LIKE_ACTIVITY_NAME_PATTERN.test(tabName);
 
   return namesTab || looksLikeADocumentInTheMainArea ? tabName : null;
 }
