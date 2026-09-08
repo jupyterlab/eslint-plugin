@@ -3,11 +3,12 @@
  * Distributed under the terms of the Modified BSD License.
  */
 
-import { TSESTree } from '@typescript-eslint/utils';
+import { TSESLint, TSESTree } from '@typescript-eslint/utils';
 import { createRule } from '../utils/create-rule';
 import {
   extractStaticSelectorText,
   matchSelectorInteraction,
+  resolveLocatorBinding,
   SelectorInteractionMatch
 } from '../utils/playwright-selectors';
 
@@ -189,7 +190,16 @@ const galataPreferSidebarActivityHelper = createRule<Options, MessageIds>({
 
     return {
       CallExpression(node) {
-        const match = matchSelectorInteraction(node);
+        // Most call expressions are not interactions at all, and
+        // `matchSelectorInteraction` rejects them on the callee alone, so the
+        // scope is looked up only once something actually needs it.
+        let scope: TSESLint.Scope.Scope | null = null;
+        const currentScope = (): TSESLint.Scope.Scope =>
+          (scope ??= context.sourceCode.getScope(node));
+
+        const match = matchSelectorInteraction(node, identifier =>
+          resolveLocatorBinding(identifier, currentScope())
+        );
         const source = match ? getSelectorSource(match) : null;
         if (source) {
           reportSelectorSource(source);

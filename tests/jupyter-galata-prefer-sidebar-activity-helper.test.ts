@@ -71,6 +71,10 @@ ruleTester.run('galata-prefer-sidebar-activity-helper', rule, {
       code: `await dialog.locator('[title="Property Inspector"]').click();`
     },
     {
+      // Only a `const` is followed: a `let` could hold a different locator.
+      code: `let tab = page.locator('[title="Debugger"]');\nawait tab.click();`
+    },
+    {
       code: `await panel.getByTitle('Debugger').click();`
     },
     {
@@ -130,6 +134,22 @@ ruleTester.run('galata-prefer-sidebar-activity-helper', rule, {
       errors: [
         {
           messageId: 'preferSidebarHelper',
+          data: {
+            title: 'Debugger',
+            id: 'jp-debugger-sidebar'
+          }
+        }
+      ]
+    },
+    {
+      // A locator held in a `const` reaches the same `page` root as the
+      // inline chain, and the report is on the interaction, not the binding.
+      code: `const tab = page.locator('[title="Debugger"]');\nawait tab.click();`,
+      errors: [
+        {
+          messageId: 'preferSidebarHelper',
+          line: 2,
+          column: 7,
           data: {
             title: 'Debugger',
             id: 'jp-debugger-sidebar'
