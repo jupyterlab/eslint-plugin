@@ -396,3 +396,90 @@ export function combineStaticSelectorText(
   }
   return parts.length > 0 ? parts.join(' ') : null;
 }
+
+/**
+ * Calls whose callback is stored and run later. Statements next to such a call
+ * say nothing about the state its body starts in.
+ */
+const DEFERRED_CALLBACK_CALLEES: ReadonlySet<string> = new Set([
+  'test',
+  'it',
+  'describe',
+  'suite',
+  'beforeAll',
+  'beforeEach',
+  'afterAll',
+  'afterEach'
+]);
+
+/**
+ * The expression a callee is written on, or null once the name itself is
+ * reached. A parameterized test is called twice, `test.each(cases)('name',
+ * cb)`, and the table form tags a template first, `` test.each`a | b`('name',
+ * cb) ``. Stopping at the inner call would read no name and leave `cb` outside
+ * any test scope, so one test's state would reach the next.
+ */
+function calleeReceiver(node: TSESTree.Node): TSESTree.Node | null {
+  switch (node.type) {
+    case 'MemberExpression':
+      return node.object;
+    case 'CallExpression':
+      return node.callee;
+    case 'TaggedTemplateExpression':
+      return node.tag;
+    default:
+      return null;
+  }
+}
+
+function rootCalleeName(node: TSESTree.Expression): string | null {
+  let current: TSESTree.Node = node;
+  let receiver = calleeReceiver(current);
+  while (receiver) {
+    current = receiver;
+    receiver = calleeReceiver(current);
+  }
+  return current.type === 'Identifier' ? current.name : null;
+}
+
+/**
+ * Whether `node` bounds the statements a rule may read as "what ran before".
+ *
+ * A rule that reasons about UI state — which menu is open, what was selected —
+ * reads the statements preceding a gesture. That reading has to stop somewhere,
+ * and the boundary is the unit that runs as one: a test callback or a named
+ * function.
+ */
+export function isTestScopeBoundary(node: TSESTree.Node): boolean {
+  if (node.type === 'FunctionDeclaration') {
+    return true;
+  }
+  if (
+    node.type !== 'FunctionExpression' &&
+    node.type !== 'ArrowFunctionExpression'
+  ) {
+    return false;
+  }
+  const parent = node.parent;
+  if (parent?.type === 'VariableDeclarator' || parent?.type === 'Property') {
+    return true;
+  }
+  return (
+    parent?.type === 'CallExpression' &&
+    parent.arguments.includes(node) &&
+    DEFERRED_CALLBACK_CALLEES.has(rootCalleeName(parent.callee) ?? '')
+  );
+}
+
+/**
+ * The innermost test callback or named function containing `node`, which is
+ * where a lookback over preceding statements has to stop. Falls back to the
+ * `Program` for a gesture written at the top level of a file.
+ */
+export function enclosingTestScope(node: TSESTree.Node): TSESTree.Node {
+  let scope: TSESTree.Node = node;
+  while (scope.parent && !isTestScopeBoundary(scope)) {
+    scope = scope.parent;
+  }
+  return scope;
+}

@@ -4,10 +4,13 @@
  */
 
 import { TSESLint, TSESTree } from '@typescript-eslint/utils';
+import { walkFrom } from '../utils/ast';
 import { createRule } from '../utils/create-rule';
 import {
   combineStaticSelectorText,
+  enclosingTestScope,
   isRightClick,
+  isTestScopeBoundary,
   matchSelectorInteraction,
   resolveLocatorBinding
 } from '../utils/playwright-selectors';
@@ -190,97 +193,22 @@ function menuOriginOf(node: TSESTree.CallExpression): MenuOrigin | null {
     : null;
 }
 
-function isNode(value: unknown): value is TSESTree.Node {
-  return (
-    typeof value === 'object' &&
-    value !== null &&
-    typeof (value as { type?: unknown }).type === 'string'
-  );
-}
-
-// Calls whose callback is stored and run later. Statements next to such a call
-// say nothing about the state its body starts in.
-const DEFERRED_CALLBACK_CALLEES: ReadonlySet<string> = new Set([
-  'test',
-  'it',
-  'describe',
-  'suite',
-  'beforeAll',
-  'beforeEach',
-  'afterAll',
-  'afterEach'
-]);
-
-function rootCalleeName(node: TSESTree.Expression): string | null {
-  let current: TSESTree.Node = node;
-  while (current.type === 'MemberExpression') {
-    current = current.object;
-  }
-  return current.type === 'Identifier' ? current.name : null;
-}
-
-/**
- * Whether the lookback must stop before leaving `node`, and whether the scan of
- * preceding statements must stop before entering it.
- *
- * A callback written inline runs where it stands, so the statements above it
- * did run first and the walk continues through it: `perf.measure(async () => {
- * … })` keeps the menu its caller opened. A named helper and a test callback do
- * not. `async function openMenu(page) { … }` can be called from anywhere, and
- * `test('b', …)` does not run after the body of `test('a', …)`, so a
- * right-click in one test must not silence the next one.
- */
-function isLookbackBoundary(node: TSESTree.Node): boolean {
-  if (node.type === 'FunctionDeclaration') {
-    return true;
-  }
-  if (
-    node.type !== 'FunctionExpression' &&
-    node.type !== 'ArrowFunctionExpression'
-  ) {
-    return false;
-  }
-  const parent = node.parent;
-  if (parent?.type === 'VariableDeclarator' || parent?.type === 'Property') {
-    return true;
-  }
-  return (
-    parent?.type === 'CallExpression' &&
-    parent.arguments.includes(node) &&
-    DEFERRED_CALLBACK_CALLEES.has(rootCalleeName(parent.callee) ?? '')
-  );
-}
-
 function collectMenuOrigins(
-  node: TSESTree.Node,
+  root: TSESTree.Node,
   found: { origin: MenuOrigin; start: number }[]
 ): void {
-  if (isLookbackBoundary(node)) {
-    return;
-  }
-  if (node.type === 'CallExpression') {
-    const origin = menuOriginOf(node);
-    if (origin) {
-      found.push({ origin, start: node.range[0] });
+  walkFrom(root, node => {
+    if (isTestScopeBoundary(node)) {
+      return 'skip-children';
     }
-  }
-  for (const [key, value] of Object.entries(
-    node as unknown as Record<string, unknown>
-  )) {
-    // `parent` is a back-reference; following it would not terminate.
-    if (key === 'parent') {
-      continue;
-    }
-    if (Array.isArray(value)) {
-      for (const item of value) {
-        if (isNode(item)) {
-          collectMenuOrigins(item, found);
-        }
+    if (node.type === 'CallExpression') {
+      const origin = menuOriginOf(node);
+      if (origin) {
+        found.push({ origin, start: node.range[0] });
       }
-    } else if (isNode(value)) {
-      collectMenuOrigins(value, found);
     }
-  }
+    return undefined;
+  });
 }
 
 /**
@@ -339,7 +267,7 @@ function originBeforeStatement(
  * preceding statements all come after an outer block's, so the innermost block
  * with an answer holds the latest one and the walk can stop there. The walk
  * also stops at the enclosing test callback or named helper, so one test's menu
- * state never reaches the next (see `isLookbackBoundary`).
+ * state never reaches the next (see `isTestScopeBoundary`).
  */
 function findMenuOrigin(
   node: TSESTree.Node,
@@ -364,7 +292,7 @@ function findMenuOrigin(
       }
     }
 
-    if (isLookbackBoundary(parent)) {
+    if (isTestScopeBoundary(parent)) {
       return null;
     }
     current = parent;
@@ -397,10 +325,7 @@ const MENU_WORD_PATTERN = /menus?\b/i;
  * or a file name says nothing.
  */
 function testMentionsMenuMarkup(node: TSESTree.Node): boolean {
-  let scope: TSESTree.Node = node;
-  while (scope.parent && !isLookbackBoundary(scope)) {
-    scope = scope.parent;
-  }
+  const scope = enclosingTestScope(node);
   // The title of a `test(…)` sits next to its callback rather than inside it.
   // It is a sentence a person wrote about what the test does, so the bare word
   // is enough there, where in a selector it would not be.
@@ -416,10 +341,7 @@ function testMentionsMenuMarkup(node: TSESTree.Node): boolean {
     }
   }
   let found = false;
-  const visit = (current: TSESTree.Node): void => {
-    if (found) {
-      return;
-    }
+  walkFrom(scope, current => {
     if (
       (current.type === 'Literal' && typeof current.value === 'string'
         ? ANY_MENU_MARKUP_PATTERN.test(current.value)
@@ -428,26 +350,10 @@ function testMentionsMenuMarkup(node: TSESTree.Node): boolean {
         ANY_MENU_MARKUP_PATTERN.test(current.value.cooked ?? ''))
     ) {
       found = true;
-      return;
+      return 'stop';
     }
-    for (const [key, value] of Object.entries(
-      current as unknown as Record<string, unknown>
-    )) {
-      if (key === 'parent') {
-        continue;
-      }
-      if (Array.isArray(value)) {
-        for (const item of value) {
-          if (isNode(item)) {
-            visit(item);
-          }
-        }
-      } else if (isNode(value)) {
-        visit(value);
-      }
-    }
-  };
-  visit(scope);
+    return undefined;
+  });
   return found;
 }
 
