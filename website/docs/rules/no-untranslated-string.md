@@ -6,7 +6,7 @@ Require user-facing string literals to be wrapped in a translation call such as 
 
 The rule reports raw string literals (and template literals without expressions) in the following positions.
 
-In every position, blank strings are never flagged. Strings of pure punctuation — such as `'/'` and `'-'` — can be translatable, but this rule only flags them when [`enforcePunctuation`](#enforcepunctuation) is on.
+In every position, blank strings are never flagged, and neither are bare numbers. Strings of pure punctuation — such as `'/'` and `'-'` — can be translatable, but this rule only flags them when [`enforcePunctuation`](#enforcepunctuation) is on.
 
 ### 1. `commands.addCommand()` properties
 
@@ -132,6 +132,7 @@ launcher.add({ command, category: trans.__('Notebook') });
     "label",
     "placeholder",
     "title",
+    "tooltip",
     "textContent",
     "innerText"
   ]
@@ -140,7 +141,7 @@ launcher.add({ command, category: trans.__('Notebook') });
 
 ### `enforcePunctuation`
 
-Set to `true` to enforce translation of punctuation characters such as `,`, `-`, `+`, and other symbols. Digits are not punctuation: `label: '1970'` is flagged either way.
+Set to `true` to enforce translation of punctuation characters such as `,`, `-`, `+`, and other symbols. It has no effect on bare numbers, which are never flagged.
 
 ```ts
 // Not flagged by default; flagged when enforcePunctuation is true

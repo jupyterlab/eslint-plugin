@@ -669,6 +669,19 @@ ruleTester.run(
           { messageId: 'untranslatedProperty', data: { prop: 'placeholder' } }
         ]
       },
+      // `tooltip` is common across the ecosystem
+      {
+        code: `const opts = { icon, tooltip: 'Run all cells' };`,
+        errors: [
+          { messageId: 'untranslatedProperty', data: { prop: 'tooltip' } }
+        ]
+      },
+      {
+        code: `button.tooltip = 'Run all cells';`,
+        errors: [
+          { messageId: 'untranslatedPropertyAssign', data: { prop: 'tooltip' } }
+        ]
+      },
       // `innerText` is handled like `textContent`
       {
         code: `node.innerText = 'Save';`,
@@ -781,22 +794,36 @@ ruleTester.run(
   }
 );
 
-// Digits are content, not punctuation: enforcePunctuation does not gate them
-ruleTester.run('no-untranslated-string (digits)', noUntranslatedString, {
-  valid: [{ code: `const opts = { label: '-' };` }],
-  invalid: [
+// Bare numbers are never flagged, with or without enforcePunctuation
+ruleTester.run('no-untranslated-string (numbers)', noUntranslatedString, {
+  valid: [
+    { code: `const opts = { label: '1970' };` },
+    { code: `node.textContent = '100%';` },
+    { code: `node.textContent = '3.14';` },
     {
       code: `const opts = { label: '1970' };`,
-      errors: [{ messageId: 'untranslatedProperty', data: { prop: 'label' } }]
+      options: [{ enforcePunctuation: true }]
     },
+    // A number next to punctuation is still a number
     {
-      code: `node.textContent = '100%';`,
+      code: `node.textContent = '1 / 2';`,
+      options: [{ enforcePunctuation: true }]
+    }
+  ],
+  invalid: [
+    // One letter is enough to make it text again
+    {
+      code: `node.textContent = '3 items';`,
       errors: [
         {
           messageId: 'untranslatedPropertyAssign',
           data: { prop: 'textContent' }
         }
       ]
+    },
+    {
+      code: `const opts = { label: 'Top 10' };`,
+      errors: [{ messageId: 'untranslatedProperty', data: { prop: 'label' } }]
     }
   ]
 });
@@ -813,6 +840,12 @@ jsxRuleTester.run(
         code: `<img alt="A diagram" />`,
         errors: [
           { messageId: 'untranslatedJsxAttribute', data: { prop: 'alt' } }
+        ]
+      },
+      {
+        code: `<ToolbarButton tooltip="Run all cells" />`,
+        errors: [
+          { messageId: 'untranslatedJsxAttribute', data: { prop: 'tooltip' } }
         ]
       },
       {

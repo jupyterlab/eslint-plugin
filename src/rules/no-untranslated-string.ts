@@ -9,12 +9,8 @@ import { getObjectProperties } from '../utils/plugin-utils';
 import { unwrapExpression } from '../utils/translation';
 import { createRule } from '../utils/create-rule';
 
-/**
- * Returns true if the text carries content a translator would work on, as
- * opposed to punctuation and symbols alone. Digits also count.
- */
-function hasTranslatableContent(str: string): boolean {
-  return /[\p{L}\p{N}]/u.test(str);
+function hasLetters(str: string): boolean {
+  return /\p{L}/u.test(str);
 }
 
 /**
@@ -110,6 +106,7 @@ const DEFAULT_CHECK_PROPERTIES = [
   'label',
   'placeholder',
   'title',
+  'tooltip',
   'textContent',
   'innerText'
 ];
@@ -207,15 +204,19 @@ const noUntranslatedString = createRule({
     }
 
     /**
-     * Returns true if the text should be wrapped in a translation call. Blank
-     * strings are never reported. Strings made only of punctuation and symbols
-     * are reported only when `enforcePunctuation` is on.
+     * Returns true if the text should be wrapped in a translation call.
+     *
+     * Blank strings are never reported. A string with no letters is read as a
+     * bare number when it has digits ('1970', '100%'), which this rule never
+     * reports, and as punctuation otherwise ('/', '-'), which it reports only
+     * when `enforcePunctuation` is on.
      */
     function isReportableText(value: string): boolean {
-      return (
-        value.trim().length > 0 &&
-        (enforcePunctuation || hasTranslatableContent(value))
-      );
+      if (value.trim().length === 0) {
+        return false;
+      }
+      // No letters: a bare number is never reported, punctuation only on request.
+      return hasLetters(value) || (enforcePunctuation && !/\p{N}/u.test(value));
     }
 
     // Literals already reported by a more specific branch (e.g. addCommand or
