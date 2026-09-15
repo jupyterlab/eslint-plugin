@@ -2265,6 +2265,46 @@ function markDisposedSignalCallbackDisposals(
   }
 }
 
+/**
+ * Whether a call can credit any disposable that is still waiting, which decides
+ * whether it is worth asking the type checker which of its arguments take
+ * ownership.
+ *
+ * Crediting removes an entry from `pending` and does nothing for a variable
+ * that is not in it, so a call naming no waiting disposable changes nothing
+ * whatever the answer is. Both the arguments and the receiver are checked
+ * because the answer also decides whether the receiver checks in
+ * `markManagedDisposableUse` run, and those credit the receiver. Any check
+ * added there has to credit the receiver or an argument for this to hold.
+ */
+function namesPendingDisposable(
+  pending: PendingDisposableMap,
+  node: TSESTree.Node | null | undefined,
+  ownership: DisposableOwnershipContext
+): boolean {
+  return getIdentifierVariables(ownership.sourceCode, node).some(variable =>
+    pending.has(variable)
+  );
+}
+
+function mayCreditPendingDisposable(
+  pending: PendingDisposableMap,
+  node: TSESTree.CallExpression | TSESTree.NewExpression,
+  ownership: DisposableOwnershipContext
+): boolean {
+  if (
+    node.type === 'CallExpression' &&
+    node.callee.type === 'MemberExpression' &&
+    namesPendingDisposable(pending, node.callee.object, ownership)
+  ) {
+    return true;
+  }
+
+  return node.arguments.some(argument =>
+    namesPendingDisposable(pending, argument, ownership)
+  );
+}
+
 export function markManagedDisposableUse(
   pending: PendingDisposableMap,
   node: TSESTree.Node,
@@ -2340,7 +2380,7 @@ export function markManagedDisposableUse(
   }
 
   const ownershipArguments =
-    pending.size > 0
+    pending.size > 0 && mayCreditPendingDisposable(pending, node, ownership)
       ? getOwnershipArguments(node as TSESTree.CallExpression, ownership)
       : [];
   if (ownershipArguments.length > 0) {
