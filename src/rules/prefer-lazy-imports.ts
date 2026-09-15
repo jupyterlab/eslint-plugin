@@ -174,7 +174,7 @@ const jupyterPreferLazyImports = createRule<[LazyImportOptions], string>({
       if (!resolved) {
         return false;
       }
-      const size = getTransitiveCodeSize(resolved);
+      const size = getTransitiveCodeSize(resolved, minimumSize);
       return size !== null && size < minimumSize;
     }
 

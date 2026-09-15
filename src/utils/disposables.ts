@@ -2316,20 +2316,24 @@ export function markManagedDisposableUse(
     markImmediateForEachOwnership(pending, node, ownership);
   }
 
+  // Crediting a disposable only ever removes an entry from `pending`, so with
+  // nothing waiting neither check below can change the outcome. Skipping them
+  // avoids resolving the callee signature, which is the most expensive query
+  // this module makes.
   if (pending.size > 0) {
     markManagedKnownOptionVariables(pending, node, ownership);
-  }
 
-  for (const argument of node.arguments) {
-    if (argument.type !== 'ObjectExpression') {
-      continue;
-    }
-    for (const property of argument.properties) {
-      if (
-        property.type === 'Property' &&
-        isOptionsObjectValueManaged(property.value, ownership)
-      ) {
-        markManagedVariables(pending, property.value, ownership);
+    for (const argument of node.arguments) {
+      if (argument.type !== 'ObjectExpression') {
+        continue;
+      }
+      for (const property of argument.properties) {
+        if (
+          property.type === 'Property' &&
+          isOptionsObjectValueManaged(property.value, ownership)
+        ) {
+          markManagedVariables(pending, property.value, ownership);
+        }
       }
     }
   }
