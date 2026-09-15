@@ -1362,6 +1362,7 @@ function isArrayExtInsertCall(
  */
 const signatureCache = new WeakMap<TSESTree.Node, ts.Signature | null>();
 const disposableTypeCache = new WeakMap<ts.Type, boolean>();
+const disposableConstructorCache = new WeakMap<ts.Symbol, boolean>();
 
 function isDisposableTypeCached(
   type: ts.Type,
@@ -2446,6 +2447,58 @@ export function isDisposableType(
     hasDisposableHeritage(type) ||
     hasDisposableShape(apparentType, checker)
   );
+}
+
+/**
+ * Whether a `new` expression creates a disposable, by the type it constructs
+ * when type information is available and by the known constructor names
+ * otherwise.
+ *
+ * A class is constructed all over a codebase, and what it constructs is a
+ * property of the class rather than of any one call, so the answer is kept per
+ * constructor symbol. Resolving that symbol is name resolution, while asking
+ * for the type of the `new` expression resolves a construct signature, so the
+ * lookup costs far less than the answer it replaces. A generic class whose
+ * disposability depends on its type arguments would be answered from the first
+ * instantiation seen, which no Lumino or JupyterLab class does.
+ */
+export function constructsDisposable(
+  node: TSESTree.NewExpression,
+  ownership: DisposableOwnershipContext
+): boolean {
+  const { checker, services } = ownership;
+  if (checker && services) {
+    try {
+      const tsNode = services.esTreeNodeToTSNodeMap.get(
+        node as TSESTree.Node
+      ) as ts.NewExpression;
+      let symbol = checker.getSymbolAtLocation(tsNode.expression);
+      if (symbol && symbol.flags & ts.SymbolFlags.Alias) {
+        // An imported class resolves to a different alias symbol in every
+        // file; the class it points at is shared by all of them.
+        symbol = checker.getAliasedSymbol(symbol);
+      }
+      const cached = symbol
+        ? disposableConstructorCache.get(symbol)
+        : undefined;
+      if (cached !== undefined) {
+        return cached || isDisposableConstructor(node);
+      }
+      const result = isDisposableTypeCached(
+        checker.getTypeAtLocation(tsNode),
+        checker
+      );
+      if (symbol) {
+        disposableConstructorCache.set(symbol, result);
+      }
+      if (result) {
+        return true;
+      }
+    } catch {
+      // Fall back to the known Lumino disposable constructors below.
+    }
+  }
+  return isDisposableConstructor(node);
 }
 
 export function shouldCheckReturnedDisposable(
