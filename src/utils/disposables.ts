@@ -2371,6 +2371,7 @@ export function markManagedDisposableUse(
       for (const property of argument.properties) {
         if (
           property.type === 'Property' &&
+          namesPendingDisposable(pending, property.value, ownership) &&
           isOptionsObjectValueManaged(property.value, ownership)
         ) {
           markManagedVariables(pending, property.value, ownership);
@@ -2490,17 +2491,37 @@ export function isDisposableType(
 }
 
 /**
+ * A class with no type parameters constructs the same type everywhere, so its
+ * instance type answers for every `new` of it. A generic one does not: `dispose`
+ * can be declared as the type parameter, which is callable in one instantiation
+ * and not in another, so those are asked about one expression at a time.
+ */
+function nonGenericClassSymbol(
+  symbol: ts.Symbol | undefined
+): ts.Symbol | undefined {
+  if (!symbol || !(symbol.flags & ts.SymbolFlags.Class)) {
+    return undefined;
+  }
+  const declarations = symbol.declarations ?? [];
+  const generic = declarations.some(
+    declaration =>
+      (ts.isClassDeclaration(declaration) ||
+        ts.isClassExpression(declaration)) &&
+      (declaration.typeParameters?.length ?? 0) > 0
+  );
+  return generic ? undefined : symbol;
+}
+
+/**
  * Whether a `new` expression creates a disposable, by the type it constructs
  * when type information is available and by the known constructor names
  * otherwise.
  *
- * A class is constructed all over a codebase, and what it constructs is a
- * property of the class rather than of any one call, so the answer is kept per
- * constructor symbol. Resolving that symbol is name resolution, while asking
- * for the type of the `new` expression resolves a construct signature, so the
- * lookup costs far less than the answer it replaces. A generic class whose
- * disposability depends on its type arguments would be answered from the first
- * instantiation seen, which no Lumino or JupyterLab class does.
+ * A class is constructed all over a codebase, and for a class with no type
+ * parameters what it constructs is a property of the class rather than of any
+ * one call, so the answer is kept per constructor symbol. Resolving that symbol
+ * is name resolution and reading the instance type off it is a lookup, while
+ * typing the `new` expression resolves a construct signature.
  */
 export function constructsDisposable(
   node: TSESTree.NewExpression,
@@ -2518,22 +2539,21 @@ export function constructsDisposable(
         // file; the class it points at is shared by all of them.
         symbol = checker.getAliasedSymbol(symbol);
       }
-      const cached = symbol
-        ? disposableConstructorCache.get(symbol)
-        : undefined;
-      if (cached !== undefined) {
-        return cached || isDisposableConstructor(node);
+      const classSymbol = nonGenericClassSymbol(symbol);
+      if (classSymbol) {
+        const cached = disposableConstructorCache.get(classSymbol);
+        if (cached !== undefined) {
+          return cached || isDisposableConstructor(node);
+        }
       }
-      // A class symbol carries its instance type directly, so asking for it
-      // skips the construct signature resolution that typing the `new`
-      // expression would run.
-      const type =
-        symbol && symbol.flags & ts.SymbolFlags.Class
-          ? checker.getDeclaredTypeOfSymbol(symbol)
-          : checker.getTypeAtLocation(tsNode);
-      const result = isDisposableTypeCached(type, checker);
-      if (symbol) {
-        disposableConstructorCache.set(symbol, result);
+      const result = isDisposableTypeCached(
+        classSymbol
+          ? checker.getDeclaredTypeOfSymbol(classSymbol)
+          : checker.getTypeAtLocation(tsNode),
+        checker
+      );
+      if (classSymbol) {
+        disposableConstructorCache.set(classSymbol, result);
       }
       if (result) {
         return true;
