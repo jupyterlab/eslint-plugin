@@ -2484,10 +2484,14 @@ export function constructsDisposable(
       if (cached !== undefined) {
         return cached || isDisposableConstructor(node);
       }
-      const result = isDisposableTypeCached(
-        checker.getTypeAtLocation(tsNode),
-        checker
-      );
+      // A class symbol carries its instance type directly, so asking for it
+      // skips the construct signature resolution that typing the `new`
+      // expression would run.
+      const type =
+        symbol && symbol.flags & ts.SymbolFlags.Class
+          ? checker.getDeclaredTypeOfSymbol(symbol)
+          : checker.getTypeAtLocation(tsNode);
+      const result = isDisposableTypeCached(type, checker);
       if (symbol) {
         disposableConstructorCache.set(symbol, result);
       }
