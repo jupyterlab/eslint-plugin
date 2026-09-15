@@ -235,8 +235,8 @@ const noUntranslatedString = createRule({
     }
 
     /**
-     * Reports the string literal behind `value`, if there is one and it has
-     * not been reported already.
+     * Reports raw string literals behind `value`, if any have not been
+     * reported already.
      */
     function reportRawString(
       value: TSESTree.Node,
@@ -244,10 +244,25 @@ const noUntranslatedString = createRule({
       data?: Record<string, string>
     ): void {
       const raw = getRawString(value);
-      if (!raw || reportedNodes.has(raw.node) || !isReportableText(raw.value)) {
+      if (raw) {
+        if (!reportedNodes.has(raw.node) && isReportableText(raw.value)) {
+          report(raw.node, messageId, data);
+        }
         return;
       }
-      report(raw.node, messageId, data);
+
+      const inner = unwrapExpression(value);
+      if (
+        inner.type === 'ArrowFunctionExpression' &&
+        inner.body.type !== 'BlockStatement'
+      ) {
+        reportRawString(inner.body, messageId, data);
+        return;
+      }
+      if (inner.type === 'ConditionalExpression') {
+        reportRawString(inner.consequent, messageId, data);
+        reportRawString(inner.alternate, messageId, data);
+      }
     }
 
     /**

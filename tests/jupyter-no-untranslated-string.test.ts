@@ -492,6 +492,13 @@ jsxRuleTester.run('no-untranslated-string (JSX)', noUntranslatedString, {
     // --- JSX: translated expression ---
     { code: `const el = <span>{trans.__('Error message:')}</span>;` },
     {
+      code: `
+        const el = (
+          <button title={visible ? trans.__('Hide layer') : trans.__('Show layer')} />
+        );
+      `
+    },
+    {
       code: `const el = (\n  <div>\n    <span>{trans.__('Label')}</span>\n  </div>\n);`
     },
     { code: `<div className={'normal-class-string'} />` },
@@ -542,6 +549,13 @@ jsxRuleTester.run('no-untranslated-string (JSX)', noUntranslatedString, {
           messageId: 'untranslatedJsxAttribute',
           data: { prop: 'aria-description' }
         }
+      ]
+    },
+    {
+      code: `<button title={visible ? 'Hide layer' : 'Show layer'} />`,
+      errors: [
+        { messageId: 'untranslatedJsxAttribute', data: { prop: 'title' } },
+        { messageId: 'untranslatedJsxAttribute', data: { prop: 'title' } }
       ]
     }
   ]
@@ -753,6 +767,63 @@ ruleTester.run(
         code: `el.setAttribute('title', <string>'Close Tab');`,
         errors: [
           { messageId: 'untranslatedSetAttribute', data: { attr: 'title' } }
+        ]
+      }
+    ]
+  }
+);
+
+// Conditional branches in monitored positions are checked independently
+ruleTester.run(
+  'no-untranslated-string (conditional expressions)',
+  noUntranslatedString,
+  {
+    valid: [
+      {
+        code: `
+          const opts = {
+            label: visible ? trans.__('Hide layer') : trans.__('Show layer')
+          };
+        `
+      },
+      { code: `const opts = { label: visible ? '-' : '1970' };` },
+      { code: `const opts = { id: visible ? 'Hide layer' : 'Show layer' };` }
+    ],
+    invalid: [
+      {
+        code: `
+          const opts = {
+            label: visible ? 'Hide layer' : 'Show layer'
+          };
+        `,
+        errors: [
+          { messageId: 'untranslatedProperty', data: { prop: 'label' } },
+          { messageId: 'untranslatedProperty', data: { prop: 'label' } }
+        ]
+      },
+      {
+        code: `widget.title = visible ? 'Hide layer' : trans.__('Show layer');`,
+        errors: [
+          { messageId: 'untranslatedPropertyAssign', data: { prop: 'title' } }
+        ]
+      },
+      {
+        code: `
+          commands.addCommand('toggle-layer', {
+            label: () => visible ? 'Hide layer' : 'Show layer',
+            execute: () => {}
+          });
+        `,
+        errors: [
+          { messageId: 'untranslatedCommandProp', data: { prop: 'label' } },
+          { messageId: 'untranslatedCommandProp', data: { prop: 'label' } }
+        ]
+      },
+      {
+        code: `showDialog({ title: visible ? 'Hide layer' : 'Show layer' });`,
+        errors: [
+          { messageId: 'untranslatedDialogOption', data: { prop: 'title' } },
+          { messageId: 'untranslatedDialogOption', data: { prop: 'title' } }
         ]
       }
     ]

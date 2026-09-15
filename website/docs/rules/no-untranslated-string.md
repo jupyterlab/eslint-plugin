@@ -8,6 +8,8 @@ The rule reports raw string literals (and template literals without expressions)
 
 In every position, blank strings are never flagged, and neither are bare numbers. Strings of pure punctuation — such as `'/'` and `'-'` — can be translatable, but this rule only flags them when [`enforcePunctuation`](#enforcepunctuation) is on.
 
+When a monitored value is a conditional expression, both the true and false result expressions are checked independently.
+
 ### 1. `commands.addCommand()` properties
 
 The `label`, `caption`, and `usage` properties must not contain bare strings. Concise arrow functions returning a raw string (e.g. `() => 'string'`) are also flagged.
