@@ -18,6 +18,7 @@ This section documents all rules currently provided by `eslint-plugin-jupyter`.
 - [no-untranslated-string](./no-untranslated-string)
 - [plugin-activation-args](./plugin-activation-args)
 - [plugin-description](./plugin-description)
+- [plugin-id-convention](./plugin-id-convention)
 - [prefer-lazy-imports](./prefer-lazy-imports)
 - [prefer-signal-this-arg](./prefer-signal-this-arg)
 - [require-disposable-ownership](./require-disposable-ownership)
@@ -39,6 +40,7 @@ The plugin ships with a recommended configuration that enables all current rules
 | [jupyter/command-described-by](./command-described-by)                                         | `warn`   |
 | [jupyter/no-untranslated-string](./no-untranslated-string)                                     | `warn`   |
 | [jupyter/plugin-description](./plugin-description)                                             | `warn`   |
+| [jupyter/plugin-id-convention](./plugin-id-convention)                                         | `error`  |
 | [jupyter/no-translation-concatenation](./no-translation-concatenation)                         | `error`  |
 | [jupyter/no-dynamic-translation](./no-dynamic-translation)                                     | `warn`   |
 | [jupyter/token-format](./token-format)                                                         | `error`  |

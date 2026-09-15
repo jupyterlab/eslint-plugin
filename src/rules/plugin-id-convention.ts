@@ -1,0 +1,305 @@
+/*
+ * Copyright (c) Jupyter Development Team.
+ * Distributed under the terms of the Modified BSD License.
+ */
+
+import * as fs from 'fs';
+import * as path from 'path';
+import { TSESTree } from '@typescript-eslint/types';
+import {
+  ESLintUtils,
+  ParserServices,
+  TSESLint
+} from '@typescript-eslint/utils';
+import * as ts from 'typescript';
+import { createRule } from '../utils/create-rule';
+import {
+  getJupyterPluginKind,
+  getObjectProperties,
+  getPluginId,
+  looksLikePluginObject,
+  typeMentionsJupyterPlugin
+} from '../utils/plugin-utils';
+import { readPackageJson } from '../utils/package-json';
+
+const MAX_PACKAGE_LEVELS = 12;
+
+interface ExtensionPackageInfo {
+  mtimeMs: number;
+  name: string;
+}
+
+const extensionPackageCache = new Map<string, ExtensionPackageInfo | null>();
+const packagePathCache = new Map<string, string | null>();
+
+/**
+ * Reads the package name from a manifest that declares an extension entry.
+ */
+function readExtensionPackage(
+  packagePath: string
+): ExtensionPackageInfo | null {
+  const packageJson = readPackageJson(packagePath);
+  if (!packageJson) {
+    return null;
+  }
+
+  const cached = extensionPackageCache.get(packagePath);
+  if (cached && cached.mtimeMs === packageJson.mtimeMs) {
+    return cached;
+  }
+
+  const data = packageJson.data;
+
+  if (
+    typeof data.name !== 'string' ||
+    !data.jupyterlab ||
+    typeof data.jupyterlab !== 'object' ||
+    (!('extension' in data.jupyterlab) && !('mimeExtension' in data.jupyterlab))
+  ) {
+    extensionPackageCache.set(packagePath, null);
+    return null;
+  }
+
+  const info: ExtensionPackageInfo = {
+    mtimeMs: packageJson.mtimeMs,
+    name: data.name
+  };
+  extensionPackageCache.set(packagePath, info);
+  return info;
+}
+
+/**
+ * Finds the nearest extension package manifest that governs a linted file.
+ */
+function getExtensionPackageName(fromFile: string): string | null {
+  const start = path.dirname(path.resolve(fromFile));
+
+  const cachedPath = packagePathCache.get(start);
+  if (cachedPath !== undefined) {
+    return cachedPath === null
+      ? null
+      : (readExtensionPackage(cachedPath)?.name ?? null);
+  }
+
+  const visited: string[] = [];
+  let found: string | null = null;
+  let directory = start;
+  for (let level = 0; level < MAX_PACKAGE_LEVELS; level++) {
+    visited.push(directory);
+    const packagePath = path.join(directory, 'package.json');
+    if (readExtensionPackage(packagePath)) {
+      found = packagePath;
+      break;
+    }
+    if (fs.existsSync(path.join(directory, '.git'))) {
+      break;
+    }
+    const parent = path.dirname(directory);
+    if (parent === directory) {
+      break;
+    }
+    directory = parent;
+  }
+
+  for (const seen of visited) {
+    packagePathCache.set(seen, found);
+  }
+  return found === null ? null : (readExtensionPackage(found)?.name ?? null);
+}
+
+/**
+ * Looks up a variable in the current scope and its parents.
+ */
+function findVariable(
+  scope: TSESLint.Scope.Scope | null,
+  name: string
+): TSESLint.Scope.Variable | null {
+  let current: TSESLint.Scope.Scope | null = scope;
+  while (current) {
+    const variable = current.variables.find(
+      candidate => candidate.name === name
+    );
+    if (variable) {
+      return variable;
+    }
+    current = current.upper;
+  }
+  return null;
+}
+
+/**
+ * Narrows a variable declaration to a local const string assignment.
+ */
+function isConstStringDefinition(
+  node: TSESTree.Node
+): node is TSESTree.VariableDeclarator {
+  return (
+    node.type === 'VariableDeclarator' &&
+    node.parent.type === 'VariableDeclaration' &&
+    node.parent.kind === 'const' &&
+    node.init?.type === 'Literal' &&
+    typeof node.init.value === 'string'
+  );
+}
+
+const pluginIdConvention = createRule({
+  name: 'plugin-id-convention',
+  meta: {
+    type: 'problem',
+    docs: {
+      description:
+        'Ensure JupyterLab plugin IDs are prefixed with the extension package name',
+      url: 'https://eslint-plugin.readthedocs.io/en/latest/rules/plugin-id-convention/'
+    },
+    messages: {
+      mismatchedPrefix:
+        'JupyterLab plugin ID "{{ pluginId }}" should start with "{{ packageName }}:" so extension-level enable/disable applies to it.'
+    },
+    schema: []
+  },
+  defaultOptions: [],
+
+  create(context) {
+    let services: ParserServices | null = null;
+    let checker: ts.TypeChecker | null = null;
+
+    try {
+      services = ESLintUtils.getParserServices(context, true);
+      checker = services.program ? services.program.getTypeChecker() : null;
+    } catch {
+      services = null;
+    }
+
+    const getTSNode = services
+      ? (node: TSESTree.Node) => services?.esTreeNodeToTSNodeMap.get(node)
+      : null;
+
+    /**
+     * Returns true when a type annotation refers to a plugin descriptor.
+     */
+    function mentionsPluginType(
+      typeNode: TSESTree.TypeNode | undefined | null
+    ): boolean {
+      return typeMentionsJupyterPlugin(typeNode, checker, getTSNode);
+    }
+
+    /**
+     * Checks whether an object literal is typed as a plugin descriptor.
+     */
+    function hasPluginType(node: TSESTree.ObjectExpression): boolean {
+      const parent = node.parent;
+      if (!parent) {
+        return false;
+      }
+
+      if (parent.type === 'VariableDeclarator') {
+        return (
+          getJupyterPluginKind(parent, checker, getTSNode) !== null ||
+          (parent.id.type === 'Identifier' &&
+            mentionsPluginType(parent.id.typeAnnotation?.typeAnnotation))
+        );
+      }
+
+      if (
+        parent.type === 'TSAsExpression' ||
+        parent.type === 'TSSatisfiesExpression'
+      ) {
+        return mentionsPluginType(parent.typeAnnotation);
+      }
+
+      if (parent.type !== 'ArrayExpression') {
+        return false;
+      }
+
+      const grandparent = parent.parent;
+      if (!grandparent) {
+        return false;
+      }
+
+      if (grandparent.type === 'VariableDeclarator') {
+        return (
+          grandparent.id.type === 'Identifier' &&
+          mentionsPluginType(grandparent.id.typeAnnotation?.typeAnnotation)
+        );
+      }
+
+      if (
+        grandparent.type === 'TSAsExpression' ||
+        grandparent.type === 'TSSatisfiesExpression'
+      ) {
+        return mentionsPluginType(grandparent.typeAnnotation);
+      }
+
+      return false;
+    }
+
+    /**
+     * Resolves an identifier when it points at a local const string.
+     */
+    function resolveStringIdentifier(
+      identifier: TSESTree.Identifier
+    ): string | null {
+      const variable = findVariable(
+        context.sourceCode.getScope(identifier),
+        identifier.name
+      );
+      const definition = variable?.defs[0]?.node;
+      if (!definition || !isConstStringDefinition(definition)) {
+        return null;
+      }
+      const init = definition.init;
+      if (init?.type !== 'Literal' || typeof init.value !== 'string') {
+        return null;
+      }
+      return init.value;
+    }
+
+    /**
+     * Reads a plugin ID from a literal property or a local const string.
+     */
+    function resolvePluginId(node: TSESTree.ObjectExpression): string | null {
+      const literalId = getPluginId(node);
+      if (literalId) {
+        return literalId;
+      }
+
+      const idProperty = getObjectProperties(node).get('id');
+      if (idProperty?.value.type === 'Identifier') {
+        return resolveStringIdentifier(idProperty.value);
+      }
+      return null;
+    }
+
+    /**
+     * Reports plugin IDs that do not use the owning extension package prefix.
+     */
+    function reportIfNeeded(node: TSESTree.ObjectExpression): void {
+      if (!looksLikePluginObject(node) && !hasPluginType(node)) {
+        return;
+      }
+
+      const packageName = getExtensionPackageName(context.filename);
+      if (!packageName) {
+        return;
+      }
+
+      const pluginId = resolvePluginId(node);
+      if (!pluginId || pluginId.startsWith(`${packageName}:`)) {
+        return;
+      }
+
+      const idProperty = getObjectProperties(node).get('id');
+      context.report({
+        node: idProperty?.value ?? node,
+        messageId: 'mismatchedPrefix',
+        data: { pluginId, packageName }
+      });
+    }
+
+    return {
+      ObjectExpression: reportIfNeeded
+    };
+  }
+});
+
+export = pluginIdConvention;
