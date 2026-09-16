@@ -8,8 +8,6 @@ The rule reports raw string literals (and template literals without expressions)
 
 In every position, blank strings are never flagged, and neither are bare numbers. Strings of pure punctuation — such as `'/'` and `'-'` — can be translatable, but this rule only flags them when [`enforcePunctuation`](#enforcepunctuation) is on.
 
-When a monitored value is a conditional expression, both the true and false result expressions are checked independently.
-
 ### 1. `commands.addCommand()` properties
 
 The `label`, `caption`, and `usage` properties must not contain bare strings. Concise arrow functions returning a raw string (e.g. `() => 'string'`) are also flagged.
@@ -118,6 +116,24 @@ launcher.add({ command, category: 'Notebook' });
 // Correct
 new MyField({ ...options, label: trans.__('My field') });
 launcher.add({ command, category: trans.__('Notebook') });
+```
+
+### Conditional values
+
+In every position above, a conditional is read one branch at a time, so each string that can reach the user needs its own translation call. This covers `? :`, `||`, `??` and `&&`.
+
+```tsx
+// Incorrect
+const el = <button title={visible ? 'Hide layer' : 'Show layer'} />;
+node.textContent = count ? 'Some files' : 'No files';
+const opts = { label: name ?? 'Untitled' };
+
+// Correct
+const el = (
+  <button title={visible ? trans.__('Hide layer') : trans.__('Show layer')} />
+);
+node.textContent = count ? trans.__('Some files') : trans.__('No files');
+const opts = { label: name ?? trans.__('Untitled') };
 ```
 
 ## Options
