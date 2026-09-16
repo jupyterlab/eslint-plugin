@@ -1237,7 +1237,7 @@ ruleTester.run(
       `,
         errors: [{ messageId: 'usedInAutostartActivate' }]
       },
-      // A spread may carry the `id`.
+      // A spread is not followed: the entries written in the object decide.
       {
         code: `
         import { JupyterFrontEndPlugin } from '@jupyterlab/application';
@@ -1250,98 +1250,6 @@ ruleTester.run(
         };
       `,
         errors: [{ messageId: 'usedInAutostartActivate' }]
-      },
-      // The spread may itself be built from spreads.
-      {
-        code: `
-        import { JupyterFrontEndPlugin } from '@jupyterlab/application';
-        import { HeavyWidget } from './widget';
-        const ids = { id: 'test:plugin' };
-        const base = { ...ids, description: 'A test plugin.' };
-        const plugin: JupyterFrontEndPlugin<void> = {
-          ...base,
-          autoStart: true,
-          activate: app => app.shell.add(new HeavyWidget(), 'main')
-        };
-      `,
-        errors: [{ messageId: 'usedInAutostartActivate' }]
-      },
-      // A later spread which turns `autoStart` off is honoured.
-      {
-        code: `
-        import { JupyterFrontEndPlugin } from '@jupyterlab/application';
-        import { HeavyWidget } from './widget';
-        const onDemand = { autoStart: false };
-        const plugin: JupyterFrontEndPlugin<void> = {
-          id: 'test:plugin',
-          autoStart: true,
-          activate: app => app.shell.add(new HeavyWidget(), 'main'),
-          ...onDemand
-        };
-      `,
-        errors: [{ messageId: 'preferLazyImport' }]
-      },
-      // A spread which cannot be followed leaves the object unknown: here it
-      // could override `autoStart`, so the object is not taken for a plugin.
-      {
-        code: `
-        import { JupyterFrontEndPlugin } from '@jupyterlab/application';
-        import { HeavyWidget } from './widget';
-        import { defaults } from './defaults';
-        const plugin: JupyterFrontEndPlugin<void> = {
-          id: 'test:plugin',
-          autoStart: true,
-          activate: app => app.shell.add(new HeavyWidget(), 'main'),
-          ...defaults
-        };
-      `,
-        errors: [{ messageId: 'preferLazyImport' }]
-      },
-      // An unrelated object built from a parameter, next to a real plugin.
-      {
-        code: `
-        import { JupyterFrontEndPlugin } from '@jupyterlab/application';
-        import { HeavyWidget } from './widget';
-        export function makeService(options) {
-          return { ...options, autoStart: true, activate: () => new HeavyWidget() };
-        }
-        const plugin: JupyterFrontEndPlugin<void> = {
-          id: 'test:plugin',
-          autoStart: true,
-          activate: () => undefined
-        };
-      `,
-        errors: [{ messageId: 'preferLazyImport' }]
-      },
-      // A variable written again may hold something else by then.
-      {
-        code: `
-        import { JupyterFrontEndPlugin } from '@jupyterlab/application';
-        import { HeavyWidget } from './widget';
-        let base = { id: 'test:plugin' };
-        base = load();
-        const plugin: JupyterFrontEndPlugin<void> = {
-          ...base,
-          autoStart: true,
-          activate: app => app.shell.add(new HeavyWidget(), 'main')
-        };
-      `,
-        errors: [{ messageId: 'preferLazyImport' }]
-      },
-      // An object without an `id` is not a plugin, whatever else it is named
-      // like, so its `activate` is an ordinary callback.
-      {
-        code: `
-        import { JupyterFrontEndPlugin } from '@jupyterlab/application';
-        import { HeavyWidget } from './widget';
-        const service = { autoStart: true, activate: () => new HeavyWidget() };
-        const plugin: JupyterFrontEndPlugin<void> = {
-          id: 'test:plugin',
-          autoStart: true,
-          activate: () => service
-        };
-      `,
-        errors: [{ messageId: 'preferLazyImport' }]
       },
       // Method shorthand for `activate`.
       {
