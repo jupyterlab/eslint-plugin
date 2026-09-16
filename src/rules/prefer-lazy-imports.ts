@@ -218,7 +218,7 @@ const jupyterPreferLazyImports = createRule<[LazyImportOptions], string>({
       if (!resolved) {
         return false;
       }
-      const size = getTransitiveCodeSize(resolved);
+      const size = getTransitiveCodeSize(resolved, minimumSize);
       return size !== null && size < minimumSize;
     }
 
@@ -289,8 +289,16 @@ const jupyterPreferLazyImports = createRule<[LazyImportOptions], string>({
         return;
       }
 
-      if (isTooSmall(source)) {
-        return;
+      // Measuring a module compiles it, which costs far more than the checks
+      // below, and most candidates are ruled out by them. The measurement
+      // therefore happens at the point of reporting rather than here.
+      function reportUnlessTooSmall(
+        descriptor: Parameters<typeof context.report>[0]
+      ): void {
+        if (isTooSmall(source)) {
+          return;
+        }
+        context.report(descriptor);
       }
 
       if (!isPluginModule) {
@@ -302,7 +310,7 @@ const jupyterPreferLazyImports = createRule<[LazyImportOptions], string>({
             isInInteractionCallback(identifier)
           )
         ) {
-          context.report({
+          reportUnlessTooSmall({
             node: declarations[0],
             messageId: 'preferLazyImportInteraction',
             data: {
@@ -330,7 +338,7 @@ const jupyterPreferLazyImports = createRule<[LazyImportOptions], string>({
       }
 
       if (tokenList === 0 && eager === 0 && deferrable > 0) {
-        context.report({
+        reportUnlessTooSmall({
           node: declarations[0],
           messageId: 'preferLazyImport',
           data: {
@@ -342,7 +350,7 @@ const jupyterPreferLazyImports = createRule<[LazyImportOptions], string>({
       }
 
       if (reportModuleLevelUsage && eager > 0 && tokenList === 0) {
-        context.report({
+        reportUnlessTooSmall({
           node: declarations[0],
           messageId: 'eagerModuleLevelUse',
           data: { source }
