@@ -442,4 +442,4 @@ A module which is only ever loaded with `import()` can import a deferred package
 
 Sizes are an estimate. The rule counts compiled bytes, which is not the same as bundled and minified bytes. It also stops at package boundaries, so a small module which pulls in a large dependency is measured as small.
 
-A value re-export is never reported. When a file re-exports a source with `export { X } from '...'`, the source stays in the startup bundle whatever the matching import does, so the rule skips it. Splitting an entry point which re-exports its own implementation is a larger refactor than this rule tries to describe.
+A value re-export is reported when its source is in [`deferredPackages`](#deferredpackages). For other sources, when a file re-exports a source with `export { X } from '...'` or `export * from '...'`, the source stays in the startup bundle whatever the matching import does, so the rule skips it. Splitting an entry point which re-exports its own implementation is a larger refactor than this rule tries to describe.
