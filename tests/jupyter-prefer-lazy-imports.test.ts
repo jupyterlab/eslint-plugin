@@ -1654,8 +1654,9 @@ ruleTester.run('prefer-lazy-imports (deferred packages)', preferLazyImports, {
       `,
       errors: [{ messageId: 'deferredPackageImport' }]
     },
-    // One source imported twice is reported once, and a declaration which
-    // TypeScript erases stays out of the snippet.
+    // One source imported twice: the declarations with a runtime use share one
+    // report and one snippet, and the one used only as a type is reported on
+    // its own line, since deleting the first would leave it behind.
     {
       code: `
         import { DataGrid } from '@lumino/datagrid';
@@ -1672,7 +1673,46 @@ ruleTester.run('prefer-lazy-imports (deferred packages)', preferLazyImports, {
             source: '@lumino/datagrid',
             snippet: "const { DataGrid } = await import('@lumino/datagrid');"
           }
+        },
+        { messageId: 'deferredPackageNotTypeOnly', line: 3 }
+      ]
+    },
+    // An unused declaration next to a used one is reported on its own as
+    // well, whichever order they come in.
+    {
+      code: `
+        import { Unused } from 'mermaid';
+        import { Diagram } from 'mermaid';
+        export function render() {
+          return new Diagram();
         }
+      `,
+      errors: [
+        { messageId: 'deferredPackageNotTypeOnly', line: 2 },
+        {
+          messageId: 'deferredPackageImport',
+          line: 3,
+          data: {
+            source: 'mermaid',
+            snippet: "const { Diagram } = await import('mermaid');"
+          }
+        }
+      ]
+    },
+    // The same next to a side-effect import.
+    {
+      code: `
+        import 'mermaid';
+        import { Unused } from 'mermaid';
+        export const ready = true;
+      `,
+      errors: [
+        {
+          messageId: 'deferredPackageImport',
+          line: 2,
+          data: { source: 'mermaid', snippet: "await import('mermaid');" }
+        },
+        { messageId: 'deferredPackageNotTypeOnly', line: 3 }
       ]
     },
     // In a plugin module the list takes over from the usage check, so the

@@ -377,7 +377,10 @@ const jupyterPreferLazyImports = createRule<[LazyImportOptions], string>({
       declarations: TSESTree.ImportDeclaration[]
     ): void {
       // The snippet is built from the declarations with a runtime use, plus a
-      // side-effect import, which has nothing to erase.
+      // side-effect import, which has nothing to erase. Each of the others is
+      // reported on its own line, because deleting the reported declarations
+      // would leave it behind, still loading the package under
+      // `verbatimModuleSyntax` or in JavaScript.
       const loading: TSESTree.ImportDeclaration[] = [];
       const references: TSESLint.Scope.Reference[] = [];
       for (const declaration of declarations) {
@@ -385,14 +388,15 @@ const jupyterPreferLazyImports = createRule<[LazyImportOptions], string>({
         if (own.length > 0 || declaration.specifiers.length === 0) {
           loading.push(declaration);
           references.push(...own);
+        } else {
+          context.report({
+            node: declaration,
+            messageId: 'deferredPackageNotTypeOnly',
+            data: { source }
+          });
         }
       }
       if (loading.length === 0) {
-        context.report({
-          node: declarations[0],
-          messageId: 'deferredPackageNotTypeOnly',
-          data: { source }
-        });
         return;
       }
 
