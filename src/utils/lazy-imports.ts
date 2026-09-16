@@ -294,8 +294,6 @@ function getFunctionVariable(
   return null;
 }
 
-const MAX_CALL_DEPTH = 6;
-
 /**
  * When a node runs, relative to the application starting. `module` is while
  * the module is evaluated. `activation` is inside the `activate` of a plugin
@@ -392,19 +390,20 @@ function getInvocation(
  * activation of an autostart plugin, or only later. A node inside a named
  * function is placed by the function's call sites, followed transitively, and
  * the earliest of them wins, so a helper called from both `activate` and a
- * command runs during activation.
+ * command runs during activation. Each function is explored once per walk,
+ * which ends a cycle and bounds the cost by the number of functions in the
+ * file, so a chain of helpers is followed however long it is.
  */
 export function getReach(
   node: TSESTree.Node,
   sourceCode: TSESLint.SourceCode,
-  seen: Set<TSESTree.Node> = new Set(),
-  depth = 0
+  seen: Set<TSESTree.Node> = new Set()
 ): Reach {
   const boundary = findDeferringBoundary(node);
   if (boundary === null) {
     return 'module';
   }
-  if (boundary === 'field' || depth >= MAX_CALL_DEPTH || seen.has(boundary)) {
+  if (boundary === 'field' || seen.has(boundary)) {
     return 'deferred';
   }
   seen.add(boundary);
@@ -421,7 +420,7 @@ export function getReach(
     let result: Reach;
     const invocation = getInvocation(identifier);
     if (invocation) {
-      result = getReach(invocation, sourceCode, seen, depth + 1);
+      result = getReach(invocation, sourceCode, seen);
     } else if (isAutostartActivateValue(identifier)) {
       // The plugin registry calls the function when the application starts.
       result = 'activation';

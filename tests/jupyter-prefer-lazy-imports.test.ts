@@ -370,6 +370,27 @@ ruleTester.run('prefer-lazy-imports', preferLazyImports, {
         };
       `
     },
+    // A chain of helpers is followed however long it is.
+    {
+      code: `
+        import { JupyterFrontEndPlugin } from '@jupyterlab/application';
+        import { buildTable } from './table';
+        function step1() { return buildTable(); }
+        function step2() { return step1(); }
+        function step3() { return step2(); }
+        function step4() { return step3(); }
+        function step5() { return step4(); }
+        function step6() { return step5(); }
+        function step7() { return step6(); }
+        function step8() { return step7(); }
+        const table = step8();
+        const plugin: JupyterFrontEndPlugin<void> = {
+          id: 'test:plugin',
+          autoStart: true,
+          activate: () => table
+        };
+      `
+    },
     // A value re-export keeps the source in the startup bundle anyway.
     {
       code: `
@@ -1274,6 +1295,27 @@ ruleTester.run(
           id: 'test:plugin',
           autoStart: true,
           activate: app => addWidget(app)
+        };
+      `,
+        errors: [{ messageId: 'usedInAutostartActivate' }]
+      },
+      // A chain of helpers is followed however long it is.
+      {
+        code: `
+        import { JupyterFrontEndPlugin } from '@jupyterlab/application';
+        import { HeavyWidget } from './widget';
+        function step1(app) { app.shell.add(new HeavyWidget(), 'main'); }
+        function step2(app) { step1(app); }
+        function step3(app) { step2(app); }
+        function step4(app) { step3(app); }
+        function step5(app) { step4(app); }
+        function step6(app) { step5(app); }
+        function step7(app) { step6(app); }
+        function step8(app) { step7(app); }
+        const plugin: JupyterFrontEndPlugin<void> = {
+          id: 'test:plugin',
+          autoStart: true,
+          activate: app => step8(app)
         };
       `,
         errors: [{ messageId: 'usedInAutostartActivate' }]
