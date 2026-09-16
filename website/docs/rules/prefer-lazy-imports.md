@@ -132,7 +132,7 @@ const plugin: JupyterFrontEndPlugin<void> = {
   id: 'my-extension:plugin',
   autoStart: true,
   activate: async (app: JupyterFrontEnd) => {
-    // Incorrect: takes more time than synchrounous import due to an extra request,
+    // Incorrect: takes more time than synchronous import due to an extra request,
     // and still blocks shell restoration as this is an auto-start plugin.
     const { HeavyWidget } = await import('./widget');
     app.commands.addCommand('my-extension:open', {
