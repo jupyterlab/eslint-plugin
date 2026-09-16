@@ -49,12 +49,14 @@ function readExtensionPackage(
   }
 
   const data = packageJson.data;
+  const jupyterlab = data.jupyterlab;
 
   if (
     typeof data.name !== 'string' ||
-    !data.jupyterlab ||
-    typeof data.jupyterlab !== 'object' ||
-    (!('extension' in data.jupyterlab) && !('mimeExtension' in data.jupyterlab))
+    !jupyterlab ||
+    typeof jupyterlab !== 'object' ||
+    !(('extension' in jupyterlab && Boolean(jupyterlab.extension)) ||
+      ('mimeExtension' in jupyterlab && Boolean(jupyterlab.mimeExtension)))
   ) {
     extensionPackageCache.set(packagePath, null);
     return null;

@@ -25,6 +25,14 @@ const corePackageFilename = path.join(
   'index.ts'
 );
 
+const disabledExtensionFilename = path.join(
+  __dirname,
+  'fixtures',
+  'disabled-extension-pkg',
+  'src',
+  'index.ts'
+);
+
 const ruleTester = new RuleTester({
   languageOptions: {
     parser: require('@typescript-eslint/parser'),
@@ -107,6 +115,16 @@ ruleTester.run('plugin-id-convention', pluginIdConvention, {
     },
     {
       filename: corePackageFilename,
+      code: `
+        const plugin: JupyterFrontEndPlugin<void> = {
+          id: '@jupyterlab/example-extension:plugin',
+          autoStart: true,
+          activate: () => {}
+        };
+      `
+    },
+    {
+      filename: disabledExtensionFilename,
       code: `
         const plugin: JupyterFrontEndPlugin<void> = {
           id: '@jupyterlab/example-extension:plugin',
