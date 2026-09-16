@@ -23,7 +23,12 @@ const plugin: JupyterFrontEndPlugin<void> = {
   id: 'my-extension:plugin',
   autoStart: true,
   activate: (app: JupyterFrontEnd) => {
-    app.shell.add(new HeavyWidget(), 'main');
+    app.commands.addCommand('my-extension:open', {
+      label: 'Open Heavy Widget',
+      execute: () => {
+        app.shell.add(new HeavyWidget(), 'main');
+      }
+    });
   }
 };
 ```
@@ -53,23 +58,29 @@ import {
 const plugin: JupyterFrontEndPlugin<void> = {
   id: 'my-extension:plugin',
   autoStart: true,
-  activate: async (app: JupyterFrontEnd) => {
-    const { HeavyWidget } = await import('./widget');
-    app.shell.add(new HeavyWidget(), 'main');
+  activate: (app: JupyterFrontEnd) => {
+    app.commands.addCommand('my-extension:open', {
+      label: 'Open Heavy Widget',
+      execute: async () => {
+        const { HeavyWidget } = await import('./widget');
+        app.shell.add(new HeavyWidget(), 'main');
+      }
+    });
   }
 };
 ```
 
-When `activate` cannot become `async`, defer inside the command or factory which needs the module:
+`activate` itself stays synchronous. A plugin without `autoStart` is activated when something requires it, so there `activate` may become `async` and import at the top of its body. Whatever waits for that plugin then waits for the request as well, so the callback form above is still the better one where it fits.
 
 ```ts
-activate: (app: JupyterFrontEnd) => {
-  app.commands.addCommand(CommandIDs.open, {
-    execute: async () => {
-      const { HeavyWidget } = await import('./widget');
-      app.shell.add(new HeavyWidget(), 'main');
+const plugin: JupyterFrontEndPlugin<void> = {
+  id: 'my-extension:plugin',
+  activate: async app => {
+    const { NotebookShell } = await import('@jupyter-notebook/application');
+    if (app.shell instanceof NotebookShell) {
+      // ...
     }
-  });
+  }
 };
 ```
 
@@ -83,7 +94,7 @@ import type { HeavyWidget } from './widget';
 
 The rule only looks at plugin modules, meaning files which define a JupyterLab plugin. [Which files count](#which-files-count) lists the forms it recognises. [`reportInteractionCallbacks`](#reportinteractioncallbacks) extends it to the remaining modules, with a stricter trigger.
 
-In such a file, an import is reported when every runtime use of its bindings sits inside a function body, a method, or an instance field initializer. Turning it into `await import()` is then a mechanical change. An import which is needed while the module is evaluated is left alone, because the imported module is fetched at startup regardless of how the other bindings are written.
+In such a file, an import is reported when every runtime use of its bindings sits inside a function body, a method, or an instance field initializer. Turning it into `await import()` is then a mechanical change, except when one of those uses runs during `activate()` of an autostart plugin; [Autostart plugins](#autostart-plugins) describes that report. An import which is needed while the module is evaluated is left alone, because the imported module is fetched at startup regardless of how the other bindings are written.
 
 These never produce a report:
 
@@ -97,6 +108,68 @@ These never produce a report:
 - Modules holding less code than [`minimumSize`](#minimumsize), because a separate chunk costs more than it saves.
 
 The rule has no autofix. The enclosing function usually has to become `async`, and that changes its signature, so the edit is left to the author.
+
+### Autostart plugins
+
+`Application.start` activates every plugin with `autoStart: true` and waits for all of them before it attaches the shell. A module used inside such an `activate()` is fetched before the application starts however it is imported, and an `await import()` in there makes the start wait for one more request, and for whatever `await` follows it.
+
+The rule therefore reports such an import with a message of its own, without the `await import()` snippet, when one of its bindings is used during activation:
+
+- in `activate()` itself, or in a callback it runs at once
+- in a helper which `activate()` calls, at any depth
+
+The usual report stays for a binding used in a command or an `app.restored` callback, and for `activate()` of a plugin without `autoStart: true`.
+
+The [correct example](#correct) awaits the import inside `execute`. Moving that `await` to the top of `activate()` silences the rule as well, and makes things worse: the whole application now waits for the widget's chunk before the shell is attached.
+
+```ts
+import {
+  JupyterFrontEnd,
+  JupyterFrontEndPlugin
+} from '@jupyterlab/application';
+
+const plugin: JupyterFrontEndPlugin<void> = {
+  id: 'my-extension:plugin',
+  autoStart: true,
+  activate: async (app: JupyterFrontEnd) => {
+    // Incorrect: takes more time than synchrounous import due to an extra request,
+    // and still blocks shell restoration as this is an auto-start plugin.
+    const { HeavyWidget } = await import('./widget');
+    app.commands.addCommand('my-extension:open', {
+      label: 'Open Heavy Widget',
+      execute: () => {
+        app.shell.add(new HeavyWidget(), 'main');
+      }
+    });
+  }
+};
+```
+
+For optimal UX keep `activate()` synchronous and load the module in the callback which first needs it. The command exists from the start, and the widget is fetched on first use.
+
+```ts
+import {
+  JupyterFrontEnd,
+  JupyterFrontEndPlugin
+} from '@jupyterlab/application';
+
+const plugin: JupyterFrontEndPlugin<void> = {
+  id: 'my-extension:plugin',
+  autoStart: true,
+  activate: (app: JupyterFrontEnd) => {
+    app.commands.addCommand('my-extension:open', {
+      label: 'Open Heavy Widget',
+      execute: async () => {
+        // Correct: fetched only when needed, app shell shows up sooner.
+        const { HeavyWidget } = await import('./widget');
+        app.shell.add(new HeavyWidget(), 'main');
+      }
+    });
+  }
+};
+```
+
+When activation needs the module at once, keep the static import and ignore the report with an `eslint-disable-next-line jupyter/prefer-lazy-imports` comment or through [`ignoreImports`](#ignoreimports).
 
 ### Which files count
 
@@ -331,6 +404,8 @@ This is the main source of unhelpful reports, and it grows with how much a packa
 Counting the other importers does not answer that. Some of them are tests, which are never bundled at all. Others sit in the same subtree, and move into the lazy chunk along with the module.
 
 So defer at the edge of a subsystem rather than one module at a time. When the same source is reported from several plugin files which all load at startup, defer it in all of them or in none.
+
+Whether a plugin is autostart is read from its own `autoStart` entry. A plugin without one is activated when another plugin requires it, and when that other plugin is autostart the activation is awaited at start as well. The rule cannot tell from one file, so such a plugin gets the usual report.
 
 Sizes are an estimate. The rule counts compiled bytes, which is not the same as bundled and minified bytes. It also stops at package boundaries, so a small module which pulls in a large dependency is measured as small.
 

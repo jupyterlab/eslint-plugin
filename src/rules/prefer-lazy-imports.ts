@@ -19,7 +19,7 @@ import {
   buildDeferredImportSnippet,
   DEFAULT_ALLOWED_PACKAGES,
   DEFAULT_MINIMUM_SIZE,
-  isEagerlyReached,
+  getReach,
   isInInteractionCallback,
   isInPluginTokenList,
   LazyImportOptions,
@@ -56,6 +56,10 @@ const jupyterPreferLazyImports = createRule<[LazyImportOptions], string>({
       eagerModuleLevelUse:
         "'{{ source }}' is used at module level in a plugin module, so it loads before the application starts. " +
         "Move the usage into a function and import it there with `await import('{{ source }}')`.",
+      usedInAutostartActivate:
+        "'{{ source }}' is imported at the top of a plugin module and used in `activate()` of an autostart plugin, so it loads before the application starts either way. " +
+        'Do not `await import(...)` inside `activate()`: that delays the whole application start. ' +
+        "Register the extension point synchronously and load '{{ source }}' in the callback that first needs it, or ignore this import if activation needs it at once.",
       preferLazyImportInteraction:
         "'{{ source }}' is only used inside user-interaction handlers, so it is not needed until the user acts. " +
         'Import it where it is used instead: `{{ snippet }}`'
@@ -272,17 +276,40 @@ const jupyterPreferLazyImports = createRule<[LazyImportOptions], string>({
 
       let deferrable = 0;
       let eager = 0;
+      let activation = 0;
       let tokenList = 0;
       for (const { identifier } of references) {
         if (isInPluginTokenList(identifier)) {
           // A token in `requires`, `optional` or `provides` is read when the
           // plugin is registered, so it can never be deferred.
           tokenList += 1;
-        } else if (isEagerlyReached(identifier, context.sourceCode)) {
-          eager += 1;
-        } else {
-          deferrable += 1;
+          continue;
         }
+        switch (getReach(identifier, context.sourceCode)) {
+          case 'module':
+            eager += 1;
+            break;
+          case 'activation':
+            activation += 1;
+            break;
+          default:
+            deferrable += 1;
+        }
+      }
+
+      if (tokenList === 0 && eager === 0 && activation > 0) {
+        // `Application.start` waits for every autostart plugin before it
+        // attaches the shell, so the module is fetched before the application
+        // starts whatever this file does, and an `await import()` inside
+        // `activate` would hold the start back by one more request. The usual
+        // snippet is therefore the wrong advice here, even when other uses
+        // sit in callbacks which could defer it.
+        context.report({
+          node: declarations[0],
+          messageId: 'usedInAutostartActivate',
+          data: { source }
+        });
+        return;
       }
 
       if (tokenList === 0 && eager === 0 && deferrable > 0) {
