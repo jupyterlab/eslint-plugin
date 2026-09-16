@@ -259,7 +259,7 @@ const pluginIdConvention = createRule({
      */
     function resolvePluginId(node: TSESTree.ObjectExpression): string | null {
       const literalId = getPluginId(node);
-      if (literalId) {
+      if (literalId !== null) {
         return literalId;
       }
 
@@ -274,17 +274,17 @@ const pluginIdConvention = createRule({
      * Reports plugin IDs that do not use the owning extension package prefix.
      */
     function reportIfNeeded(node: TSESTree.ObjectExpression): void {
-      if (!looksLikePluginObject(node) && !hasPluginType(node)) {
+      const pluginId = resolvePluginId(node);
+      if (pluginId === null) {
+        return;
+      }
+
+      if (!looksLikePluginObject(node, pluginId) && !hasPluginType(node)) {
         return;
       }
 
       const packageName = getExtensionPackageName(context.filename);
-      if (!packageName) {
-        return;
-      }
-
-      const pluginId = resolvePluginId(node);
-      if (!pluginId || pluginId.startsWith(`${packageName}:`)) {
+      if (!packageName || pluginId.startsWith(`${packageName}:`)) {
         return;
       }
 

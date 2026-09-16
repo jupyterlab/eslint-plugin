@@ -340,19 +340,16 @@ export function isCallableProperty(
  * Returns true when an object literal has the shape of a JupyterLab plugin:
  * a string `id`, an `activate` function, and at least one of the properties
  * which only plugins carry. Used for plugin objects written without a type
- * annotation.
+ * annotation. The plugin ID can be supplied by callers that resolve it from a
+ * local const instead of a literal.
  */
 export function looksLikePluginObject(
-  node: TSESTree.ObjectExpression
+  node: TSESTree.ObjectExpression,
+  pluginId: string | null = getPluginId(node)
 ): boolean {
   const properties = getObjectProperties(node);
 
-  const id = properties.get('id');
-  if (
-    !id ||
-    id.value.type !== 'Literal' ||
-    typeof id.value.value !== 'string'
-  ) {
+  if (pluginId === null || !properties.has('id')) {
     return false;
   }
 
