@@ -639,7 +639,8 @@ ruleTester.run('prefer-lazy-imports', preferLazyImports, {
         }
       ]
     },
-    // `@lumino/datagrid` is denied even though `@lumino/*` is allowed.
+    // `@lumino/datagrid` is denied even though `@lumino/*` is allowed. The
+    // deferred list is emptied so that the denial alone is under test.
     {
       code: `
         import { JupyterFrontEndPlugin } from '@jupyterlab/application';
@@ -650,6 +651,7 @@ ruleTester.run('prefer-lazy-imports', preferLazyImports, {
           activate: () => new DataGrid()
         };
       `,
+      options: [{ deferredPackages: [] }],
       errors: [{ messageId: 'preferLazyImport' }]
     },
     // A default import, reported with the matching snippet.
@@ -1429,3 +1431,331 @@ tsxTester.run('prefer-lazy-imports (tsx)', preferLazyImports, {
     }
   ]
 });
+
+ruleTester.run('prefer-lazy-imports (deferred packages)', preferLazyImports, {
+  valid: [
+    // A type-only import is erased, whichever module it sits in.
+    {
+      code: `
+        import type { DataGrid } from '@lumino/datagrid';
+        export class GridHolder {
+          grid: DataGrid | null = null;
+        }
+      `
+    },
+    // Bindings used only in type positions are erased as well.
+    {
+      code: `
+        import { DataModel } from '@lumino/datagrid';
+        export interface IInspectable {
+          model: DataModel;
+        }
+      `
+    },
+    // `typeof` is a type position too.
+    {
+      code: `
+        import { DataGrid } from '@lumino/datagrid';
+        export type GridClass = typeof DataGrid;
+      `
+    },
+    // An unused import is erased.
+    {
+      code: `
+        import { DataGrid } from '@lumino/datagrid';
+        export const ready = true;
+      `
+    },
+    // A type-only re-export is erased, in either spelling.
+    {
+      code: `export type { DataGrid } from '@lumino/datagrid';`
+    },
+    {
+      code: `export { type DataGrid } from '@lumino/datagrid';`
+    },
+    // Already deferred: this is the form the list asks for.
+    {
+      code: `
+        export class GridWidget {
+          async initialize() {
+            const { DataGrid } = await import('@lumino/datagrid');
+            return new DataGrid();
+          }
+        }
+      `
+    },
+    // A package outside the list keeps the usual trigger, so a module without
+    // a plugin in it is not checked.
+    {
+      code: `
+        import { parse } from 'heavy-parser';
+        export class Renderer {
+          render(source: string) {
+            return parse(source);
+          }
+        }
+      `
+    },
+    // A stylesheet from a listed package is applied when imported, so it is
+    // handled like every other asset.
+    {
+      code: `
+        import 'react-toastify/dist/ReactToastify.css';
+        export const ready = true;
+      `
+    },
+    // An empty list switches the check off.
+    {
+      code: `
+        import { DataGrid } from '@lumino/datagrid';
+        export function createGrid() {
+          return new DataGrid();
+        }
+      `,
+      options: [{ deferredPackages: [] }]
+    },
+    // The list replaces the default one.
+    {
+      code: `
+        import { DataGrid } from '@lumino/datagrid';
+        export function createGrid() {
+          return new DataGrid();
+        }
+      `,
+      options: [{ deferredPackages: ['mermaid'] }]
+    },
+    // `ignoreImports` still skips a listed package.
+    {
+      code: `
+        import { DataGrid } from '@lumino/datagrid';
+        export function createGrid() {
+          return new DataGrid();
+        }
+      `,
+      options: [{ ignoreImports: ['@lumino/datagrid'] }]
+    },
+    // A `!` entry exempts one subpath of a listed package.
+    {
+      code: `
+        import { python } from '@codemirror/legacy-modes/mode/python';
+        export function mode() {
+          return python;
+        }
+      `,
+      options: [
+        {
+          deferredPackages: [
+            '@codemirror/legacy-modes',
+            '!@codemirror/legacy-modes/mode/python'
+          ]
+        }
+      ]
+    }
+  ],
+  invalid: [
+    // The core case: a module which no plugin trigger reaches.
+    {
+      code: `
+        import { DataGrid } from '@lumino/datagrid';
+        export class GridWidget {
+          create() {
+            return new DataGrid();
+          }
+        }
+      `,
+      errors: [
+        {
+          messageId: 'deferredPackageImport',
+          data: {
+            source: '@lumino/datagrid',
+            snippet: "const { DataGrid } = await import('@lumino/datagrid');"
+          }
+        }
+      ]
+    },
+    // A base class is needed while the module is evaluated.
+    {
+      code: `
+        import { DataModel } from '@lumino/datagrid';
+        export class CSVModel extends DataModel {}
+      `,
+      errors: [
+        {
+          messageId: 'deferredPackageEagerUse',
+          data: { source: '@lumino/datagrid' }
+        }
+      ]
+    },
+    // A side-effect import loads the package as well.
+    {
+      code: `
+        import 'mermaid';
+        export const ready = true;
+      `,
+      errors: [
+        {
+          messageId: 'deferredPackageImport',
+          data: { source: 'mermaid', snippet: "await import('mermaid');" }
+        }
+      ]
+    },
+    // A value re-export keeps the package in the startup bundle.
+    {
+      code: `export { DataGrid } from '@lumino/datagrid';`,
+      errors: [
+        {
+          messageId: 'deferredPackageReExport',
+          data: { source: '@lumino/datagrid' }
+        }
+      ]
+    },
+    {
+      code: `export * from 'mermaid';`,
+      errors: [{ messageId: 'deferredPackageReExport' }]
+    },
+    // A subpath import matches through its owning package.
+    {
+      code: `
+        import { python } from '@codemirror/legacy-modes/mode/python';
+        export function mode() {
+          return python;
+        }
+      `,
+      errors: [{ messageId: 'deferredPackageImport' }]
+    },
+    // A wildcard entry covers every language package.
+    {
+      code: `
+        import { python } from '@codemirror/lang-python';
+        export function extensions() {
+          return [python()];
+        }
+      `,
+      errors: [{ messageId: 'deferredPackageImport' }]
+    },
+    // One source imported twice is reported once, and a declaration which
+    // TypeScript erases stays out of the snippet.
+    {
+      code: `
+        import { DataGrid } from '@lumino/datagrid';
+        import { DataModel } from '@lumino/datagrid';
+        export function createGrid(model: DataModel) {
+          return new DataGrid({ dataModel: model });
+        }
+      `,
+      errors: [
+        {
+          messageId: 'deferredPackageImport',
+          line: 2,
+          data: {
+            source: '@lumino/datagrid',
+            snippet: "const { DataGrid } = await import('@lumino/datagrid');"
+          }
+        }
+      ]
+    },
+    // In a plugin module the list takes over from the usage check, so the
+    // import is reported once, with the deferred message.
+    {
+      code: `
+        import { JupyterFrontEndPlugin } from '@jupyterlab/application';
+        import { DataGrid } from '@lumino/datagrid';
+        const plugin: JupyterFrontEndPlugin<void> = {
+          id: 'test:plugin',
+          autoStart: true,
+          activate: () => new DataGrid()
+        };
+      `,
+      errors: [{ messageId: 'deferredPackageImport' }]
+    },
+    // Module level use in a plugin module is reported without the strict
+    // option, and once with it.
+    {
+      code: `
+        import { JupyterFrontEndPlugin } from '@jupyterlab/application';
+        import { DataGrid } from '@lumino/datagrid';
+        const grid = new DataGrid();
+        const plugin: JupyterFrontEndPlugin<void> = {
+          id: 'test:plugin',
+          autoStart: true,
+          activate: () => grid
+        };
+      `,
+      errors: [{ messageId: 'deferredPackageEagerUse' }]
+    },
+    {
+      code: `
+        import { JupyterFrontEndPlugin } from '@jupyterlab/application';
+        import { DataGrid } from '@lumino/datagrid';
+        const grid = new DataGrid();
+        const plugin: JupyterFrontEndPlugin<void> = {
+          id: 'test:plugin',
+          autoStart: true,
+          activate: () => grid
+        };
+      `,
+      options: [{ reportModuleLevelUsage: true }],
+      errors: [{ messageId: 'deferredPackageEagerUse' }]
+    },
+    // A token from a listed package is read when the plugin is registered.
+    {
+      code: `
+        import { JupyterFrontEndPlugin } from '@jupyterlab/application';
+        import { IGrid } from 'heavy-grid';
+        const plugin: JupyterFrontEndPlugin<void> = {
+          id: 'test:plugin',
+          requires: [IGrid],
+          activate: (app, grid) => grid
+        };
+      `,
+      options: [{ deferredPackages: ['heavy-grid'] }],
+      errors: [{ messageId: 'deferredPackageEagerUse' }]
+    },
+    // The list wins over `allowedPackages`.
+    {
+      code: `
+        import { DataGrid } from '@lumino/datagrid';
+        export function createGrid() {
+          return new DataGrid();
+        }
+      `,
+      options: [{ allowedPackages: ['@lumino/*'] }],
+      errors: [{ messageId: 'deferredPackageImport' }]
+    },
+    // The list wins over the manifest, which marks this package as provided
+    // by the application.
+    {
+      filename: sharedPkgFilename,
+      code: `
+        import { JupyterFrontEndPlugin } from '@jupyterlab/application';
+        import { Shared } from '@myorg/host-provided';
+        const plugin: JupyterFrontEndPlugin<void> = {
+          id: 'test:plugin',
+          autoStart: true,
+          activate: () => new Shared()
+        };
+      `,
+      options: [{ deferredPackages: ['@myorg/host-provided'] }],
+      errors: [{ messageId: 'deferredPackageImport' }]
+    }
+  ]
+});
+
+espreeTester.run(
+  'prefer-lazy-imports (deferred packages, javascript)',
+  preferLazyImports,
+  {
+    valid: [],
+    invalid: [
+      {
+        code: `
+          import { DataGrid } from '@lumino/datagrid';
+          export function createGrid() {
+            return new DataGrid();
+          }
+        `,
+        errors: [{ messageId: 'deferredPackageImport' }]
+      }
+    ]
+  }
+);
