@@ -4,7 +4,7 @@
  */
 
 import { TSESTree } from '@typescript-eslint/types';
-import { TSESLint } from '@typescript-eslint/utils';
+import { ASTUtils, TSESLint } from '@typescript-eslint/utils';
 import { getObjectProperties, isCallableProperty } from './plugin-utils';
 
 /*
@@ -304,15 +304,105 @@ function getFunctionVariable(
 export type Reach = 'module' | 'activation' | 'deferred';
 
 /**
+ * Returns the name an object entry is stored under, or null for a computed
+ * key.
+ */
+function getPropertyName(property: TSESTree.Property): string | null {
+  if (property.computed) {
+    return null;
+  }
+  const key = property.key;
+  if (key.type === 'Identifier') {
+    return key.name;
+  }
+  if (key.type === 'Literal' && typeof key.value === 'string') {
+    return key.value;
+  }
+  return null;
+}
+
+/**
+ * Resolves a spread to the object literal it copies, when it names a variable
+ * declared in the same file with an object literal and never written again.
+ */
+function resolveSpread(
+  spread: TSESTree.SpreadElement,
+  sourceCode: TSESLint.SourceCode
+): TSESTree.ObjectExpression | null {
+  if (spread.argument.type !== 'Identifier') {
+    return null;
+  }
+  const variable = ASTUtils.findVariable(
+    sourceCode.getScope(spread),
+    spread.argument
+  );
+  if (!variable || variable.defs.length !== 1) {
+    return null;
+  }
+  const declarator = variable.defs[0].node;
+  if (
+    declarator.type !== 'VariableDeclarator' ||
+    declarator.init?.type !== 'ObjectExpression' ||
+    variable.references.some(
+      reference => reference.isWrite() && !reference.init
+    )
+  ) {
+    return null;
+  }
+  return declarator.init;
+}
+
+/**
+ * Reads the properties an object literal ends up with, in source order so that
+ * a later entry overrides an earlier one. A spread is followed when it
+ * resolves to an object literal in the same file. Any other spread leaves the
+ * result unknown, and null is returned.
+ */
+function getEffectiveProperties(
+  object: TSESTree.ObjectExpression,
+  sourceCode: TSESLint.SourceCode,
+  seen: Set<TSESTree.ObjectExpression> = new Set()
+): Map<string, TSESTree.Node> | null {
+  if (seen.has(object)) {
+    return null;
+  }
+  seen.add(object);
+  const properties = new Map<string, TSESTree.Node>();
+  for (const entry of object.properties) {
+    if (entry.type === 'SpreadElement') {
+      const source = resolveSpread(entry, sourceCode);
+      const spread = source && getEffectiveProperties(source, sourceCode, seen);
+      if (!spread) {
+        return null;
+      }
+      for (const [name, value] of spread) {
+        properties.set(name, value);
+      }
+      continue;
+    }
+    const name = getPropertyName(entry);
+    if (name) {
+      properties.set(name, entry.value);
+    }
+  }
+  return properties;
+}
+
+/**
  * Returns true when the node is the `activate` entry of a plugin object which
  * declares `autoStart: true`. Only the literal `true` counts: a plugin with
  * `autoStart: 'defer'` is activated after the shell is attached. The object
  * also has to carry an `id`, which every plugin has, so that an unrelated
  * object using the same two names is not taken for one. The `id` may be any
- * expression, since a plugin built in a factory computes it, and a spread may
- * supply it.
+ * expression, since a plugin built in a factory computes it. Spreads are
+ * followed to object literals in the same file, so one may supply the `id` or
+ * override `autoStart`, and an object with a spread which cannot be followed
+ * is not taken for a plugin.
  */
-function isAutostartActivateProperty(node: TSESTree.Node | undefined): boolean {
+function isAutostartActivateProperty(
+  node: TSESTree.Node | undefined,
+  sourceCode: TSESLint.SourceCode
+): boolean {
   if (!node || node.type !== 'Property' || node.computed) {
     return false;
   }
@@ -320,22 +410,16 @@ function isAutostartActivateProperty(node: TSESTree.Node | undefined): boolean {
   if (object?.type !== 'ObjectExpression') {
     return false;
   }
-  const properties = getObjectProperties(object);
-  if (properties.get('activate') !== node) {
-    return false;
-  }
+  const properties = getEffectiveProperties(object, sourceCode);
   if (
-    !properties.has('id') &&
-    !object.properties.some(property => property.type === 'SpreadElement')
+    !properties ||
+    properties.get('activate') !== node.value ||
+    !properties.has('id')
   ) {
     return false;
   }
   const autoStart = properties.get('autoStart');
-  return (
-    !!autoStart &&
-    autoStart.value.type === 'Literal' &&
-    autoStart.value.value === true
-  );
+  return autoStart?.type === 'Literal' && autoStart.value === true;
 }
 
 /**
@@ -344,12 +428,15 @@ function isAutostartActivateProperty(node: TSESTree.Node | undefined): boolean {
  * declared elsewhere in the file, as in `activate: activateFoo` or the
  * shorthand `{ activate }`.
  */
-function isAutostartActivateValue(node: TSESTree.Node): boolean {
+function isAutostartActivateValue(
+  node: TSESTree.Node,
+  sourceCode: TSESLint.SourceCode
+): boolean {
   const parent = node.parent;
   return (
     parent?.type === 'Property' &&
     parent.value === node &&
-    isAutostartActivateProperty(parent)
+    isAutostartActivateProperty(parent, sourceCode)
   );
 }
 
@@ -418,7 +505,7 @@ export function getReach(
   }
   seen.add(boundary);
 
-  if (isAutostartActivateValue(boundary)) {
+  if (isAutostartActivateValue(boundary, sourceCode)) {
     return 'activation';
   }
   const variable = getFunctionVariable(boundary, sourceCode);
@@ -431,7 +518,7 @@ export function getReach(
     const invocation = getInvocation(identifier);
     if (invocation) {
       result = getReach(invocation, sourceCode, seen);
-    } else if (isAutostartActivateValue(identifier)) {
+    } else if (isAutostartActivateValue(identifier, sourceCode)) {
       // The plugin registry calls the function when the application starts.
       result = 'activation';
     } else {

@@ -312,7 +312,7 @@ const jupyterPreferLazyImports = createRule<[LazyImportOptions], string>({
         // `activate` would hold the start back by one more request. The usual
         // snippet is therefore the wrong advice here, even when other uses
         // sit in callbacks which could defer it.
-        context.report({
+        reportUnlessTooSmall({
           node: declarations[0],
           messageId: 'usedInAutostartActivate',
           data: { source }
