@@ -306,7 +306,11 @@ export type Reach = 'module' | 'activation' | 'deferred';
 /**
  * Returns true when the node is the `activate` entry of a plugin object which
  * declares `autoStart: true`. Only the literal `true` counts: a plugin with
- * `autoStart: 'defer'` is activated after the shell is attached.
+ * `autoStart: 'defer'` is activated after the shell is attached. The object
+ * also has to carry an `id`, which every plugin has, so that an unrelated
+ * object using the same two names is not taken for one. The `id` may be any
+ * expression, since a plugin built in a factory computes it, and a spread may
+ * supply it.
  */
 function isAutostartActivateProperty(node: TSESTree.Node | undefined): boolean {
   if (!node || node.type !== 'Property' || node.computed) {
@@ -318,6 +322,12 @@ function isAutostartActivateProperty(node: TSESTree.Node | undefined): boolean {
   }
   const properties = getObjectProperties(object);
   if (properties.get('activate') !== node) {
+    return false;
+  }
+  if (
+    !properties.has('id') &&
+    !object.properties.some(property => property.type === 'SpreadElement')
+  ) {
     return false;
   }
   const autoStart = properties.get('autoStart');

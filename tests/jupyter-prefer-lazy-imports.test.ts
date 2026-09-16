@@ -1222,6 +1222,50 @@ ruleTester.run(
       `,
         errors: [{ messageId: 'usedInAutostartActivate' }]
       },
+      // A plugin built in a factory computes its `id`.
+      {
+        code: `
+        import { JupyterFrontEndPlugin } from '@jupyterlab/application';
+        import { HeavyWidget } from './widget';
+        export function createPlugin(name: string): JupyterFrontEndPlugin<void> {
+          return {
+            id: \`test:\${name}\`,
+            autoStart: true,
+            activate: app => app.shell.add(new HeavyWidget(), 'main')
+          };
+        }
+      `,
+        errors: [{ messageId: 'usedInAutostartActivate' }]
+      },
+      // A spread may carry the `id`.
+      {
+        code: `
+        import { JupyterFrontEndPlugin } from '@jupyterlab/application';
+        import { HeavyWidget } from './widget';
+        const base = { id: 'test:plugin', description: 'A test plugin.' };
+        const plugin: JupyterFrontEndPlugin<void> = {
+          ...base,
+          autoStart: true,
+          activate: app => app.shell.add(new HeavyWidget(), 'main')
+        };
+      `,
+        errors: [{ messageId: 'usedInAutostartActivate' }]
+      },
+      // An object without an `id` is not a plugin, whatever else it is named
+      // like, so its `activate` is an ordinary callback.
+      {
+        code: `
+        import { JupyterFrontEndPlugin } from '@jupyterlab/application';
+        import { HeavyWidget } from './widget';
+        const service = { autoStart: true, activate: () => new HeavyWidget() };
+        const plugin: JupyterFrontEndPlugin<void> = {
+          id: 'test:plugin',
+          autoStart: true,
+          activate: () => service
+        };
+      `,
+        errors: [{ messageId: 'preferLazyImport' }]
+      },
       // Method shorthand for `activate`.
       {
         code: `
