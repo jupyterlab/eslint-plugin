@@ -68,6 +68,9 @@ const jupyterPreferLazyImports = createRule<[LazyImportOptions], string>({
         "'{{ source }}' is in `deferredPackages`, so it must only be loaded with `await import()`, but it is used while this module is evaluated. " +
         "Move the usage into a function and import it there with `await import('{{ source }}')`. " +
         'If this module is itself only loaded with `import()`, disable the rule for this import.',
+      deferredPackageNotTypeOnly:
+        "'{{ source }}' is in `deferredPackages`, and this import has no runtime use, but it is not written as `import type`, so a build with `verbatimModuleSyntax` or plain JavaScript loads the package anyway. " +
+        'Remove the import, or make it `import type`.',
       deferredPackageReExport:
         "'{{ source }}' is in `deferredPackages`, so it must only be loaded with `await import()`, but this re-export loads it together with the module. " +
         "Remove the re-export and use `await import('{{ source }}')` where the package is needed."
@@ -354,14 +357,19 @@ const jupyterPreferLazyImports = createRule<[LazyImportOptions], string>({
      * with this module, and whether this module is part of the startup bundle
      * cannot be seen from this file. So the import is reported wherever it
      * appears, and the usage only picks the advice.
+     *
+     * Only `import type` is exempt, and that never gets here. A value import
+     * whose bindings have no runtime use, an inline `type` specifier included,
+     * is erased by TypeScript without `verbatimModuleSyntax` but kept with it
+     * (`import { type X }` becomes `import {} from '...'`), and JavaScript
+     * never erases anything, so it counts as loading the package as well.
      */
     function checkDeferredPackage(
       source: string,
       declarations: TSESTree.ImportDeclaration[]
     ): void {
-      // A side-effect import always loads the package. One with bindings only
-      // does so when a binding is used as a value, since TypeScript erases the
-      // rest.
+      // The snippet is built from the declarations with a runtime use, plus a
+      // side-effect import, which has nothing to erase.
       const loading: TSESTree.ImportDeclaration[] = [];
       const references: TSESLint.Scope.Reference[] = [];
       for (const declaration of declarations) {
@@ -372,6 +380,11 @@ const jupyterPreferLazyImports = createRule<[LazyImportOptions], string>({
         }
       }
       if (loading.length === 0) {
+        context.report({
+          node: declarations[0],
+          messageId: 'deferredPackageNotTypeOnly',
+          data: { source }
+        });
         return;
       }
 
@@ -396,14 +409,17 @@ const jupyterPreferLazyImports = createRule<[LazyImportOptions], string>({
     }
 
     /**
-     * A value re-export keeps the source in the startup bundle. For a package
-     * which must only be loaded with `import()` that is a finding in itself.
-     * For any other source it means deferring the matching import would gain
-     * nothing, so the usage check skips that source.
+     * A re-export of a package which must only be loaded with `import()` is a
+     * finding in itself, `export { type X } from` included: only `export type`
+     * is erased under `verbatimModuleSyntax`, the rest stays as
+     * `export {} from '...'` and loads the source. For any other source a
+     * value re-export keeps it in the startup bundle, so deferring the
+     * matching import would gain nothing and the usage check skips it.
      */
     function checkReExport(
       node: TSESTree.ExportNamedDeclaration | TSESTree.ExportAllDeclaration,
-      source: string
+      source: string,
+      hasValueSpecifier: boolean
     ): void {
       if (isDeferredPackage(source)) {
         context.report({
@@ -411,7 +427,7 @@ const jupyterPreferLazyImports = createRule<[LazyImportOptions], string>({
           messageId: 'deferredPackageReExport',
           data: { source }
         });
-      } else {
+      } else if (hasValueSpecifier) {
         reExportedSources.add(source);
       }
     }
@@ -460,16 +476,15 @@ const jupyterPreferLazyImports = createRule<[LazyImportOptions], string>({
         if (!node.source || node.exportKind === 'type') {
           return;
         }
-        const hasValueSpecifier = node.specifiers.some(
-          specifier => specifier.exportKind !== 'type'
+        checkReExport(
+          node,
+          node.source.value,
+          node.specifiers.some(specifier => specifier.exportKind !== 'type')
         );
-        if (hasValueSpecifier) {
-          checkReExport(node, node.source.value);
-        }
       },
       ExportAllDeclaration(node) {
         if (node.exportKind !== 'type') {
-          checkReExport(node, node.source.value);
+          checkReExport(node, node.source.value, true);
         }
       },
       'Program:exit'() {

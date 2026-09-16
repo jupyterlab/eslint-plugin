@@ -1443,35 +1443,9 @@ ruleTester.run('prefer-lazy-imports (deferred packages)', preferLazyImports, {
         }
       `
     },
-    // Bindings used only in type positions are erased as well.
-    {
-      code: `
-        import { DataModel } from '@lumino/datagrid';
-        export interface IInspectable {
-          model: DataModel;
-        }
-      `
-    },
-    // `typeof` is a type position too.
-    {
-      code: `
-        import { DataGrid } from '@lumino/datagrid';
-        export type GridClass = typeof DataGrid;
-      `
-    },
-    // An unused import is erased.
-    {
-      code: `
-        import { DataGrid } from '@lumino/datagrid';
-        export const ready = true;
-      `
-    },
-    // A type-only re-export is erased, in either spelling.
+    // A type-only re-export is erased.
     {
       code: `export type { DataGrid } from '@lumino/datagrid';`
-    },
-    {
-      code: `export { type DataGrid } from '@lumino/datagrid';`
     },
     // Already deferred: this is the form the list asks for.
     {
@@ -1611,6 +1585,53 @@ ruleTester.run('prefer-lazy-imports (deferred packages)', preferLazyImports, {
     },
     {
       code: `export * from 'mermaid';`,
+      errors: [{ messageId: 'deferredPackageReExport' }]
+    },
+    // A value import with no runtime use is erased only without
+    // `verbatimModuleSyntax`, which JupyterLab enables, so it is reported with
+    // advice to write `import type`. Used only as a type:
+    {
+      code: `
+        import { DataModel } from '@lumino/datagrid';
+        export interface IInspectable {
+          model: DataModel;
+        }
+      `,
+      errors: [
+        {
+          messageId: 'deferredPackageNotTypeOnly',
+          data: { source: '@lumino/datagrid' }
+        }
+      ]
+    },
+    // Used only inside `typeof`:
+    {
+      code: `
+        import { DataGrid } from '@lumino/datagrid';
+        export type GridClass = typeof DataGrid;
+      `,
+      errors: [{ messageId: 'deferredPackageNotTypeOnly' }]
+    },
+    // Not used at all:
+    {
+      code: `
+        import { DataGrid } from '@lumino/datagrid';
+        export const ready = true;
+      `,
+      errors: [{ messageId: 'deferredPackageNotTypeOnly' }]
+    },
+    // An inline `type` specifier leaves `import {} from '...'` behind under
+    // `verbatimModuleSyntax`, which still loads the package.
+    {
+      code: `
+        import { type DataGrid } from '@lumino/datagrid';
+        export const ready = true;
+      `,
+      errors: [{ messageId: 'deferredPackageNotTypeOnly' }]
+    },
+    // The same holds for a re-export with inline `type` specifiers.
+    {
+      code: `export { type DataGrid } from '@lumino/datagrid';`,
       errors: [{ messageId: 'deferredPackageReExport' }]
     },
     // A subpath import matches through its owning package.
@@ -1755,6 +1776,14 @@ espreeTester.run(
           }
         `,
         errors: [{ messageId: 'deferredPackageImport' }]
+      },
+      // Nothing is erased in JavaScript, so an unused import loads the package.
+      {
+        code: `
+          import { DataGrid } from '@lumino/datagrid';
+          export const ready = true;
+        `,
+        errors: [{ messageId: 'deferredPackageNotTypeOnly' }]
       }
     ]
   }

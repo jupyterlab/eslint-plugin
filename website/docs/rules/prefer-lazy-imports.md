@@ -164,11 +164,13 @@ JupyterLab loads some packages only when they are first needed. `@lumino/datagri
 
 [`deferredPackages`](#deferredpackages) lists those packages. An import of a listed package is reported in every module, not only in plugin modules, and however its bindings are used. The list wins over [`allowedPackages`](#allowedpackages) and over the manifest. Only these stay silent:
 
-- `import type`, type-only specifiers, and bindings used only in type positions, which TypeScript erases.
+- `import type` and `export type` declarations, which TypeScript erases whatever its configuration.
 - Assets from the package, such as `react-toastify/dist/ReactToastify.css`, handled as described under [Assets](#assets).
 - Specifiers listed in [`ignoreImports`](#ignoreimports).
 
-A side-effect import such as `import 'mermaid'` and a value re-export such as `export { DataGrid } from '@lumino/datagrid'` are reported as well. Both load the package as soon as the module is evaluated.
+A side-effect import such as `import 'mermaid'` and a re-export such as `export { DataGrid } from '@lumino/datagrid'` are reported as well. Both load the package as soon as the module is evaluated.
+
+A value import whose bindings have no runtime use is reported too, with advice to write it as `import type`. TypeScript erases such an import only without `verbatimModuleSyntax`, which JupyterLab itself enables. With that option, `import { DataModel } from '@lumino/datagrid'` used only in a type position stays in the output, and `import { type DataModel }` becomes `import {} from '@lumino/datagrid'`, which still loads the package. A JavaScript build never erases an import at all.
 
 ```ts
 // grid.ts, a module without a plugin in it
