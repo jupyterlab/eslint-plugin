@@ -5,9 +5,12 @@ Ensure JupyterLab plugin IDs are prefixed with the extension package name.
 ## Why
 
 JupyterLab treats the part of a plugin ID before the first `:` as the extension
-name. If a package ships plugins under a different prefix, extension-level
-commands such as `jupyter labextension disable package-name` cannot reliably
-apply to every plugin in that package.
+name when it disables, defers or locks all plugins of an extension. A plugin
+shipped under a different prefix is skipped by deferring and locking, and by
+`jupyter labextension disable package-name` up to JupyterLab 4.6. From
+JupyterLab 4.7, disabling by package name disables every plugin the package
+provides, and the browser console warns about each plugin whose ID does not
+follow the convention.
 
 ## Rule details
 
@@ -32,8 +35,8 @@ For example, in a package with this manifest:
 
 ## Incorrect
 
-The plugin ID uses a different package prefix, so disabling
-`@jupyterlab/example-extension` would not target this plugin by convention.
+The plugin ID uses a different package prefix, so extension-level
+configuration for `@jupyterlab/example-extension` does not apply to this plugin.
 
 ```ts
 const plugin: JupyterFrontEndPlugin<void> = {
@@ -43,8 +46,7 @@ const plugin: JupyterFrontEndPlugin<void> = {
 };
 ```
 
-A MIME renderer entry under a different prefix is not disabled with the
-package either.
+A MIME renderer entry under a different prefix is skipped the same way.
 
 ```ts
 const extension: IRenderMime.IExtension = {

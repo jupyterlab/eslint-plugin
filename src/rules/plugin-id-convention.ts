@@ -176,7 +176,7 @@ const pluginIdConvention = createRule({
     },
     messages: {
       mismatchedPrefix:
-        'JupyterLab plugin ID "{{ pluginId }}" should start with "{{ packageName }}:" so extension-level enable/disable applies to it.'
+        'JupyterLab plugin ID "{{ pluginId }}" should start with "{{ packageName }}:" so extension-level configuration (disable, defer, lock) applies to it.'
     },
     schema: []
   },
