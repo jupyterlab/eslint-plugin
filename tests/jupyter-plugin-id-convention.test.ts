@@ -25,6 +25,15 @@ const corePackageFilename = path.join(
   'index.ts'
 );
 
+const nestedCorePackageFilename = path.join(
+  __dirname,
+  'fixtures',
+  'extension-pkg',
+  'core-nested',
+  'src',
+  'index.ts'
+);
+
 const disabledExtensionFilename = path.join(
   __dirname,
   'fixtures',
@@ -118,6 +127,16 @@ ruleTester.run('plugin-id-convention', pluginIdConvention, {
       code: `
         const plugin: JupyterFrontEndPlugin<void> = {
           id: '@jupyterlab/example-extension:plugin',
+          autoStart: true,
+          activate: () => {}
+        };
+      `
+    },
+    {
+      filename: nestedCorePackageFilename,
+      code: `
+        const plugin: JupyterFrontEndPlugin<void> = {
+          id: '@jupyterlab/core-nested:plugin',
           autoStart: true,
           activate: () => {}
         };
@@ -239,6 +258,18 @@ ruleTester.run('plugin-id-convention', pluginIdConvention, {
           autoStart: true,
           activate: () => {}
         };
+      `,
+      errors: [{ messageId: 'mismatchedPrefix' }]
+    },
+    {
+      filename: fixtureFilename,
+      code: `
+        function make(): JupyterFrontEndPlugin<void> {
+          return {
+            id: '@jupyterlab/other-extension:factory',
+            activate: () => {}
+          };
+        }
       `,
       errors: [{ messageId: 'mismatchedPrefix' }]
     }

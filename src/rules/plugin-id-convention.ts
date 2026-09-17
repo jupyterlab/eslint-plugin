@@ -29,8 +29,47 @@ interface ExtensionPackageInfo {
   name: string;
 }
 
-const extensionPackageCache = new Map<string, ExtensionPackageInfo | null>();
+interface PackageManifestInfo {
+  mtimeMs: number;
+  name: string | null;
+  isExtension: boolean;
+}
+
+const packageManifestCache = new Map<string, PackageManifestInfo>();
 const packagePathCache = new Map<string, string | null>();
+
+/**
+ * Reads manifest metadata used to detect package boundaries.
+ */
+function readPackageManifest(packagePath: string): PackageManifestInfo | null {
+  const packageJson = readPackageJson(packagePath);
+  if (!packageJson) {
+    return null;
+  }
+
+  const cached = packageManifestCache.get(packagePath);
+  if (cached?.mtimeMs === packageJson.mtimeMs) {
+    return cached;
+  }
+
+  const data = packageJson.data;
+  const jupyterlab = data.jupyterlab;
+  const name = typeof data.name === 'string' ? data.name : null;
+  const isExtension =
+    name !== null &&
+    !!jupyterlab &&
+    typeof jupyterlab === 'object' &&
+    (('extension' in jupyterlab && Boolean(jupyterlab.extension)) ||
+      ('mimeExtension' in jupyterlab && Boolean(jupyterlab.mimeExtension)));
+
+  const info: PackageManifestInfo = {
+    mtimeMs: packageJson.mtimeMs,
+    name,
+    isExtension
+  };
+  packageManifestCache.set(packagePath, info);
+  return info;
+}
 
 /**
  * Reads the package name from a manifest that declares an extension entry.
@@ -38,35 +77,15 @@ const packagePathCache = new Map<string, string | null>();
 function readExtensionPackage(
   packagePath: string
 ): ExtensionPackageInfo | null {
-  const packageJson = readPackageJson(packagePath);
-  if (!packageJson) {
-    return null;
-  }
-
-  const cached = extensionPackageCache.get(packagePath);
-  if (cached && cached.mtimeMs === packageJson.mtimeMs) {
-    return cached;
-  }
-
-  const data = packageJson.data;
-  const jupyterlab = data.jupyterlab;
-
-  if (
-    typeof data.name !== 'string' ||
-    !jupyterlab ||
-    typeof jupyterlab !== 'object' ||
-    !(('extension' in jupyterlab && Boolean(jupyterlab.extension)) ||
-      ('mimeExtension' in jupyterlab && Boolean(jupyterlab.mimeExtension)))
-  ) {
-    extensionPackageCache.set(packagePath, null);
+  const manifest = readPackageManifest(packagePath);
+  if (!manifest?.isExtension || manifest.name === null) {
     return null;
   }
 
   const info: ExtensionPackageInfo = {
-    mtimeMs: packageJson.mtimeMs,
-    name: data.name
+    mtimeMs: manifest.mtimeMs,
+    name: manifest.name
   };
-  extensionPackageCache.set(packagePath, info);
   return info;
 }
 
@@ -89,7 +108,7 @@ function getExtensionPackageName(fromFile: string): string | null {
   for (let level = 0; level < MAX_PACKAGE_LEVELS; level++) {
     visited.push(directory);
     const packagePath = path.join(directory, 'package.json');
-    if (readExtensionPackage(packagePath)) {
+    if (fs.existsSync(packagePath)) {
       found = packagePath;
       break;
     }
@@ -206,7 +225,14 @@ const pluginIdConvention = createRule({
         parent.type === 'TSAsExpression' ||
         parent.type === 'TSSatisfiesExpression'
       ) {
-        return mentionsPluginType(parent.typeAnnotation);
+        return (
+          mentionsPluginType(parent.typeAnnotation) ||
+          isReturnedFromPluginFactory(node)
+        );
+      }
+
+      if (isReturnedFromPluginFactory(node)) {
+        return true;
       }
 
       if (parent.type !== 'ArrayExpression') {
@@ -229,10 +255,71 @@ const pluginIdConvention = createRule({
         grandparent.type === 'TSAsExpression' ||
         grandparent.type === 'TSSatisfiesExpression'
       ) {
-        return mentionsPluginType(grandparent.typeAnnotation);
+        return (
+          mentionsPluginType(grandparent.typeAnnotation) ||
+          isReturnedFromPluginFactory(parent)
+        );
+      }
+
+      return isReturnedFromPluginFactory(parent);
+    }
+
+    /**
+     * Checks whether an object or array literal is returned by a factory whose
+     * return type is a plugin descriptor.
+     */
+    function isReturnedFromPluginFactory(node: TSESTree.Expression): boolean {
+      let expression: TSESTree.Node = node;
+      let parent = expression.parent;
+
+      while (
+        parent?.type === 'TSAsExpression' ||
+        parent?.type === 'TSSatisfiesExpression'
+      ) {
+        expression = parent;
+        parent = parent.parent;
+      }
+
+      if (
+        parent?.type === 'ReturnStatement' &&
+        parent.argument === expression
+      ) {
+        const fn = getEnclosingFunction(parent);
+        return mentionsPluginType(fn?.returnType?.typeAnnotation);
+      }
+
+      if (
+        parent?.type === 'ArrowFunctionExpression' &&
+        parent.body === expression
+      ) {
+        return mentionsPluginType(parent.returnType?.typeAnnotation);
       }
 
       return false;
+    }
+
+    /**
+     * Finds the function that owns a return statement.
+     */
+    function getEnclosingFunction(
+      node: TSESTree.Node
+    ):
+      | TSESTree.FunctionDeclaration
+      | TSESTree.FunctionExpression
+      | TSESTree.ArrowFunctionExpression
+      | null {
+      let current = node.parent;
+      while (current) {
+        if (
+          current.type === 'FunctionDeclaration' ||
+          current.type === 'FunctionExpression' ||
+          current.type === 'ArrowFunctionExpression'
+        ) {
+          return current;
+        }
+        current = current.parent;
+      }
+      return null;
     }
 
     /**

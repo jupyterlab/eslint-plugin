@@ -10,7 +10,15 @@ export interface PackageJsonFile {
   data: Record<string, unknown>;
 }
 
-const packageJsonCache = new Map<string, PackageJsonFile | null>();
+interface FailedPackageJsonFile {
+  mtimeMs: number;
+  data: null;
+}
+
+const packageJsonCache = new Map<
+  string,
+  PackageJsonFile | FailedPackageJsonFile
+>();
 
 /**
  * Reads and caches a package.json file until its mtime changes.
@@ -24,20 +32,20 @@ export function readPackageJson(packagePath: string): PackageJsonFile | null {
   }
 
   const cached = packageJsonCache.get(packagePath);
-  if (cached && cached.mtimeMs === mtimeMs) {
-    return cached;
+  if (cached?.mtimeMs === mtimeMs) {
+    return cached.data === null ? null : cached;
   }
 
   let parsed: unknown;
   try {
     parsed = JSON.parse(fs.readFileSync(packagePath, 'utf8'));
   } catch {
-    packageJsonCache.set(packagePath, null);
+    packageJsonCache.set(packagePath, { mtimeMs, data: null });
     return null;
   }
 
   if (!parsed || typeof parsed !== 'object' || Array.isArray(parsed)) {
-    packageJsonCache.set(packagePath, null);
+    packageJsonCache.set(packagePath, { mtimeMs, data: null });
     return null;
   }
 
