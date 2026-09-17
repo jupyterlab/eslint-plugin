@@ -143,10 +143,11 @@ const plugin: JupyterFrontEndPlugin<void> = {
 ### Technical details
 
 The ID can be a string literal or assembled from constant strings:
+
 - a template literal, a `+` concatenation, a `const` that copies another,
-or a member of a `const` object;
-- with type information additionally: a `const` imported from another module, a namespace
-member and an enum member count.
+  or a member of a `const` object;
+- with type information, anything whose type is a string literal type: a
+  `const` imported from another module, a namespace member or an enum member.
 
 An ID the rule cannot resolve to a string, such as one built
 from a reassigned variable or a function call, is not checked.
