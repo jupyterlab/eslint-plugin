@@ -7,9 +7,9 @@ import * as fs from 'fs';
 import * as path from 'path';
 import { TSESTree } from '@typescript-eslint/types';
 import {
+  ASTUtils,
   ESLintUtils,
-  ParserServices,
-  TSESLint
+  ParserServices
 } from '@typescript-eslint/utils';
 import * as ts from 'typescript';
 import { createRule } from '../utils/create-rule';
@@ -128,26 +128,6 @@ function getExtensionPackageName(fromFile: string): string | null {
     packagePathCache.set(seen, found);
   }
   return found === null ? null : (readExtensionPackage(found)?.name ?? null);
-}
-
-/**
- * Looks up a variable in the current scope and its parents.
- */
-function findVariable(
-  scope: TSESLint.Scope.Scope | null,
-  name: string
-): TSESLint.Scope.Variable | null {
-  let current: TSESLint.Scope.Scope | null = scope;
-  while (current) {
-    const variable = current.variables.find(
-      candidate => candidate.name === name
-    );
-    if (variable) {
-      return variable;
-    }
-    current = current.upper;
-  }
-  return null;
 }
 
 /**
@@ -336,9 +316,9 @@ const pluginIdConvention = createRule({
     function resolveStringIdentifier(
       identifier: TSESTree.Identifier
     ): string | null {
-      const variable = findVariable(
+      const variable = ASTUtils.findVariable(
         context.sourceCode.getScope(identifier),
-        identifier.name
+        identifier
       );
       const definition = variable?.defs[0]?.node;
       if (!definition || !isConstStringDefinition(definition)) {
