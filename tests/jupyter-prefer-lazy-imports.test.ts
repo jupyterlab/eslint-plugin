@@ -91,11 +91,23 @@ espreeTester.run('prefer-lazy-imports (javascript)', preferLazyImports, {
         import { HeavyTable } from './lazy-large';
         export default {
           id: 'test:plugin',
-          autoStart: true,
+          description: 'Adds a table.',
           activate: () => new HeavyTable({ rows: 2, columns: 2 })
         };
       `,
       errors: [{ messageId: 'preferLazyImport' }]
+    },
+    // The activation message needs no type information either.
+    {
+      filename: fixtureFilename,
+      code: `
+        import { HeavyTable } from './lazy-large';
+        function activate(app) {
+          app.shell.add(new HeavyTable({ rows: 2, columns: 2 }), 'main');
+        }
+        export default { id: 'test:plugin', autoStart: true, activate };
+      `,
+      errors: [{ messageId: 'usedInAutostartActivate' }]
     }
   ]
 });
@@ -112,7 +124,6 @@ typeAwareTester.run('prefer-lazy-imports (type-aware)', preferLazyImports, {
         import { HeavyWidget } from 'heavy-pkg';
         const plugin: JFEP<void> = {
           id: 'test:plugin',
-          autoStart: true,
           activate: () => new HeavyWidget()
         };
       `,
@@ -359,6 +370,27 @@ ruleTester.run('prefer-lazy-imports', preferLazyImports, {
         };
       `
     },
+    // A chain of helpers is followed however long it is.
+    {
+      code: `
+        import { JupyterFrontEndPlugin } from '@jupyterlab/application';
+        import { buildTable } from './table';
+        function step1() { return buildTable(); }
+        function step2() { return step1(); }
+        function step3() { return step2(); }
+        function step4() { return step3(); }
+        function step5() { return step4(); }
+        function step6() { return step5(); }
+        function step7() { return step6(); }
+        function step8() { return step7(); }
+        const table = step8();
+        const plugin: JupyterFrontEndPlugin<void> = {
+          id: 'test:plugin',
+          autoStart: true,
+          activate: () => table
+        };
+      `
+    },
     // A value re-export keeps the source in the startup bundle anyway.
     {
       code: `
@@ -590,6 +622,10 @@ ruleTester.run('prefer-lazy-imports', preferLazyImports, {
   ],
 
   invalid: [
+    // The plugins below are activated on demand. An import used straight from
+    // `activate` of an autostart plugin gets the activation message instead,
+    // which has its own block further down.
+    //
     // The core case: a relative import used only inside activate.
     {
       code: `
@@ -597,7 +633,6 @@ ruleTester.run('prefer-lazy-imports', preferLazyImports, {
         import { HeavyWidget } from './widget';
         const plugin: JupyterFrontEndPlugin<void> = {
           id: 'test:plugin',
-          autoStart: true,
           activate: (app: JupyterFrontEnd) => {
             app.shell.add(new HeavyWidget(), 'main');
           }
@@ -621,7 +656,6 @@ ruleTester.run('prefer-lazy-imports', preferLazyImports, {
         import * as vega from 'vega-embed';
         const plugin: JupyterFrontEndPlugin<void> = {
           id: 'test:plugin',
-          autoStart: true,
           activate: app => {
             app.commands.addCommand('render', {
               execute: () => vega.default('#el', {})
@@ -639,17 +673,18 @@ ruleTester.run('prefer-lazy-imports', preferLazyImports, {
         }
       ]
     },
-    // `@lumino/datagrid` is denied even though `@lumino/*` is allowed.
+    // `@lumino/datagrid` is denied even though `@lumino/*` is allowed. The
+    // deferred list is emptied so that the denial alone is under test.
     {
       code: `
         import { JupyterFrontEndPlugin } from '@jupyterlab/application';
         import { DataGrid } from '@lumino/datagrid';
         const plugin: JupyterFrontEndPlugin<void> = {
           id: 'test:plugin',
-          autoStart: true,
           activate: () => new DataGrid()
         };
       `,
+      options: [{ deferredPackages: [] }],
       errors: [{ messageId: 'preferLazyImport' }]
     },
     // A default import, reported with the matching snippet.
@@ -659,7 +694,6 @@ ruleTester.run('prefer-lazy-imports', preferLazyImports, {
         import Editor from './editor';
         const plugin: JupyterFrontEndPlugin<void> = {
           id: 'test:plugin',
-          autoStart: true,
           activate: () => new Editor()
         };
       `,
@@ -680,7 +714,6 @@ ruleTester.run('prefer-lazy-imports', preferLazyImports, {
         import { HeavyWidget as Heavy } from './widget';
         const plugin: JupyterFrontEndPlugin<void> = {
           id: 'test:plugin',
-          autoStart: true,
           activate: () => new Heavy()
         };
       `,
@@ -700,7 +733,7 @@ ruleTester.run('prefer-lazy-imports', preferLazyImports, {
         import { HeavyWidget } from './widget';
         export default {
           id: 'test:plugin',
-          autoStart: true,
+          description: 'Adds a widget.',
           activate: () => new HeavyWidget()
         };
       `,
@@ -756,7 +789,6 @@ ruleTester.run('prefer-lazy-imports', preferLazyImports, {
         }
         const plugin: JupyterFrontEndPlugin<void> = {
           id: 'test:plugin',
-          autoStart: true,
           activate: () => new Renderer()
         };
       `,
@@ -770,7 +802,6 @@ ruleTester.run('prefer-lazy-imports', preferLazyImports, {
         const value = compute();
         const plugin: JupyterFrontEndPlugin<void> = {
           id: 'test:plugin',
-          autoStart: true,
           activate: () => value
         };
       `,
@@ -812,7 +843,6 @@ ruleTester.run('prefer-lazy-imports', preferLazyImports, {
         import { Widget } from '@lumino/widgets';
         const plugin: JupyterFrontEndPlugin<void> = {
           id: 'test:plugin',
-          autoStart: true,
           activate: () => new Widget()
         };
       `,
@@ -833,7 +863,6 @@ ruleTester.run('prefer-lazy-imports', preferLazyImports, {
         export type { INotebookDiff } from './diff';
         const plugin: JupyterFrontEndPlugin<void> = {
           id: 'test:plugin',
-          autoStart: true,
           activate: () => new NotebookDiff()
         };
       `,
@@ -849,7 +878,6 @@ ruleTester.run('prefer-lazy-imports', preferLazyImports, {
         }
         const plugin: JupyterFrontEndPlugin<void> = {
           id: 'test:plugin',
-          autoStart: true,
           activate: () => makeTable()
         };
       `,
@@ -864,7 +892,6 @@ ruleTester.run('prefer-lazy-imports', preferLazyImports, {
         import { DEFAULT_CPU_LABEL } from './cpuView';
         const plugin: JupyterFrontEndPlugin<void> = {
           id: 'test:plugin',
-          autoStart: true,
           activate: () => CpuView.create(DEFAULT_CPU_LABEL)
         };
       `,
@@ -887,7 +914,6 @@ ruleTester.run('prefer-lazy-imports', preferLazyImports, {
         import { HeavyTable } from './lazy-large';
         const plugin: JupyterFrontEndPlugin<void> = {
           id: 'test:plugin',
-          autoStart: true,
           activate: () => new HeavyTable({ rows: 2, columns: 2 })
         };
       `,
@@ -902,7 +928,6 @@ ruleTester.run('prefer-lazy-imports', preferLazyImports, {
         import { createTable } from './lazy-barrel';
         const plugin: JupyterFrontEndPlugin<void> = {
           id: 'test:plugin',
-          autoStart: true,
           activate: () => createTable()
         };
       `,
@@ -916,7 +941,6 @@ ruleTester.run('prefer-lazy-imports', preferLazyImports, {
         import { CommandIDs } from './lazy-tiny';
         const plugin: JupyterFrontEndPlugin<void> = {
           id: 'test:plugin',
-          autoStart: true,
           activate: () => CommandIDs.open
         };
       `,
@@ -939,7 +963,6 @@ ruleTester.run('prefer-lazy-imports', preferLazyImports, {
         import diagram from './lazy-diagram.svg';
         const plugin: JupyterFrontEndPlugin<void> = {
           id: 'test:plugin',
-          autoStart: true,
           activate: () => diagram
         };
       `,
@@ -953,7 +976,6 @@ ruleTester.run('prefer-lazy-imports', preferLazyImports, {
         import theme from './lazy-theme.raw.css';
         const plugin: JupyterFrontEndPlugin<void> = {
           id: 'test:plugin',
-          autoStart: true,
           activate: () => theme
         };
       `,
@@ -967,7 +989,6 @@ ruleTester.run('prefer-lazy-imports', preferLazyImports, {
         type Widget = typeof HeavyWidget;
         const plugin: JupyterFrontEndPlugin<void> = {
           id: 'test:plugin',
-          autoStart: true,
           activate: () => new HeavyWidget()
         };
       `,
@@ -980,7 +1001,6 @@ ruleTester.run('prefer-lazy-imports', preferLazyImports, {
         import { HeavyThing } from 'heavy-pkg';
         const plugin: JupyterFrontEndPlugin<void> = {
           id: 'test:plugin',
-          autoStart: true,
           activate: () => {
             registry.add({ requires: [HeavyThing] });
           }
@@ -995,7 +1015,6 @@ ruleTester.run('prefer-lazy-imports', preferLazyImports, {
         import theme, * as helpers from 'heavy-pkg';
         const plugin: JupyterFrontEndPlugin<void> = {
           id: 'test:plugin',
-          autoStart: true,
           activate: () => [theme, helpers]
         };
       `,
@@ -1013,7 +1032,6 @@ ruleTester.run('prefer-lazy-imports', preferLazyImports, {
         import { Grid } from '@myorg/grid';
         const plugin: JupyterFrontEndPlugin<void> = {
           id: 'test:plugin',
-          autoStart: true,
           activate: () => new Grid()
         };
       `,
@@ -1036,7 +1054,6 @@ ruleTester.run('prefer-lazy-imports', preferLazyImports, {
         import { HeavyTable } from './lazy-large';
         const plugin: JupyterFrontEndPlugin<void> = {
           id: 'test:plugin',
-          autoStart: true,
           activate: () => new HeavyTable({ rows: 2, columns: 2 })
         };
       `,
@@ -1051,7 +1068,7 @@ ruleTester.run('prefer-lazy-imports', preferLazyImports, {
         function activate() {
           return new HeavyTable({ rows: 1, columns: 1 });
         }
-        export default { id: 'test:plugin', autoStart: true, activate };
+        export default { id: 'test:plugin', description: 'Adds a table.', activate };
       `,
       errors: [{ messageId: 'preferLazyImport' }]
     },
@@ -1063,7 +1080,6 @@ ruleTester.run('prefer-lazy-imports', preferLazyImports, {
         import { Bundled } from '@myorg/bundled-here';
         const plugin: JupyterFrontEndPlugin<void> = {
           id: 'test:plugin',
-          autoStart: true,
           activate: () => new Bundled()
         };
       `,
@@ -1077,7 +1093,6 @@ ruleTester.run('prefer-lazy-imports', preferLazyImports, {
         import { Defaulted } from '@myorg/shared-default';
         const plugin: JupyterFrontEndPlugin<void> = {
           id: 'test:plugin',
-          autoStart: true,
           activate: () => new Defaulted()
         };
       `,
@@ -1091,7 +1106,6 @@ ruleTester.run('prefer-lazy-imports', preferLazyImports, {
         import { Excluded } from '@myorg/not-shared';
         const plugin: JupyterFrontEndPlugin<void> = {
           id: 'test:plugin',
-          autoStart: true,
           activate: () => new Excluded()
         };
       `,
@@ -1106,7 +1120,6 @@ ruleTester.run('prefer-lazy-imports', preferLazyImports, {
         import { parse } from 'heavy-parser';
         const plugin: JupyterFrontEndPlugin<void> = {
           id: 'test:plugin',
-          autoStart: true,
           activate: () => parse('')
         };
       `,
@@ -1119,7 +1132,6 @@ ruleTester.run('prefer-lazy-imports', preferLazyImports, {
         import { render } from 'heavy-lib/lib/render';
         const plugin: JupyterFrontEndPlugin<void> = {
           id: 'test:plugin',
-          autoStart: true,
           activate: () => render()
         };
       `,
@@ -1127,6 +1139,480 @@ ruleTester.run('prefer-lazy-imports', preferLazyImports, {
     }
   ]
 });
+
+ruleTester.run(
+  'prefer-lazy-imports (autostart activation)',
+  preferLazyImports,
+  {
+    valid: [
+      // A token in `requires` pins the import whatever `activate` does with it.
+      {
+        code: `
+        import { JupyterFrontEndPlugin } from '@jupyterlab/application';
+        import { IMyToken } from './tokens';
+        const plugin: JupyterFrontEndPlugin<void> = {
+          id: 'test:plugin',
+          autoStart: true,
+          requires: [IMyToken],
+          activate: app => console.log(IMyToken.name)
+        };
+      `
+      },
+      // A module under the size threshold is not reported however `activate`
+      // uses it.
+      {
+        filename: fixtureFilename,
+        code: `
+        import { JupyterFrontEndPlugin } from '@jupyterlab/application';
+        import { CommandIDs } from './lazy-tiny';
+        const plugin: JupyterFrontEndPlugin<void> = {
+          id: 'test:plugin',
+          autoStart: true,
+          activate: app => app.commands.notifyCommandChanged(CommandIDs.open)
+        };
+      `
+      },
+      // A module-level use keeps the import eager, which stays silent without
+      // the strict option, whatever `activate` adds.
+      {
+        code: `
+        import { JupyterFrontEndPlugin } from '@jupyterlab/application';
+        import { HeavyWidget } from './widget';
+        const shared = new HeavyWidget();
+        const plugin: JupyterFrontEndPlugin<void> = {
+          id: 'test:plugin',
+          autoStart: true,
+          activate: app => app.shell.add(new HeavyWidget(), 'main')
+        };
+      `
+      }
+    ],
+    invalid: [
+      // The example from the issue: the only use runs inside `activate` of an
+      // autostart plugin, so the module is fetched before the application
+      // starts either way, and `await import()` in there would delay the start.
+      {
+        code: `
+        import { JupyterFrontEndPlugin } from '@jupyterlab/application';
+        import { addKernelRunningSessionManager } from './kernels';
+        const plugin: JupyterFrontEndPlugin<void> = {
+          id: 'running-extension:plugin',
+          autoStart: true,
+          activate: app => {
+            const managers = new RunningSessionManagers();
+            void addKernelRunningSessionManager(managers, app);
+            return managers;
+          }
+        };
+      `,
+        errors: [
+          {
+            messageId: 'usedInAutostartActivate',
+            data: { source: './kernels' }
+          }
+        ]
+      },
+      // A plugin detected by its shape alone.
+      {
+        code: `
+        import { HeavyWidget } from './widget';
+        export default {
+          id: 'test:plugin',
+          autoStart: true,
+          activate: () => new HeavyWidget()
+        };
+      `,
+        errors: [{ messageId: 'usedInAutostartActivate' }]
+      },
+      // A plugin built in a factory computes its `id`.
+      {
+        code: `
+        import { JupyterFrontEndPlugin } from '@jupyterlab/application';
+        import { HeavyWidget } from './widget';
+        export function createPlugin(name: string): JupyterFrontEndPlugin<void> {
+          return {
+            id: \`test:\${name}\`,
+            autoStart: true,
+            activate: app => app.shell.add(new HeavyWidget(), 'main')
+          };
+        }
+      `,
+        errors: [{ messageId: 'usedInAutostartActivate' }]
+      },
+      // A spread is not followed: the entries written in the object decide.
+      {
+        code: `
+        import { JupyterFrontEndPlugin } from '@jupyterlab/application';
+        import { HeavyWidget } from './widget';
+        const base = { id: 'test:plugin', description: 'A test plugin.' };
+        const plugin: JupyterFrontEndPlugin<void> = {
+          ...base,
+          autoStart: true,
+          activate: app => app.shell.add(new HeavyWidget(), 'main')
+        };
+      `,
+        errors: [{ messageId: 'usedInAutostartActivate' }]
+      },
+      // Method shorthand for `activate`.
+      {
+        code: `
+        import { JupyterFrontEndPlugin } from '@jupyterlab/application';
+        import { HeavyWidget } from './widget';
+        const plugin: JupyterFrontEndPlugin<void> = {
+          id: 'test:plugin',
+          autoStart: true,
+          activate(app) {
+            app.shell.add(new HeavyWidget(), 'main');
+          }
+        };
+      `,
+        errors: [{ messageId: 'usedInAutostartActivate' }]
+      },
+      // `activate` naming a function declared elsewhere in the file, in the
+      // shorthand form and in the explicit one.
+      {
+        code: `
+        import { HeavyWidget } from './widget';
+        function activate(app) {
+          app.shell.add(new HeavyWidget(), 'main');
+        }
+        export default { id: 'test:plugin', autoStart: true, activate };
+      `,
+        errors: [{ messageId: 'usedInAutostartActivate' }]
+      },
+      {
+        code: `
+        import { JupyterFrontEndPlugin } from '@jupyterlab/application';
+        import { HeavyWidget } from './widget';
+        const activatePlugin = app => {
+          app.shell.add(new HeavyWidget(), 'main');
+        };
+        const plugin: JupyterFrontEndPlugin<void> = {
+          id: 'test:plugin',
+          autoStart: true,
+          activate: activatePlugin
+        };
+      `,
+        errors: [{ messageId: 'usedInAutostartActivate' }]
+      },
+      // A helper called from `activate` runs during activation as well.
+      {
+        code: `
+        import { JupyterFrontEndPlugin } from '@jupyterlab/application';
+        import { HeavyWidget } from './widget';
+        function addWidget(app) {
+          app.shell.add(new HeavyWidget(), 'main');
+        }
+        const plugin: JupyterFrontEndPlugin<void> = {
+          id: 'test:plugin',
+          autoStart: true,
+          activate: app => {
+            addWidget(app);
+          }
+        };
+      `,
+        errors: [{ messageId: 'usedInAutostartActivate' }]
+      },
+      // The same through two helpers.
+      {
+        code: `
+        import { JupyterFrontEndPlugin } from '@jupyterlab/application';
+        import { HeavyWidget } from './widget';
+        const build = () => new HeavyWidget();
+        function addWidget(app) {
+          app.shell.add(build(), 'main');
+        }
+        const plugin: JupyterFrontEndPlugin<void> = {
+          id: 'test:plugin',
+          autoStart: true,
+          activate: app => addWidget(app)
+        };
+      `,
+        errors: [{ messageId: 'usedInAutostartActivate' }]
+      },
+      // A chain of helpers is followed however long it is.
+      {
+        code: `
+        import { JupyterFrontEndPlugin } from '@jupyterlab/application';
+        import { HeavyWidget } from './widget';
+        function step1(app) { app.shell.add(new HeavyWidget(), 'main'); }
+        function step2(app) { step1(app); }
+        function step3(app) { step2(app); }
+        function step4(app) { step3(app); }
+        function step5(app) { step4(app); }
+        function step6(app) { step5(app); }
+        function step7(app) { step6(app); }
+        function step8(app) { step7(app); }
+        const plugin: JupyterFrontEndPlugin<void> = {
+          id: 'test:plugin',
+          autoStart: true,
+          activate: app => step8(app)
+        };
+      `,
+        errors: [{ messageId: 'usedInAutostartActivate' }]
+      },
+      // A helper declared inside `activate` and called there.
+      {
+        code: `
+        import { JupyterFrontEndPlugin } from '@jupyterlab/application';
+        import { HeavyWidget } from './widget';
+        const plugin: JupyterFrontEndPlugin<void> = {
+          id: 'test:plugin',
+          autoStart: true,
+          activate: app => {
+            function addWidget() {
+              app.shell.add(new HeavyWidget(), 'main');
+            }
+            addWidget();
+          }
+        };
+      `,
+        errors: [{ messageId: 'usedInAutostartActivate' }]
+      },
+      // A callback which runs at once inside `activate`.
+      {
+        code: `
+        import { JupyterFrontEndPlugin } from '@jupyterlab/application';
+        import { HeavyWidget } from './widget';
+        const plugin: JupyterFrontEndPlugin<void> = {
+          id: 'test:plugin',
+          autoStart: true,
+          activate: app => {
+            ['left', 'right'].forEach(area => {
+              app.shell.add(new HeavyWidget(), area);
+            });
+          }
+        };
+      `,
+        errors: [{ messageId: 'usedInAutostartActivate' }]
+      },
+      // A helper passed by name to a method which calls it straight away.
+      {
+        code: `
+        import { JupyterFrontEndPlugin } from '@jupyterlab/application';
+        import { HeavyWidget } from './widget';
+        const build = (area: string) => new HeavyWidget(area);
+        const plugin: JupyterFrontEndPlugin<void> = {
+          id: 'test:plugin',
+          autoStart: true,
+          activate: () => ['left', 'right'].map(build)
+        };
+      `,
+        errors: [{ messageId: 'usedInAutostartActivate' }]
+      },
+      // An `await` before the use keeps it inside `activate`, and the start
+      // waits for the whole of it.
+      {
+        code: `
+        import { JupyterFrontEndPlugin } from '@jupyterlab/application';
+        import { HeavyWidget } from './widget';
+        const plugin: JupyterFrontEndPlugin<void> = {
+          id: 'test:plugin',
+          autoStart: true,
+          activate: async app => {
+            await app.serviceManager.ready;
+            app.shell.add(new HeavyWidget(), 'main');
+          }
+        };
+      `,
+        errors: [{ messageId: 'usedInAutostartActivate' }]
+      },
+      // One use in `activate` is enough: the module is fetched before the
+      // start whatever the command does, so the snippet would be wrong here
+      // too.
+      {
+        code: `
+        import { JupyterFrontEndPlugin } from '@jupyterlab/application';
+        import { HeavyWidget } from './widget';
+        const plugin: JupyterFrontEndPlugin<void> = {
+          id: 'test:plugin',
+          autoStart: true,
+          activate: app => {
+            app.shell.add(new HeavyWidget(), 'main');
+            app.commands.addCommand('test:open', {
+              execute: () => app.shell.add(new HeavyWidget(), 'main')
+            });
+          }
+        };
+      `,
+        errors: [{ messageId: 'usedInAutostartActivate' }]
+      },
+      // A helper called both from `activate` and from a command runs during
+      // activation.
+      {
+        code: `
+        import { JupyterFrontEndPlugin } from '@jupyterlab/application';
+        import { HeavyWidget } from './widget';
+        function open(app) {
+          app.shell.add(new HeavyWidget(), 'main');
+        }
+        const plugin: JupyterFrontEndPlugin<void> = {
+          id: 'test:plugin',
+          autoStart: true,
+          activate: app => {
+            app.commands.addCommand('test:open', { execute: () => open(app) });
+            open(app);
+          }
+        };
+      `,
+        errors: [{ messageId: 'usedInAutostartActivate' }]
+      },
+      // Two plugins in one file: the autostart one decides.
+      {
+        code: `
+        import { JupyterFrontEndPlugin } from '@jupyterlab/application';
+        import { HeavyWidget } from './widget';
+        const onDemand: JupyterFrontEndPlugin<void> = {
+          id: 'test:on-demand',
+          activate: app => app.shell.add(new HeavyWidget(), 'main')
+        };
+        const atStart: JupyterFrontEndPlugin<void> = {
+          id: 'test:at-start',
+          autoStart: true,
+          activate: app => app.shell.add(new HeavyWidget(), 'left')
+        };
+        export default [onDemand, atStart];
+      `,
+        errors: [{ messageId: 'usedInAutostartActivate' }]
+      },
+      // Under the strict option a module-level use still takes precedence.
+      {
+        code: `
+        import { JupyterFrontEndPlugin } from '@jupyterlab/application';
+        import { HeavyWidget } from './widget';
+        const shared = new HeavyWidget();
+        const plugin: JupyterFrontEndPlugin<void> = {
+          id: 'test:plugin',
+          autoStart: true,
+          activate: app => app.shell.add(new HeavyWidget(), 'main')
+        };
+      `,
+        options: [
+          { allowedPackages: ['@jupyterlab/*'], reportModuleLevelUsage: true }
+        ],
+        errors: [{ messageId: 'eagerModuleLevelUse' }]
+      },
+      // Without `autoStart: true` the plugin is activated on demand, so the
+      // usual report and its snippet apply.
+      {
+        code: `
+        import { JupyterFrontEndPlugin } from '@jupyterlab/application';
+        import { HeavyWidget } from './widget';
+        const plugin: JupyterFrontEndPlugin<void> = {
+          id: 'test:plugin',
+          autoStart: false,
+          activate: app => app.shell.add(new HeavyWidget(), 'main')
+        };
+      `,
+        errors: [
+          {
+            messageId: 'preferLazyImport',
+            data: {
+              source: './widget',
+              snippet: "const { HeavyWidget } = await import('./widget');"
+            }
+          }
+        ]
+      },
+      {
+        code: `
+        import { JupyterFrontEndPlugin } from '@jupyterlab/application';
+        import { HeavyWidget } from './widget';
+        const plugin: JupyterFrontEndPlugin<void> = {
+          id: 'test:plugin',
+          activate: app => app.shell.add(new HeavyWidget(), 'main')
+        };
+      `,
+        errors: [{ messageId: 'preferLazyImport' }]
+      },
+      // A deferred plugin is activated after the shell is attached.
+      {
+        code: `
+        import { JupyterFrontEndPlugin } from '@jupyterlab/application';
+        import { HeavyWidget } from './widget';
+        const plugin: JupyterFrontEndPlugin<void> = {
+          id: 'test:plugin',
+          autoStart: 'defer',
+          activate: app => app.shell.add(new HeavyWidget(), 'main')
+        };
+      `,
+        errors: [{ messageId: 'preferLazyImport' }]
+      },
+      // A command registered by an autostart plugin runs when it is invoked.
+      {
+        code: `
+        import { JupyterFrontEndPlugin } from '@jupyterlab/application';
+        import { HeavyWidget } from './widget';
+        const plugin: JupyterFrontEndPlugin<void> = {
+          id: 'test:plugin',
+          autoStart: true,
+          activate: app => {
+            app.commands.addCommand('test:open', {
+              execute: () => app.shell.add(new HeavyWidget(), 'main')
+            });
+          }
+        };
+      `,
+        errors: [{ messageId: 'preferLazyImport' }]
+      },
+      // A callback which waits for the application does not run during
+      // activation.
+      {
+        code: `
+        import { JupyterFrontEndPlugin } from '@jupyterlab/application';
+        import { HeavyWidget } from './widget';
+        const plugin: JupyterFrontEndPlugin<void> = {
+          id: 'test:plugin',
+          autoStart: true,
+          activate: app => {
+            void app.restored.then(() => {
+              app.shell.add(new HeavyWidget(), 'main');
+            });
+          }
+        };
+      `,
+        errors: [{ messageId: 'preferLazyImport' }]
+      },
+      // A helper called only from a command stays deferred, autostart or not.
+      {
+        code: `
+        import { JupyterFrontEndPlugin } from '@jupyterlab/application';
+        import { HeavyWidget } from './widget';
+        function open(app) {
+          app.shell.add(new HeavyWidget(), 'main');
+        }
+        const plugin: JupyterFrontEndPlugin<void> = {
+          id: 'test:plugin',
+          autoStart: true,
+          activate: app => {
+            app.commands.addCommand('test:open', { execute: () => open(app) });
+          }
+        };
+      `,
+        errors: [{ messageId: 'preferLazyImport' }]
+      },
+      // A function handed to something other than `activate` is not called on
+      // start, whatever its name.
+      {
+        code: `
+        import { JupyterFrontEndPlugin } from '@jupyterlab/application';
+        import { HeavyWidget } from './widget';
+        const activate = app => app.shell.add(new HeavyWidget(), 'main');
+        const plugin: JupyterFrontEndPlugin<void> = {
+          id: 'test:plugin',
+          autoStart: true,
+          activate: app => {
+            app.commands.addCommand('test:open', {
+              execute: () => activate(app)
+            });
+          }
+        };
+      `,
+        errors: [{ messageId: 'preferLazyImport' }]
+      }
+    ]
+  }
+);
 
 ruleTester.run(
   'prefer-lazy-imports (interaction callbacks)',
@@ -1429,3 +1915,418 @@ tsxTester.run('prefer-lazy-imports (tsx)', preferLazyImports, {
     }
   ]
 });
+
+ruleTester.run('prefer-lazy-imports (deferred packages)', preferLazyImports, {
+  valid: [
+    // A type-only import is erased, whichever module it sits in.
+    {
+      code: `
+        import type { DataGrid } from '@lumino/datagrid';
+        export class GridHolder {
+          grid: DataGrid | null = null;
+        }
+      `
+    },
+    // A type-only re-export is erased.
+    {
+      code: `export type { DataGrid } from '@lumino/datagrid';`
+    },
+    // Already deferred: this is the form the list asks for.
+    {
+      code: `
+        export class GridWidget {
+          async initialize() {
+            const { DataGrid } = await import('@lumino/datagrid');
+            return new DataGrid();
+          }
+        }
+      `
+    },
+    // A package outside the list keeps the usual trigger, so a module without
+    // a plugin in it is not checked.
+    {
+      code: `
+        import { parse } from 'heavy-parser';
+        export class Renderer {
+          render(source: string) {
+            return parse(source);
+          }
+        }
+      `
+    },
+    // A stylesheet from a listed package is applied when imported, so it is
+    // handled like every other asset.
+    {
+      code: `
+        import 'react-toastify/dist/ReactToastify.css';
+        export const ready = true;
+      `
+    },
+    // An empty list switches the check off.
+    {
+      code: `
+        import { DataGrid } from '@lumino/datagrid';
+        export function createGrid() {
+          return new DataGrid();
+        }
+      `,
+      options: [{ deferredPackages: [] }]
+    },
+    // The list replaces the default one.
+    {
+      code: `
+        import { DataGrid } from '@lumino/datagrid';
+        export function createGrid() {
+          return new DataGrid();
+        }
+      `,
+      options: [{ deferredPackages: ['mermaid'] }]
+    },
+    // `ignoreImports` still skips a listed package.
+    {
+      code: `
+        import { DataGrid } from '@lumino/datagrid';
+        export function createGrid() {
+          return new DataGrid();
+        }
+      `,
+      options: [{ ignoreImports: ['@lumino/datagrid'] }]
+    },
+    // A `!` entry exempts one subpath of a listed package.
+    {
+      code: `
+        import { python } from '@codemirror/legacy-modes/mode/python';
+        export function mode() {
+          return python;
+        }
+      `,
+      options: [
+        {
+          deferredPackages: [
+            '@codemirror/legacy-modes',
+            '!@codemirror/legacy-modes/mode/python'
+          ]
+        }
+      ]
+    }
+  ],
+  invalid: [
+    // The core case: a module which no plugin trigger reaches.
+    {
+      code: `
+        import { DataGrid } from '@lumino/datagrid';
+        export class GridWidget {
+          create() {
+            return new DataGrid();
+          }
+        }
+      `,
+      errors: [
+        {
+          messageId: 'deferredPackageImport',
+          data: {
+            source: '@lumino/datagrid',
+            snippet: "const { DataGrid } = await import('@lumino/datagrid');"
+          }
+        }
+      ]
+    },
+    // A base class is needed while the module is evaluated.
+    {
+      code: `
+        import { DataModel } from '@lumino/datagrid';
+        export class CSVModel extends DataModel {}
+      `,
+      errors: [
+        {
+          messageId: 'deferredPackageEagerUse',
+          data: { source: '@lumino/datagrid' }
+        }
+      ]
+    },
+    // A side-effect import loads the package as well.
+    {
+      code: `
+        import 'mermaid';
+        export const ready = true;
+      `,
+      errors: [
+        {
+          messageId: 'deferredPackageImport',
+          data: { source: 'mermaid', snippet: "await import('mermaid');" }
+        }
+      ]
+    },
+    // A value re-export keeps the package in the startup bundle.
+    {
+      code: `export { DataGrid } from '@lumino/datagrid';`,
+      errors: [
+        {
+          messageId: 'deferredPackageReExport',
+          data: { source: '@lumino/datagrid' }
+        }
+      ]
+    },
+    {
+      code: `export * from 'mermaid';`,
+      errors: [{ messageId: 'deferredPackageReExport' }]
+    },
+    // A value import with no runtime use is erased only without
+    // `verbatimModuleSyntax`, which JupyterLab enables, so it is reported with
+    // advice to write `import type`. Used only as a type:
+    {
+      code: `
+        import { DataModel } from '@lumino/datagrid';
+        export interface IInspectable {
+          model: DataModel;
+        }
+      `,
+      errors: [
+        {
+          messageId: 'deferredPackageNotTypeOnly',
+          data: { source: '@lumino/datagrid' }
+        }
+      ]
+    },
+    // Used only inside `typeof`:
+    {
+      code: `
+        import { DataGrid } from '@lumino/datagrid';
+        export type GridClass = typeof DataGrid;
+      `,
+      errors: [{ messageId: 'deferredPackageNotTypeOnly' }]
+    },
+    // Not used at all:
+    {
+      code: `
+        import { DataGrid } from '@lumino/datagrid';
+        export const ready = true;
+      `,
+      errors: [{ messageId: 'deferredPackageNotTypeOnly' }]
+    },
+    // An inline `type` specifier leaves `import {} from '...'` behind under
+    // `verbatimModuleSyntax`, which still loads the package.
+    {
+      code: `
+        import { type DataGrid } from '@lumino/datagrid';
+        export const ready = true;
+      `,
+      errors: [{ messageId: 'deferredPackageNotTypeOnly' }]
+    },
+    // The same holds for a re-export with inline `type` specifiers.
+    {
+      code: `export { type DataGrid } from '@lumino/datagrid';`,
+      errors: [{ messageId: 'deferredPackageReExport' }]
+    },
+    // A subpath import matches through its owning package.
+    {
+      code: `
+        import { python } from '@codemirror/legacy-modes/mode/python';
+        export function mode() {
+          return python;
+        }
+      `,
+      errors: [{ messageId: 'deferredPackageImport' }]
+    },
+    // A wildcard entry covers every language package.
+    {
+      code: `
+        import { python } from '@codemirror/lang-python';
+        export function extensions() {
+          return [python()];
+        }
+      `,
+      errors: [{ messageId: 'deferredPackageImport' }]
+    },
+    // One source imported twice: the declarations with a runtime use share one
+    // report and one snippet, and the one used only as a type is reported on
+    // its own line, since deleting the first would leave it behind.
+    {
+      code: `
+        import { DataGrid } from '@lumino/datagrid';
+        import { DataModel } from '@lumino/datagrid';
+        export function createGrid(model: DataModel) {
+          return new DataGrid({ dataModel: model });
+        }
+      `,
+      errors: [
+        {
+          messageId: 'deferredPackageImport',
+          line: 2,
+          data: {
+            source: '@lumino/datagrid',
+            snippet: "const { DataGrid } = await import('@lumino/datagrid');"
+          }
+        },
+        { messageId: 'deferredPackageNotTypeOnly', line: 3 }
+      ]
+    },
+    // An unused declaration next to a used one is reported on its own as
+    // well, whichever order they come in.
+    {
+      code: `
+        import { Unused } from 'mermaid';
+        import { Diagram } from 'mermaid';
+        export function render() {
+          return new Diagram();
+        }
+      `,
+      errors: [
+        { messageId: 'deferredPackageNotTypeOnly', line: 2 },
+        {
+          messageId: 'deferredPackageImport',
+          line: 3,
+          data: {
+            source: 'mermaid',
+            snippet: "const { Diagram } = await import('mermaid');"
+          }
+        }
+      ]
+    },
+    // The same next to a side-effect import.
+    {
+      code: `
+        import 'mermaid';
+        import { Unused } from 'mermaid';
+        export const ready = true;
+      `,
+      errors: [
+        {
+          messageId: 'deferredPackageImport',
+          line: 2,
+          data: { source: 'mermaid', snippet: "await import('mermaid');" }
+        },
+        { messageId: 'deferredPackageNotTypeOnly', line: 3 }
+      ]
+    },
+    // In a plugin module the list takes over from the usage check, so the
+    // import is reported once, with the deferred message.
+    {
+      code: `
+        import { JupyterFrontEndPlugin } from '@jupyterlab/application';
+        import { DataGrid } from '@lumino/datagrid';
+        const plugin: JupyterFrontEndPlugin<void> = {
+          id: 'test:plugin',
+          activate: () => new DataGrid()
+        };
+      `,
+      errors: [{ messageId: 'deferredPackageImport' }]
+    },
+    // A use during the activation of an autostart plugin gets the autostart
+    // advice, with the list named: the snippet would put the `await import()`
+    // into `activate`.
+    {
+      code: `
+        import { JupyterFrontEndPlugin } from '@jupyterlab/application';
+        import { DataGrid } from '@lumino/datagrid';
+        const plugin: JupyterFrontEndPlugin<void> = {
+          id: 'test:plugin',
+          autoStart: true,
+          activate: () => new DataGrid()
+        };
+      `,
+      errors: [
+        {
+          messageId: 'deferredPackageAutostartUse',
+          data: { source: '@lumino/datagrid' }
+        }
+      ]
+    },
+    // Module level use in a plugin module is reported without the strict
+    // option, and once with it.
+    {
+      code: `
+        import { JupyterFrontEndPlugin } from '@jupyterlab/application';
+        import { DataGrid } from '@lumino/datagrid';
+        const grid = new DataGrid();
+        const plugin: JupyterFrontEndPlugin<void> = {
+          id: 'test:plugin',
+          autoStart: true,
+          activate: () => grid
+        };
+      `,
+      errors: [{ messageId: 'deferredPackageEagerUse' }]
+    },
+    {
+      code: `
+        import { JupyterFrontEndPlugin } from '@jupyterlab/application';
+        import { DataGrid } from '@lumino/datagrid';
+        const grid = new DataGrid();
+        const plugin: JupyterFrontEndPlugin<void> = {
+          id: 'test:plugin',
+          autoStart: true,
+          activate: () => grid
+        };
+      `,
+      options: [{ reportModuleLevelUsage: true }],
+      errors: [{ messageId: 'deferredPackageEagerUse' }]
+    },
+    // A token from a listed package is read when the plugin is registered.
+    {
+      code: `
+        import { JupyterFrontEndPlugin } from '@jupyterlab/application';
+        import { IGrid } from 'heavy-grid';
+        const plugin: JupyterFrontEndPlugin<void> = {
+          id: 'test:plugin',
+          requires: [IGrid],
+          activate: (app, grid) => grid
+        };
+      `,
+      options: [{ deferredPackages: ['heavy-grid'] }],
+      errors: [{ messageId: 'deferredPackageEagerUse' }]
+    },
+    // The list wins over `allowedPackages`.
+    {
+      code: `
+        import { DataGrid } from '@lumino/datagrid';
+        export function createGrid() {
+          return new DataGrid();
+        }
+      `,
+      options: [{ allowedPackages: ['@lumino/*'] }],
+      errors: [{ messageId: 'deferredPackageImport' }]
+    },
+    // The list wins over the manifest, which marks this package as provided
+    // by the application.
+    {
+      filename: sharedPkgFilename,
+      code: `
+        import { JupyterFrontEndPlugin } from '@jupyterlab/application';
+        import { Shared } from '@myorg/host-provided';
+        const plugin: JupyterFrontEndPlugin<void> = {
+          id: 'test:plugin',
+          activate: () => new Shared()
+        };
+      `,
+      options: [{ deferredPackages: ['@myorg/host-provided'] }],
+      errors: [{ messageId: 'deferredPackageImport' }]
+    }
+  ]
+});
+
+espreeTester.run(
+  'prefer-lazy-imports (deferred packages, javascript)',
+  preferLazyImports,
+  {
+    valid: [],
+    invalid: [
+      {
+        code: `
+          import { DataGrid } from '@lumino/datagrid';
+          export function createGrid() {
+            return new DataGrid();
+          }
+        `,
+        errors: [{ messageId: 'deferredPackageImport' }]
+      },
+      // Nothing is erased in JavaScript, so an unused import loads the package.
+      {
+        code: `
+          import { DataGrid } from '@lumino/datagrid';
+          export const ready = true;
+        `,
+        errors: [{ messageId: 'deferredPackageNotTypeOnly' }]
+      }
+    ]
+  }
+);
