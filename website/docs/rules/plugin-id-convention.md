@@ -82,18 +82,18 @@ const extension: IRenderMime.IExtension = {
 
 ## Limitations
 
-Renaming a plugin that has shipped has a cost. JupyterLab stores user settings
-and reads `overrides.json` under the plugin ID, and a `disabledExtensions`,
+Renaming a plugin that has shipped has a cost. A `disabledExtensions`,
 `deferredExtensions` or `lockedExtensions` entry that names the plugin in full
-stops matching. The extension can migrate the user settings while a schema for
-the old ID is still served: for an ID under the extension's own name that means
-keeping the old schema file, and for a prefix that belonged to another package
-it is the case only while a package of that name is installed.
+stops matching. If the plugin loads its settings under its own ID, as
+JupyterLab's own plugins do, the user settings and any `overrides.json` entry
+stay under the old ID as well. The extension can migrate the user settings
+while a schema for the old ID is still served, which for a prefix that belonged
+to another package is the case only while a package of that name is installed:
 
 ```ts
 import { ISettingRegistry } from '@jupyterlab/settingregistry';
 
-const OLD_ID = '@my-org/unconventional-name';
+const OLD_ID = '@my-org/unconventional:plugin';
 
 const plugin: JupyterFrontEndPlugin<void> = {
   id: '@my-org/conventional:plugin',
@@ -104,7 +104,7 @@ const plugin: JupyterFrontEndPlugin<void> = {
     // If nothing was saved under the new ID yet...
     if (Object.keys(settings.user).length === 0) {
       // ...copy the old settings once.
-      // Note: by using `connector.fetch` rather than `reigstry.load` we
+      // Note: by using `connector.fetch` rather than `registry.load` we
       // prevent the old ID from showing up in the settings editor.
       const old = await registry.connector.fetch(OLD_ID).catch(() => undefined);
       if (old && Object.keys(old.data.user).length > 0) {
