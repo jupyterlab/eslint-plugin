@@ -15,8 +15,7 @@ follow the convention.
 ## Rule details
 
 The rule reads the nearest JupyterLab extension `package.json` and reports
-literal plugin IDs that do not start with `<package name>:`. It also resolves
-plugin IDs stored in local `const` string declarations.
+plugin IDs that do not start with `<package name>:`.
 
 MIME renderer extension entries (`IRenderMime.IExtension`) are registered as
 plugins under their `id`, so the rule checks them the same way, in packages
@@ -140,3 +139,14 @@ const plugin: JupyterFrontEndPlugin<void> = {
   activate: () => {}
 };
 ```
+
+### Technical details
+
+The ID can be a string literal or assembled from constant strings:
+- a template literal, a `+` concatenation, a `const` that copies another,
+or a member of a `const` object;
+- with type information additionally: a `const` imported from another module, a namespace
+member and an enum member count.
+
+An ID the rule cannot resolve to a string, such as one built
+from a reassigned variable or a function call, is not checked.

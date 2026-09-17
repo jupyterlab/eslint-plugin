@@ -6,11 +6,7 @@
 import * as fs from 'fs';
 import * as path from 'path';
 import { TSESTree } from '@typescript-eslint/types';
-import {
-  ASTUtils,
-  ESLintUtils,
-  ParserServices
-} from '@typescript-eslint/utils';
+import { ESLintUtils, ParserServices } from '@typescript-eslint/utils';
 import * as ts from 'typescript';
 import { createRule } from '../utils/create-rule';
 import {
@@ -128,21 +124,6 @@ function getExtensionPackageName(fromFile: string): string | null {
     packagePathCache.set(seen, found);
   }
   return found === null ? null : (readExtensionPackage(found)?.name ?? null);
-}
-
-/**
- * Narrows a variable declaration to a local const string assignment.
- */
-function isConstStringDefinition(
-  node: TSESTree.Node
-): node is TSESTree.VariableDeclarator {
-  return (
-    node.type === 'VariableDeclarator' &&
-    node.parent.type === 'VariableDeclaration' &&
-    node.parent.kind === 'const' &&
-    node.init?.type === 'Literal' &&
-    typeof node.init.value === 'string'
-  );
 }
 
 const pluginIdConvention = createRule({
@@ -326,47 +307,15 @@ const pluginIdConvention = createRule({
     }
 
     /**
-     * Resolves an identifier when it points at a local const string.
-     */
-    function resolveStringIdentifier(
-      identifier: TSESTree.Identifier
-    ): string | null {
-      const variable = ASTUtils.findVariable(
-        context.sourceCode.getScope(identifier),
-        identifier
-      );
-      const definition = variable?.defs[0]?.node;
-      if (!definition || !isConstStringDefinition(definition)) {
-        return null;
-      }
-      const init = definition.init;
-      if (init?.type !== 'Literal' || typeof init.value !== 'string') {
-        return null;
-      }
-      return init.value;
-    }
-
-    /**
-     * Reads a plugin ID from a literal property or a local const string.
-     */
-    function resolvePluginId(node: TSESTree.ObjectExpression): string | null {
-      const literalId = getPluginId(node);
-      if (literalId !== null) {
-        return literalId;
-      }
-
-      const idProperty = getObjectProperties(node).get('id');
-      if (idProperty?.value.type === 'Identifier') {
-        return resolveStringIdentifier(idProperty.value);
-      }
-      return null;
-    }
-
-    /**
      * Reports plugin IDs that do not use the owning extension package prefix.
      */
     function reportIfNeeded(node: TSESTree.ObjectExpression): void {
-      const pluginId = resolvePluginId(node);
+      const pluginId = getPluginId(
+        node,
+        context.sourceCode.getScope(node),
+        checker,
+        getTSNode
+      );
       if (pluginId === null) {
         return;
       }

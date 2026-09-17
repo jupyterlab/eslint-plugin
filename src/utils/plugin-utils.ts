@@ -4,6 +4,7 @@
  */
 
 import { TSESTree } from '@typescript-eslint/types';
+import { ASTUtils, TSESLint } from '@typescript-eslint/utils';
 import * as ts from 'typescript';
 
 export type JupyterPluginKind = 'frontend' | 'service-manager';
@@ -82,29 +83,56 @@ export function getObjectProperties(
 }
 
 /**
- * Gets the plugin ID from an object expression
+ * Gets the plugin ID from an object expression. Without a scope only a
+ * literal, a template literal without substitutions or a `+` chain of literals
+ * resolves. With a scope, a `const` string and a member of a `const` object
+ * resolve too, and with a checker so does anything with a string literal
+ * type, such as a `const` imported from another module.
  */
-export function getPluginId(obj: TSESTree.ObjectExpression): string | null {
-  for (const prop of obj.properties) {
-    if (prop.type === 'Property') {
-      let keyName: string | null = null;
-      if (prop.key.type === 'Identifier') {
-        keyName = prop.key.name;
-      } else if (
-        prop.key.type === 'Literal' &&
-        typeof prop.key.value === 'string'
-      ) {
-        keyName = prop.key.value;
-      }
-      if (keyName === 'id' && prop.value.type === 'Literal') {
-        const value = prop.value.value;
-        if (typeof value === 'string') {
-          return value;
-        }
-      }
-    }
+export function getPluginId(
+  obj: TSESTree.ObjectExpression,
+  scope?: TSESLint.Scope.Scope | null,
+  checker?: ts.TypeChecker | null,
+  getTSNode?: ((n: TSESTree.Node) => ts.Node | undefined) | null
+): string | null {
+  const idProperty = getObjectProperties(obj).get('id');
+  return idProperty
+    ? resolveStaticString(idProperty.value, scope, checker, getTSNode)
+    : null;
+}
+
+/**
+ * Resolves an expression to the string it holds at lint time.
+ * `getStaticValue` folds the plain JavaScript part: a literal, a template
+ * literal, a `+` chain, a variable that is never reassigned and a member of an
+ * object literal that is never mutated, with TypeScript casts stripped. The
+ * checker then answers for the TypeScript part: a `const` imported from
+ * another module, a namespace member, an enum member or a `static readonly`
+ * class property.
+ */
+export function resolveStaticString(
+  node: TSESTree.Node,
+  scope?: TSESLint.Scope.Scope | null,
+  checker?: ts.TypeChecker | null,
+  getTSNode?: ((n: TSESTree.Node) => ts.Node | undefined) | null
+): string | null {
+  const folded = ASTUtils.getStaticValue(node, scope ?? undefined);
+  if (typeof folded?.value === 'string') {
+    return folded.value;
   }
-  return null;
+  if (!checker || !getTSNode) {
+    return null;
+  }
+  try {
+    const tsNode = getTSNode(node);
+    if (!tsNode) {
+      return null;
+    }
+    const type = checker.getTypeAtLocation(tsNode);
+    return type.isStringLiteral() ? type.value : null;
+  } catch {
+    return null;
+  }
 }
 export interface TokenEntry {
   name: string;
@@ -413,7 +441,7 @@ export function looksLikePluginObject(
  * Returns true when an object literal has the shape of a MIME renderer
  * extension entry: a string `id` and a `rendererFactory`. Used for entries
  * written without a type annotation. The plugin ID can be supplied by callers
- * that resolve it from a local const instead of a literal.
+ * that resolve it from an expression instead of a literal.
  */
 export function looksLikeMimeExtensionObject(
   node: TSESTree.ObjectExpression,

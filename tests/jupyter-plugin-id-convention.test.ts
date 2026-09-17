@@ -238,6 +238,59 @@ ruleTester.run('plugin-id-convention', pluginIdConvention, {
           rendererFactory
         };
       `
+    },
+    // IDs assembled from const strings resolve to the right prefix.
+    {
+      filename: fixtureFilename,
+      code: `
+        const NS = '@jupyterlab/example-extension';
+        const plugin: JupyterFrontEndPlugin<void> = {
+          id: \`\${NS}:plugin\`,
+          activate: () => {}
+        };
+      `
+    },
+    {
+      filename: fixtureFilename,
+      code: `
+        const pluginIds = { main: '@jupyterlab/example-extension:main' };
+        const plugin: JupyterFrontEndPlugin<void> = {
+          id: pluginIds.main,
+          activate: () => {}
+        };
+      `
+    },
+    // A reassigned variable and a mutated object are not resolved.
+    {
+      filename: fixtureFilename,
+      code: `
+        let NS = '@jupyterlab/other-extension';
+        NS = '@jupyterlab/example-extension';
+        const plugin: JupyterFrontEndPlugin<void> = {
+          id: \`\${NS}:plugin\`,
+          activate: () => {}
+        };
+      `
+    },
+    {
+      filename: fixtureFilename,
+      code: `
+        const pluginIds = { main: '@jupyterlab/other-extension:main' };
+        pluginIds.main = '@jupyterlab/example-extension:main';
+        const plugin: JupyterFrontEndPlugin<void> = {
+          id: pluginIds.main,
+          activate: () => {}
+        };
+      `
+    },
+    {
+      filename: fixtureFilename,
+      code: `
+        const plugin: JupyterFrontEndPlugin<void> = {
+          id: \`\${getPrefix()}:plugin\`,
+          activate: () => {}
+        };
+      `
     }
   ],
 
@@ -334,6 +387,80 @@ ruleTester.run('plugin-id-convention', pluginIdConvention, {
         const plugin: JupyterFrontEndPlugin<void> = {
           id: '@jupyterlab/example-extension-plugin',
           autoStart: true,
+          activate: () => {}
+        };
+      `,
+      errors: [{ messageId: 'mismatchedPrefix' }]
+    },
+    // IDs assembled from const strings.
+    {
+      filename: fixtureFilename,
+      code: `
+        const plugin: JupyterFrontEndPlugin<void> = {
+          id: \`@jupyterlab/other-extension:plugin\`,
+          activate: () => {}
+        };
+      `,
+      errors: [{ messageId: 'mismatchedPrefix' }]
+    },
+    {
+      filename: fixtureFilename,
+      code: `
+        const NS = '@jupyterlab/other-extension';
+        const plugin: JupyterFrontEndPlugin<void> = {
+          id: \`\${NS}:plugin\`,
+          activate: () => {}
+        };
+      `,
+      errors: [
+        {
+          messageId: 'mismatchedPrefix',
+          data: {
+            pluginId: '@jupyterlab/other-extension:plugin',
+            packageName: '@jupyterlab/example-extension'
+          }
+        }
+      ]
+    },
+    {
+      filename: fixtureFilename,
+      code: `
+        const NS = '@jupyterlab/other-extension';
+        const plugin: JupyterFrontEndPlugin<void> = {
+          id: NS + ':' + 'plugin',
+          activate: () => {}
+        };
+      `,
+      errors: [{ messageId: 'mismatchedPrefix' }]
+    },
+    {
+      filename: fixtureFilename,
+      code: `
+        const BASE = '@jupyterlab/other-extension:plugin';
+        const PLUGIN_ID = BASE;
+        const plugin: JupyterFrontEndPlugin<void> = {
+          id: PLUGIN_ID,
+          activate: () => {}
+        };
+      `,
+      errors: [{ messageId: 'mismatchedPrefix' }]
+    },
+    {
+      filename: fixtureFilename,
+      code: `
+        const plugin: JupyterFrontEndPlugin<void> = {
+          id: '@jupyterlab/other-extension:plugin' as const,
+          activate: () => {}
+        };
+      `,
+      errors: [{ messageId: 'mismatchedPrefix' }]
+    },
+    {
+      filename: fixtureFilename,
+      code: `
+        const pluginIds = { main: '@jupyterlab/other-extension:main' } as const;
+        const plugin: JupyterFrontEndPlugin<void> = {
+          id: pluginIds.main,
           activate: () => {}
         };
       `,
@@ -483,6 +610,78 @@ ruleTester.run('plugin-id-convention', pluginIdConvention, {
 typeAwareTester.run('plugin-id-convention (type-aware)', pluginIdConvention, {
   valid: [],
   invalid: [
+    // A const imported from another module has a string literal type.
+    {
+      filename: 'tests/fixtures/mime-pkg/src/type-aware-fixture.ts',
+      code: `
+        import { OTHER_ID } from './ids';
+        const extension: IRenderMime.IExtension = {
+          id: OTHER_ID,
+          rendererFactory
+        };
+      `,
+      errors: [{ messageId: 'mismatchedPrefix' }]
+    },
+    {
+      filename: 'tests/fixtures/mime-pkg/src/type-aware-fixture.ts',
+      code: `
+        import { PluginIDs } from './ids';
+        const extension: IRenderMime.IExtension = {
+          id: PluginIDs.factory,
+          rendererFactory
+        };
+      `,
+      errors: [
+        {
+          messageId: 'mismatchedPrefix',
+          data: {
+            pluginId: '@jupyterlab/other-mime:factory',
+            packageName: '@jupyterlab/example-mime'
+          }
+        }
+      ]
+    },
+    // A namespace member, an enum member and a readonly static have string
+    // literal types.
+    {
+      filename: 'tests/fixtures/mime-pkg/src/type-aware-fixture.ts',
+      code: `
+        namespace PluginIDs {
+          export const factory = '@jupyterlab/other-mime:factory';
+        }
+        const extension: IRenderMime.IExtension = {
+          id: PluginIDs.factory,
+          rendererFactory
+        };
+      `,
+      errors: [{ messageId: 'mismatchedPrefix' }]
+    },
+    {
+      filename: 'tests/fixtures/mime-pkg/src/type-aware-fixture.ts',
+      code: `
+        enum PluginIDs {
+          factory = '@jupyterlab/other-mime:factory'
+        }
+        const extension: IRenderMime.IExtension = {
+          id: PluginIDs.factory,
+          rendererFactory
+        };
+      `,
+      errors: [{ messageId: 'mismatchedPrefix' }]
+    },
+    {
+      filename: 'tests/fixtures/mime-pkg/src/type-aware-fixture.ts',
+      code: `
+        class Renderer {
+          static readonly id = '@jupyterlab/other-mime:factory';
+        }
+        const extension: IRenderMime.IExtension = {
+          id: Renderer.id,
+          rendererFactory
+        };
+      `,
+      errors: [{ messageId: 'mismatchedPrefix' }]
+    },
     // The MIME entry type is reached through a renamed namespace import, so
     // only the checker can tell that this object is a MIME renderer entry.
     {
