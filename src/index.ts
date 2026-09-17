@@ -94,8 +94,10 @@ const plugin = {
           'jupyter/galata-prefer-menu-helper': 'warn',
           'jupyter/galata-prefer-notebook-cell-helper': 'warn',
           'jupyter/galata-prefer-sidebar-activity-helper': 'warn',
-          // Test files declare mock plugins; deferring their imports is pointless.
-          'jupyter/prefer-lazy-imports': 'off'
+          // Test files declare mock plugins; deferring their imports is
+          // pointless and their IDs are never used to disable an extension.
+          'jupyter/prefer-lazy-imports': 'off',
+          'jupyter/plugin-id-convention': 'off'
         }
       }
     ],
@@ -134,7 +136,8 @@ const plugin = {
             'jupyter/galata-prefer-menu-helper': 'warn',
             'jupyter/galata-prefer-notebook-cell-helper': 'warn',
             'jupyter/galata-prefer-sidebar-activity-helper': 'warn',
-            'jupyter/prefer-lazy-imports': 'off'
+            'jupyter/prefer-lazy-imports': 'off',
+            'jupyter/plugin-id-convention': 'off'
           }
         }
       ]
