@@ -2213,7 +2213,8 @@ ruleTester.run('prefer-lazy-imports (deferred packages)', preferLazyImports, {
       errors: [{ messageId: 'deferredPackageImport' }]
     },
     // A use during the activation of an autostart plugin gets the autostart
-    // advice: the snippet would put the `await import()` into `activate`.
+    // advice, with the list named: the snippet would put the `await import()`
+    // into `activate`.
     {
       code: `
         import { JupyterFrontEndPlugin } from '@jupyterlab/application';
@@ -2224,7 +2225,12 @@ ruleTester.run('prefer-lazy-imports (deferred packages)', preferLazyImports, {
           activate: () => new DataGrid()
         };
       `,
-      errors: [{ messageId: 'usedInAutostartActivate' }]
+      errors: [
+        {
+          messageId: 'deferredPackageAutostartUse',
+          data: { source: '@lumino/datagrid' }
+        }
+      ]
     },
     // Module level use in a plugin module is reported without the strict
     // option, and once with it.

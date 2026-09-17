@@ -72,6 +72,11 @@ const jupyterPreferLazyImports = createRule<[LazyImportOptions], string>({
         "'{{ source }}' is in `deferredPackages`, so it must only be loaded with `await import()`, but it is used while this module is evaluated. " +
         "Move the usage into a function and import it there with `await import('{{ source }}')`. " +
         'If this module is itself only loaded with `import()`, disable the rule for this import.',
+      deferredPackageAutostartUse:
+        "'{{ source }}' is imported at the top of a plugin module and used in `activate()` of an autostart plugin, so it loads before the application starts either way. " +
+        'It is also in `deferredPackages`, so it must only be loaded with `await import()`. ' +
+        'Do not `await import(...)` inside `activate()`: that delays the whole application start. ' +
+        "Register the extension point synchronously and load '{{ source }}' in the callback that first needs it, or ignore this import if activation needs it at once.",
       deferredPackageNotTypeOnly:
         "'{{ source }}' is in `deferredPackages`, and this import has no runtime use, but it is not written as `import type`, so a build with `verbatimModuleSyntax` or plain JavaScript loads the package anyway. " +
         'Remove the import, or make it `import type`.',
@@ -453,11 +458,12 @@ const jupyterPreferLazyImports = createRule<[LazyImportOptions], string>({
       }
       if (activation) {
         // The snippet would put the `await import()` into `activate`, which
-        // holds the whole start back, so the advice is the same as for any
-        // import used during the activation of an autostart plugin.
+        // holds the whole start back, so the advice is the one for any import
+        // used during the activation of an autostart plugin, with the list
+        // named as well.
         context.report({
           node: loading[0],
-          messageId: 'usedInAutostartActivate',
+          messageId: 'deferredPackageAutostartUse',
           data: { source }
         });
         return;
