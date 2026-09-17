@@ -17,8 +17,10 @@ import {
   getJupyterPluginKind,
   getObjectProperties,
   getPluginId,
+  looksLikeMimeExtensionObject,
   looksLikePluginObject,
-  typeMentionsJupyterPlugin
+  typeMentionsJupyterPlugin,
+  typeMentionsMimeExtension
 } from '../utils/plugin-utils';
 import { readPackageJson } from '../utils/package-json';
 
@@ -196,16 +198,22 @@ const pluginIdConvention = createRule({
       : null;
 
     /**
-     * Returns true when a type annotation refers to a plugin descriptor.
+     * Returns true when a type annotation refers to a plugin descriptor or to
+     * a MIME renderer extension entry, which JupyterLab registers as a plugin
+     * under the entry's `id`.
      */
     function mentionsPluginType(
       typeNode: TSESTree.TypeNode | undefined | null
     ): boolean {
-      return typeMentionsJupyterPlugin(typeNode, checker, getTSNode);
+      return (
+        typeMentionsJupyterPlugin(typeNode, checker, getTSNode) ||
+        typeMentionsMimeExtension(typeNode, checker, getTSNode)
+      );
     }
 
     /**
-     * Checks whether an object literal is typed as a plugin descriptor.
+     * Checks whether an object literal is typed as a plugin descriptor or as
+     * a MIME renderer extension entry.
      */
     function hasPluginType(node: TSESTree.ObjectExpression): boolean {
       const parent = node.parent;
@@ -368,7 +376,11 @@ const pluginIdConvention = createRule({
         return;
       }
 
-      if (!looksLikePluginObject(node, pluginId) && !hasPluginType(node)) {
+      if (
+        !looksLikePluginObject(node, pluginId) &&
+        !looksLikeMimeExtensionObject(node, pluginId) &&
+        !hasPluginType(node)
+      ) {
         return;
       }
 

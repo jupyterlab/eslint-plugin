@@ -15,6 +15,10 @@ The rule reads the nearest JupyterLab extension `package.json` and reports
 literal plugin IDs that do not start with `<package name>:`. It also resolves
 plugin IDs stored in local `const` string declarations.
 
+MIME renderer extension entries (`IRenderMime.IExtension`) are registered as
+plugins under their `id`, so the rule checks them the same way, in packages
+that declare `jupyterlab.extension` or `jupyterlab.mimeExtension`.
+
 For example, in a package with this manifest:
 
 ```json
@@ -39,6 +43,16 @@ const plugin: JupyterFrontEndPlugin<void> = {
 };
 ```
 
+A MIME renderer entry under a different prefix is not disabled with the
+package either.
+
+```ts
+const extension: IRenderMime.IExtension = {
+  id: '@jupyterlab/other-extension:factory',
+  rendererFactory
+};
+```
+
 ## Correct
 
 The plugin ID starts with the package name followed by `:`.
@@ -48,6 +62,13 @@ const plugin: JupyterFrontEndPlugin<void> = {
   id: '@jupyterlab/example-extension:plugin',
   autoStart: true,
   activate: () => {}
+};
+```
+
+```ts
+const extension: IRenderMime.IExtension = {
+  id: '@jupyterlab/example-extension:factory',
+  rendererFactory
 };
 ```
 

@@ -209,14 +209,13 @@ function isPluginTypeName(name: string | null): boolean {
 }
 
 /**
- * Returns true when a type annotation mentions a JupyterLab plugin type at any
- * depth, so arrays, unions and wrappers such as `Promise<...>` are recognised.
- * Resolves import aliases through the TypeScript checker when it is available.
+ * Returns true when `matches` accepts a type reference found at any depth of
+ * a type annotation, so arrays, unions and wrappers such as `Promise<...>` are
+ * recognised.
  */
-export function typeMentionsJupyterPlugin(
+function typeMentions(
   typeNode: TSESTree.TypeNode | undefined | null,
-  checker?: ts.TypeChecker | null,
-  getTSNode?: ((n: TSESTree.Node) => ts.Node | undefined) | null,
+  matches: (reference: TSESTree.TSTypeReference) => boolean,
   depth = 0
 ): boolean {
   if (!typeNode || depth > 6) {
@@ -224,59 +223,109 @@ export function typeMentionsJupyterPlugin(
   }
 
   switch (typeNode.type) {
-    case 'TSTypeReference': {
-      if (isPluginTypeName(extractTypeName(typeNode.typeName))) {
-        return true;
-      }
-      if (
-        checker &&
-        getTSNode &&
-        typeNode.typeName.type === 'Identifier' &&
-        isPluginTypeName(
-          resolveTypeAlias(typeNode.typeName, checker, getTSNode)
-        )
-      ) {
+    case 'TSTypeReference':
+      if (matches(typeNode)) {
         return true;
       }
       return (typeNode.typeArguments?.params ?? []).some(param =>
-        typeMentionsJupyterPlugin(param, checker, getTSNode, depth + 1)
+        typeMentions(param, matches, depth + 1)
       );
-    }
     case 'TSArrayType':
-      return typeMentionsJupyterPlugin(
-        typeNode.elementType,
-        checker,
-        getTSNode,
-        depth + 1
-      );
+      return typeMentions(typeNode.elementType, matches, depth + 1);
     case 'TSUnionType':
     case 'TSIntersectionType':
       return typeNode.types.some(type =>
-        typeMentionsJupyterPlugin(type, checker, getTSNode, depth + 1)
+        typeMentions(type, matches, depth + 1)
       );
     case 'TSTupleType':
       return typeNode.elementTypes.some(type =>
-        typeMentionsJupyterPlugin(type, checker, getTSNode, depth + 1)
+        typeMentions(type, matches, depth + 1)
       );
     case 'TSTypeOperator':
     case 'TSRestType':
     case 'TSOptionalType':
-      return typeMentionsJupyterPlugin(
-        typeNode.typeAnnotation ?? null,
-        checker,
-        getTSNode,
-        depth + 1
-      );
+      return typeMentions(typeNode.typeAnnotation ?? null, matches, depth + 1);
     case 'TSNamedTupleMember':
-      return typeMentionsJupyterPlugin(
-        typeNode.elementType,
-        checker,
-        getTSNode,
-        depth + 1
-      );
+      return typeMentions(typeNode.elementType, matches, depth + 1);
     default:
       return false;
   }
+}
+
+/**
+ * Returns true when a type annotation mentions a JupyterLab plugin type at any
+ * depth, so arrays, unions and wrappers such as `Promise<...>` are recognised.
+ * Resolves import aliases through the TypeScript checker when it is available.
+ */
+export function typeMentionsJupyterPlugin(
+  typeNode: TSESTree.TypeNode | undefined | null,
+  checker?: ts.TypeChecker | null,
+  getTSNode?: ((n: TSESTree.Node) => ts.Node | undefined) | null
+): boolean {
+  return typeMentions(typeNode, reference => {
+    if (isPluginTypeName(extractTypeName(reference.typeName))) {
+      return true;
+    }
+    return (
+      !!checker &&
+      !!getTSNode &&
+      reference.typeName.type === 'Identifier' &&
+      isPluginTypeName(resolveTypeAlias(reference.typeName, checker, getTSNode))
+    );
+  });
+}
+
+/** The namespace and interface which type a MIME renderer extension entry. */
+const MIME_EXTENSION_NAMESPACE = 'IRenderMime';
+const MIME_EXTENSION_TYPE_NAME = 'IExtension';
+
+/**
+ * Returns true when a type reference is `IRenderMime.IExtension`. Only the
+ * qualified spelling counts, because a bare `IExtension` is too common a name
+ * to mean anything on its own. The namespace may sit behind a module import
+ * (`Interfaces.IRenderMime.IExtension`), and a renamed import such as
+ * `import { IRenderMime as RM }` is resolved through the TypeScript checker
+ * when it is available.
+ */
+function isMimeExtensionReference(
+  reference: TSESTree.TSTypeReference,
+  checker?: ts.TypeChecker | null,
+  getTSNode?: ((n: TSESTree.Node) => ts.Node | undefined) | null
+): boolean {
+  const typeName = reference.typeName;
+  if (
+    typeName.type !== 'TSQualifiedName' ||
+    typeName.right.name !== MIME_EXTENSION_TYPE_NAME
+  ) {
+    return false;
+  }
+  const namespace = extractTypeName(typeName.left)?.split('.').pop();
+  if (namespace === MIME_EXTENSION_NAMESPACE) {
+    return true;
+  }
+  return (
+    !!checker &&
+    !!getTSNode &&
+    typeName.left.type === 'Identifier' &&
+    resolveTypeAlias(typeName.left, checker, getTSNode) ===
+      MIME_EXTENSION_NAMESPACE
+  );
+}
+
+/**
+ * Returns true when a type annotation mentions the MIME renderer extension
+ * entry type at any depth, with the same wrappers as
+ * `typeMentionsJupyterPlugin`. JupyterLab registers each entry as a plugin
+ * whose ID is the entry's `id`, so the entry follows the plugin ID convention.
+ */
+export function typeMentionsMimeExtension(
+  typeNode: TSESTree.TypeNode | undefined | null,
+  checker?: ts.TypeChecker | null,
+  getTSNode?: ((n: TSESTree.Node) => ts.Node | undefined) | null
+): boolean {
+  return typeMentions(typeNode, reference =>
+    isMimeExtensionReference(reference, checker, getTSNode)
+  );
 }
 
 /**
@@ -358,4 +407,22 @@ export function looksLikePluginObject(
   }
 
   return PLUGIN_SHAPE_PROPERTIES.some(name => properties.has(name));
+}
+
+/**
+ * Returns true when an object literal has the shape of a MIME renderer
+ * extension entry: a string `id` and a `rendererFactory`. Used for entries
+ * written without a type annotation. The plugin ID can be supplied by callers
+ * that resolve it from a local const instead of a literal.
+ */
+export function looksLikeMimeExtensionObject(
+  node: TSESTree.ObjectExpression,
+  pluginId: string | null = getPluginId(node)
+): boolean {
+  const properties = getObjectProperties(node);
+  return (
+    pluginId !== null &&
+    properties.has('id') &&
+    properties.has('rendererFactory')
+  );
 }

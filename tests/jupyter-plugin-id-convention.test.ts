@@ -42,12 +42,36 @@ const disabledExtensionFilename = path.join(
   'index.ts'
 );
 
+const mimePackageFilename = path.join(
+  __dirname,
+  'fixtures',
+  'mime-pkg',
+  'src',
+  'index.ts'
+);
+
 const ruleTester = new RuleTester({
   languageOptions: {
     parser: require('@typescript-eslint/parser'),
     parserOptions: {
       ecmaVersion: 2020,
       sourceType: 'module'
+    }
+  }
+});
+
+// Resolving a renamed namespace import needs the TypeScript program.
+const typeAwareTester = new RuleTester({
+  languageOptions: {
+    parser: require('@typescript-eslint/parser'),
+    parserOptions: {
+      ecmaVersion: 2020,
+      sourceType: 'module',
+      projectService: {
+        allowDefaultProject: ['tests/fixtures/mime-pkg/src/*.ts'],
+        defaultProject: 'tsconfig.json'
+      },
+      tsconfigRootDir: path.resolve(__dirname, '..')
     }
   }
 });
@@ -161,6 +185,38 @@ ruleTester.run('plugin-id-convention', pluginIdConvention, {
           activate: () => {}
         };
       `
+    },
+    // MIME renderer entries are registered as plugins under their `id`.
+    {
+      filename: mimePackageFilename,
+      code: `
+        const extension: IRenderMime.IExtension = {
+          id: '@jupyterlab/example-mime:factory',
+          rendererFactory
+        };
+        export default extension;
+      `
+    },
+    {
+      filename: mimePackageFilename,
+      code: `
+        export default [
+          {
+            id: '@jupyterlab/example-mime:factory',
+            rendererFactory,
+            rank: 0
+          }
+        ];
+      `
+    },
+    {
+      filename: nonExtensionFilename,
+      code: `
+        const extension: IRenderMime.IExtension = {
+          id: 'other-extension:factory',
+          rendererFactory
+        };
+      `
     }
   ],
 
@@ -270,6 +326,131 @@ ruleTester.run('plugin-id-convention', pluginIdConvention, {
             activate: () => {}
           };
         }
+      `,
+      errors: [{ messageId: 'mismatchedPrefix' }]
+    },
+    // A MIME renderer entry in a package which only declares `mimeExtension`.
+    {
+      filename: mimePackageFilename,
+      code: `
+        const extension: IRenderMime.IExtension = {
+          id: '@jupyterlab/other-mime:factory',
+          rendererFactory
+        };
+      `,
+      errors: [
+        {
+          messageId: 'mismatchedPrefix',
+          data: {
+            pluginId: '@jupyterlab/other-mime:factory',
+            packageName: '@jupyterlab/example-mime'
+          }
+        }
+      ]
+    },
+    // The union JupyterLab's own MIME packages use for the default export.
+    {
+      filename: fixtureFilename,
+      code: `
+        const extensions: IRenderMime.IExtension | IRenderMime.IExtension[] = [
+          {
+            id: '@jupyterlab/example-extension:factory',
+            rendererFactory
+          },
+          {
+            id: '@jupyterlab/example-lines-extension:factory',
+            rendererFactory
+          }
+        ];
+        export default extensions;
+      `,
+      errors: [
+        {
+          messageId: 'mismatchedPrefix',
+          data: {
+            pluginId: '@jupyterlab/example-lines-extension:factory',
+            packageName: '@jupyterlab/example-extension'
+          }
+        }
+      ]
+    },
+    // Without a type annotation the entry is recognised by `rendererFactory`.
+    {
+      filename: mimePackageFilename,
+      code: `
+        export default [
+          {
+            id: '@jupyterlab/other-mime:factory',
+            rendererFactory,
+            rank: 0
+          }
+        ];
+      `,
+      errors: [{ messageId: 'mismatchedPrefix' }]
+    },
+    {
+      filename: mimePackageFilename,
+      code: `
+        const EXTENSION_ID = '@jupyterlab/other-mime:factory';
+        const extension: IRenderMime.IExtension = {
+          id: EXTENSION_ID,
+          rendererFactory
+        };
+      `,
+      errors: [{ messageId: 'mismatchedPrefix' }]
+    },
+    // The properties come from a spread, so only the annotation identifies
+    // the object as a MIME entry.
+    {
+      filename: mimePackageFilename,
+      code: `
+        const extension: IRenderMime.IExtension = {
+          id: '@jupyterlab/other-mime:factory',
+          ...shared
+        };
+      `,
+      errors: [{ messageId: 'mismatchedPrefix' }]
+    },
+    {
+      filename: mimePackageFilename,
+      code: `
+        function make(): IRenderMime.IExtension {
+          return {
+            id: '@jupyterlab/other-mime:factory',
+            ...shared
+          };
+        }
+      `,
+      errors: [{ messageId: 'mismatchedPrefix' }]
+    },
+    {
+      filename: mimePackageFilename,
+      code: `
+        import * as Interfaces from '@jupyterlab/rendermime-interfaces';
+        const extension: Interfaces.IRenderMime.IExtension = {
+          id: '@jupyterlab/other-mime:factory',
+          ...shared
+        };
+      `,
+      errors: [{ messageId: 'mismatchedPrefix' }]
+    }
+  ]
+});
+
+typeAwareTester.run('plugin-id-convention (type-aware)', pluginIdConvention, {
+  valid: [],
+  invalid: [
+    // The MIME entry type is reached through a renamed namespace import, so
+    // only the checker can tell that this object is a MIME renderer entry.
+    {
+      filename: 'tests/fixtures/mime-pkg/src/type-aware-fixture.ts',
+      code: `
+        import { IRenderMime as RM } from '../../types';
+        const shared = { rendererFactory: {} };
+        const extension: RM.IExtension = {
+          id: '@jupyterlab/other-mime:factory',
+          ...shared
+        };
       `,
       errors: [{ messageId: 'mismatchedPrefix' }]
     }
