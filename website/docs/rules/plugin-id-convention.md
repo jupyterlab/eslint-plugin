@@ -33,6 +33,12 @@ For example, in a package with this manifest:
 }
 ```
 
+A plugin whose ID is exactly the package name, with no `:` part, is not
+reported by default. Such an ID does not follow the convention, but
+`disabledExtensions`, `deferredExtensions` and `lockedExtensions` match it in
+full, so it has no user impact. Set `reportIdEqualToPackageName` to
+report such an ID.
+
 ## Incorrect
 
 The plugin ID uses a different package prefix, so extension-level
@@ -114,7 +120,23 @@ Entries in `overrides.json` and in the page config are deployment configuration
 and have to be updated there. When that cost is too high, keep the ID and add an
 `eslint-disable-next-line jupyter/plugin-id-convention` comment with the reason.
 
-
 ## Options
 
-This rule has no options.
+```ts
+{
+  "reportIdEqualToPackageName": false
+}
+```
+
+### `reportIdEqualToPackageName`
+
+Set to `true` to also report a plugin whose ID is exactly the package name. The
+report asks for the `<package>:<plugin>` form.
+
+```ts
+// Not reported by default; reported when reportIdEqualToPackageName is true
+const plugin: JupyterFrontEndPlugin<void> = {
+  id: '@jupyterlab/example-extension',
+  activate: () => {}
+};
+```

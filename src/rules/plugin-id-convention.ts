@@ -156,13 +156,28 @@ const pluginIdConvention = createRule({
     },
     messages: {
       mismatchedPrefix:
-        'JupyterLab plugin ID "{{ pluginId }}" should start with "{{ packageName }}:" so extension-level configuration (disable, defer, lock) applies to it.'
+        'JupyterLab plugin ID "{{ pluginId }}" should start with "{{ packageName }}:" so extension-level configuration (disable, defer, lock) applies to it.',
+      idEqualsPackageName:
+        'JupyterLab plugin ID "{{ pluginId }}" is the package name alone; the convention is "{{ packageName }}:<plugin>".'
     },
-    schema: []
+    schema: [
+      {
+        type: 'object',
+        properties: {
+          reportIdEqualToPackageName: {
+            type: 'boolean',
+            default: false,
+            description:
+              'Also report a plugin whose ID is exactly the package name. Extension-level configuration matches such an ID in full, so it has no user impact, but it does not follow the `<package>:<plugin>` convention.'
+          }
+        },
+        additionalProperties: false
+      }
+    ]
   },
-  defaultOptions: [],
+  defaultOptions: [{ reportIdEqualToPackageName: false }],
 
-  create(context) {
+  create(context, [options]) {
     let services: ParserServices | null = null;
     let checker: ts.TypeChecker | null = null;
 
@@ -369,10 +384,18 @@ const pluginIdConvention = createRule({
         return;
       }
 
+      // An ID that is exactly the package name follows no convention, but
+      // `disabledExtensions`, `deferredExtensions` and `lockedExtensions`
+      // match it in full, so it is reported only when asked for.
+      const isPackageName = pluginId === packageName;
+      if (isPackageName && !options.reportIdEqualToPackageName) {
+        return;
+      }
+
       const idProperty = getObjectProperties(node).get('id');
       context.report({
         node: idProperty?.value ?? node,
-        messageId: 'mismatchedPrefix',
+        messageId: isPackageName ? 'idEqualsPackageName' : 'mismatchedPrefix',
         data: { pluginId, packageName }
       });
     }

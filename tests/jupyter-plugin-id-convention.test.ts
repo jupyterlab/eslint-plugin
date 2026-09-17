@@ -217,6 +217,27 @@ ruleTester.run('plugin-id-convention', pluginIdConvention, {
           rendererFactory
         };
       `
+    },
+    // The package name alone matches `disabledExtensions`, `deferredExtensions`
+    // and `lockedExtensions` in full, so it is not reported by default.
+    {
+      filename: fixtureFilename,
+      code: `
+        const plugin: JupyterFrontEndPlugin<void> = {
+          id: '@jupyterlab/example-extension',
+          autoStart: true,
+          activate: () => {}
+        };
+      `
+    },
+    {
+      filename: mimePackageFilename,
+      code: `
+        const extension: IRenderMime.IExtension = {
+          id: '@jupyterlab/example-mime',
+          rendererFactory
+        };
+      `
     }
   ],
 
@@ -306,8 +327,22 @@ ruleTester.run('plugin-id-convention', pluginIdConvention, {
       `,
       errors: [{ messageId: 'mismatchedPrefix' }]
     },
+    // An ID that starts with the package name but has no `:` is another name.
     {
       filename: fixtureFilename,
+      code: `
+        const plugin: JupyterFrontEndPlugin<void> = {
+          id: '@jupyterlab/example-extension-plugin',
+          autoStart: true,
+          activate: () => {}
+        };
+      `,
+      errors: [{ messageId: 'mismatchedPrefix' }]
+    },
+    // The package name alone is reported only on request.
+    {
+      filename: fixtureFilename,
+      options: [{ reportIdEqualToPackageName: true }],
       code: `
         const plugin: JupyterFrontEndPlugin<void> = {
           id: '@jupyterlab/example-extension',
@@ -315,7 +350,15 @@ ruleTester.run('plugin-id-convention', pluginIdConvention, {
           activate: () => {}
         };
       `,
-      errors: [{ messageId: 'mismatchedPrefix' }]
+      errors: [
+        {
+          messageId: 'idEqualsPackageName',
+          data: {
+            pluginId: '@jupyterlab/example-extension',
+            packageName: '@jupyterlab/example-extension'
+          }
+        }
+      ]
     },
     {
       filename: fixtureFilename,
