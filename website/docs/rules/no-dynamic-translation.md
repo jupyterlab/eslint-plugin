@@ -3,27 +3,65 @@
 Require JupyterLab translation messages to be written as literals at the call
 site.
 
-## Incorrect
+## Examples
+
+### Insert a file name
+
+**Incorrect**
 
 ```ts
 trans.__(`Delete ${fileName}`);
+```
+
+**Correct**
+
+```ts
+trans.__('Delete %1', fileName);
+```
+
+### Translate singular and plural forms
+
+**Incorrect**
+
+```ts
 trans._n('%1 file', `${n} files`, n);
+```
 
-let text = `Kernel ${Text.titleCase(status)}`;
+**Correct**
+
+```ts
+trans._n('%1 file', '%1 files', n);
+```
+
+### Build a status message
+
+**Incorrect**
+
+```ts
+const text = `Kernel ${Text.titleCase(status)}`;
 widget.node.textContent = trans.__(text);
+```
 
+**Correct**
+
+```ts
+widget.node.textContent = trans.__('Kernel %1', Text.titleCase(status));
+```
+
+### Write constant messages at the call site
+
+Even a constant string must appear in the translation call for the extractor to find it.
+
+**Incorrect**
+
+```ts
 const MESSAGE = 'Delete';
 trans.__(MESSAGE);
 ```
 
-## Correct
+**Correct**
 
 ```ts
-trans.__('Delete %1', fileName);
-trans._n('%1 file', '%1 files', n);
-
-widget.node.textContent = trans.__('Kernel %1', Text.titleCase(status));
-
 trans.__('Delete');
 ```
 

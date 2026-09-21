@@ -2,19 +2,24 @@
 
 Pass `this` when connecting a signal that can outlive the receiving object, so disposal can remove the connection.
 
-## Incorrect
+## Examples
+
+### Connect to an application service
+
+The registry outlives the panel. Passing `this` lets `Widget.dispose()` remove the connection when the panel closes.
+
+**Incorrect**
 
 ```ts
 class SettingsPanel extends Widget {
   constructor(registry: ISettingRegistry) {
     super();
-    // This callback stays connected after the panel is disposed.
     registry.pluginChanged.connect(() => this.update());
   }
 }
 ```
 
-## Correct
+**Correct**
 
 ```ts
 class SettingsPanel extends Widget {
@@ -25,13 +30,92 @@ class SettingsPanel extends Widget {
 }
 ```
 
+### Connect a view to a shared model
+
+A notebook model can outlive an individual view. Closing a view should stop its callbacks without disposing the shared model.
+
+**Incorrect**
+
+```ts
+class NotebookView extends Widget {
+  constructor(private _model: INotebookModel) {
+    super();
+    this._model.contentChanged.connect(() => this.update());
+  }
+}
+```
+
+**Correct**
+
+```ts
+class NotebookView extends Widget {
+  constructor(private _model: INotebookModel) {
+    super();
+    this._model.contentChanged.connect(() => this.update(), this);
+  }
+}
+```
+
+### Replace a bound callback
+
+Each `.bind(this)` call creates a new function. Connecting the method with a receiver lets inherited cleanup remove it.
+
+**Incorrect**
+
+```ts
+class SourcesBody extends Widget {
+  constructor(service: IDebugger) {
+    super();
+    service.model.currentFrameChanged.connect(this._onFrameChanged.bind(this));
+  }
+
+  private _onFrameChanged(): void {
+    this.update();
+  }
+}
+```
+
+**Correct**
+
+```ts
+class SourcesBody extends Widget {
+  constructor(service: IDebugger) {
+    super();
+    service.model.currentFrameChanged.connect(this._onFrameChanged, this);
+  }
+
+  private _onFrameChanged(): void {
+    this.update();
+  }
+}
+```
+
+### Keep an existing matching disconnect
+
+This callback already has a cleanup path. Adding `this` only to `connect()` would break the existing `disconnect()` match.
+
+**Allowed**
+
+```ts
+class SettingsPanel extends Widget {
+  constructor(registry: ISettingRegistry) {
+    super();
+    const update = () => this.update();
+    registry.pluginChanged.connect(update);
+    this.disposed.connect(() => {
+      registry.pluginChanged.disconnect(update);
+    });
+  }
+}
+```
+
 ## Why
 
 A settings registry lives longer than the panels that use it. Without a receiver, its signal keeps the callback connected after a panel is disposed. Passing `this` lets the inherited `Widget.dispose()` remove that connection.
 
 The same applies to a notebook model shared by multiple views: closing one view should remove its callbacks without disposing the model.
 
-This rule covers cleanup. For unbound methods that fail when called, see [require-signal-this-arg](../require-signal-this-arg).
+This rule covers cleanup. For unbound methods that fail when called, see [require-signal-this-arg](../require-signal-this-arg). The two rules do not report the same connection. Adding a receiver alone does not provide cleanup in a class that has none; see [require-signal-cleanup](../require-signal-cleanup).
 
 ## Type-aware checking
 
@@ -43,23 +127,9 @@ Enable [type-aware linting](https://typescript-eslint.io/getting-started/typed-l
 
 ## Fixing a report
 
-The editor suggestion adds `this` to the connection. For `callback.bind(this)`, it also removes the bind. Review matching `disconnect()` calls before accepting: the callback and receiver must match the original connection.
+The editor suggestion adds `this` to the connection. For `callback.bind(this)`, it also removes the bind. A callback bound to another object keeps that binding; the suggestion only adds the cleanup receiver. Review matching `disconnect()` calls before accepting: the callback and receiver must match the original connection.
 
 A matching one-argument `disconnect(callback)` already provides cleanup and is left alone. Adding a receiver only to `connect()` would break that match.
-
-## More examples
-
-A bound method can be connected without creating a new function:
-
-```ts
-// Incorrect: each bind() creates a new callback.
-service.model.currentFrameChanged.connect(this._onFrameChanged.bind(this));
-
-// Correct: Widget.dispose() can remove this connection.
-service.model.currentFrameChanged.connect(this._onFrameChanged, this);
-```
-
-These calls belong in a widget receiving a longer-lived debugger service. For a class that does not already clean up its connections, adding `this` alone is not enough; see [require-signal-cleanup](../require-signal-cleanup).
 
 ## Options
 
@@ -80,6 +150,10 @@ These calls belong in a widget receiving a longer-lived debugger service. For a 
 <summary>Scope and limitations</summary>
 
 The rule reports only when the sender is a known long-lived service, or a model used by a Lumino widget, and the receiving class already has receiver-based cleanup. Senders owned and disposed by that class, its own signals and `disposed` signals are left alone.
+
+Receiver-based cleanup includes `Signal.clearData(this)`, `Signal.disconnectReceiver(this)`, `Signal.disconnectAll(this)`, `Signal.disconnectBetween(sender, this)`, or a matching `disconnect(callback, this)` in the class. Lumino widgets inherit cleanup from `Widget.dispose()`.
+
+Calls in static members and nested regular functions are skipped because `this` does not identify the receiving instance there.
 
 Unknown lifetimes are not reported. Add your own application services with `longLivedTypes`. The model/view check requires a Lumino widget; other view-like classes are not covered. Cleanup in another file cannot be detected.
 

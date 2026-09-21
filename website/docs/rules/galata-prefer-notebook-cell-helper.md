@@ -2,31 +2,66 @@
 
 Prefer the Galata `page.notebook` helper over raw Playwright selectors and keyboard shortcuts for notebook cell operations.
 
-## Incorrect
+## Examples
+
+### Set and run the first cell
+
+**Incorrect**
 
 ```ts
 await page
   .locator(
     '.jp-Cell-inputArea >> .cm-editor >> .cm-content[contenteditable="true"]'
   )
+  .first()
   .fill('print("hello")');
 await page.keyboard.press('Control+Enter');
-
-await page.click('.jp-Cell-inputArea');
-await page.locator('.jp-Cell').nth(2).click();
-await page.press('.jp-Cell', 'Shift+Enter');
 ```
 
-## Correct
+**Correct**
 
 ```ts
 await page.notebook.setCell(0, 'code', 'print("hello")');
 await page.notebook.runCell(0);
+```
 
+### Enter editing mode
+
+**Incorrect**
+
+```ts
+await page.locator('.jp-Cell-inputArea').first().click();
+```
+
+**Correct**
+
+```ts
 await page.notebook.enterCellEditingMode(0);
-await page.notebook.selectCells(2);
+```
 
-// Not a notebook cell: the console reuses the same editor markup.
+### Select the third cell
+
+Cell indexes start at zero.
+
+**Incorrect**
+
+```ts
+await page.locator('.jp-Cell').nth(2).click();
+```
+
+**Correct**
+
+```ts
+await page.notebook.selectCells(2);
+```
+
+### Console input
+
+The console reuses editor markup but is not a notebook cell.
+
+**Allowed**
+
+```ts
 await page
   .locator(
     '.jp-CodeConsole-input >> .cm-editor >> .cm-content[contenteditable="true"]'

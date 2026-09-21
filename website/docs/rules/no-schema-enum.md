@@ -2,57 +2,89 @@
 
 Disallow `enum` in settings JSON schema files; use `oneOf` with `const`, `title`, and an explicit `type` instead.
 
-## Incorrect
+## Examples
 
-These choices display the stored values instead of translatable labels:
+### Give string choices readable labels
+
+These are setting definitions within a `schema/*.json` file. Keep stored values stable while adding labels that can be translated.
+
+**Incorrect**
 
 ```json
 {
-  "properties": {
-    "defaultZoom": {
-      "type": "string",
-      "enum": ["fit-to-width", "fit-to-height", "100%"]
-    }
-  }
+  "type": "string",
+  "enum": ["fit-to-width", "fit-to-height"]
 }
 ```
 
-Adding labels without declaring the setting's type is also reported:
+**Correct**
 
 ```json
 {
-  "properties": {
-    "defaultZoom": {
-      "oneOf": [
-        { "const": "fit-to-width", "title": "Fit to width" },
-        { "const": "fit-to-height", "title": "Fit to height" },
-        { "const": "100%", "title": "100%" }
-      ]
-    }
-  }
+  "type": "string",
+  "oneOf": [
+    { "const": "fit-to-width", "title": "Fit to width" },
+    { "const": "fit-to-height", "title": "Fit to height" }
+  ]
 }
 ```
 
-## Correct
+### Declare the type of string choices
+
+Labels alone are not enough: the containing setting needs `type` for the editor to render string choices. This missing type can be fixed automatically.
+
+**Incorrect**
 
 ```json
 {
-  "properties": {
-    "defaultZoom": {
-      "type": "string",
-      "oneOf": [
-        { "const": "fit-to-width", "title": "Fit to width" },
-        { "const": "fit-to-height", "title": "Fit to height" },
-        { "const": "100%", "title": "100%" }
-      ]
-    }
-  }
+  "oneOf": [
+    { "const": "light", "title": "Light theme" },
+    { "const": "dark", "title": "Dark theme" }
+  ]
+}
+```
+
+**Correct**
+
+```json
+{
+  "type": "string",
+  "oneOf": [
+    { "const": "light", "title": "Light theme" },
+    { "const": "dark", "title": "Dark theme" }
+  ]
+}
+```
+
+### Label numeric choices
+
+The rule also reports numeric `enum` arrays. Keep the numeric type and values when adding labels.
+
+**Incorrect**
+
+```json
+{
+  "type": "integer",
+  "enum": [2, 4, 8]
+}
+```
+
+**Correct**
+
+```json
+{
+  "type": "integer",
+  "oneOf": [
+    { "const": 2, "title": "Two spaces" },
+    { "const": 4, "title": "Four spaces" },
+    { "const": 8, "title": "Eight spaces" }
+  ]
 }
 ```
 
 ## Why
 
-With `enum`, users see the stored values, such as `fit-to-width`, and those labels cannot be translated. With `oneOf`, each `title` provides a readable, translatable label while `const` preserves the stored value.
+With `enum`, users see stored values such as `fit-to-width`, and the schema cannot associate them with translatable labels. With `oneOf`, each `title` provides a readable, translatable label while `const` preserves the stored value.
 
 String choices also need `"type": "string"` on the containing setting so the settings editor can render the control. The rule can add a missing type automatically.
 
@@ -79,3 +111,10 @@ export default [
   }
 ];
 ```
+
+<details>
+<summary>Which schema values are checked?</summary>
+
+The rule reports `enum` properties whose value is an array in JSON files directly inside a `schema/` directory. It also reports a missing sibling `type` when every `oneOf` choice has a string `const`. It does not add types to numeric or mixed choices, and it does not check JSON files outside these schema directories.
+
+</details>

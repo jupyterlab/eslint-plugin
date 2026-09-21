@@ -2,22 +2,75 @@
 
 Forbid concatenating dynamic values into JupyterLab translation messages.
 
-## Incorrect
+## Examples
+
+### Insert a user name
+
+**Incorrect**
 
 ```ts
 this.trans.__('Hello ' + userName);
-trans._p('menu ' + section, 'Open');
-trans._n('%1 file', '%1 ' + word, n);
 ```
 
-## Correct
+**Correct**
 
 ```ts
 this.trans.__('Hello %1', userName);
-trans._p('menu', 'Open');
-trans._n('%1 file', '%1 files', n);
+```
 
-// Literal concatenation is still readable, so it stays fine:
+### Insert several values
+
+Placeholders let translators change the order of the file and folder names.
+
+**Incorrect**
+
+```ts
+trans.__('Move ' + fileName + ' to ' + folderName);
+```
+
+**Correct**
+
+```ts
+trans.__('Move %1 to %2', fileName, folderName);
+```
+
+### Translate complete plural messages
+
+**Incorrect**
+
+```ts
+trans._n('Delete ' + n + ' file', 'Delete ' + n + ' files', n);
+```
+
+**Correct**
+
+```ts
+trans._n('Delete %1 file', 'Delete %1 files', n);
+```
+
+### Use a literal translation context
+
+For an action in the file menu, write its context explicitly. If different contexts are needed, use separate calls with literal contexts.
+
+**Incorrect**
+
+```ts
+trans._p('menu ' + section, 'Open');
+```
+
+**Correct**
+
+```ts
+trans._p('file menu', 'Open');
+```
+
+### Split a long literal across source lines
+
+Concatenation is allowed when every part is literal text.
+
+**Allowed**
+
+```ts
 trans.__('Part 1 of long message.\n' + 'Part 2 of long message.\n');
 ```
 

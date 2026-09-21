@@ -4,20 +4,55 @@ Prefix each plugin ID with the extension package name followed by `:`.
 
 These examples belong to a package named `@jupyterlab/example-extension`. The same convention applies to MIME renderer extensions.
 
-## Incorrect
+## Examples
 
-The plugin ID uses a different package prefix, so deferring or locking
-`@jupyterlab/example-extension` misses this plugin.
+### Match the extension package
+
+Using another package’s prefix makes deferring or locking this extension miss the plugin.
+
+**Incorrect**
 
 ```ts
 const plugin: JupyterFrontEndPlugin<void> = {
   id: '@jupyterlab/other-extension:plugin',
-  autoStart: true,
   activate: () => {}
 };
 ```
 
-A MIME renderer entry under a different prefix is skipped the same way.
+**Correct**
+
+```ts
+const plugin: JupyterFrontEndPlugin<void> = {
+  id: '@jupyterlab/example-extension:plugin',
+  activate: () => {}
+};
+```
+
+### Include the package before a short plugin name
+
+**Incorrect**
+
+```ts
+const plugin: JupyterFrontEndPlugin<void> = {
+  id: 'commands',
+  activate: () => {}
+};
+```
+
+**Correct**
+
+```ts
+const plugin: JupyterFrontEndPlugin<void> = {
+  id: '@jupyterlab/example-extension:commands',
+  activate: () => {}
+};
+```
+
+### Name a MIME renderer extension
+
+MIME renderer entries are registered as plugins under their IDs too.
+
+**Incorrect**
 
 ```ts
 const extension: IRenderMime.IExtension = {
@@ -26,17 +61,7 @@ const extension: IRenderMime.IExtension = {
 };
 ```
 
-## Correct
-
-The plugin ID starts with the package name followed by `:`.
-
-```ts
-const plugin: JupyterFrontEndPlugin<void> = {
-  id: '@jupyterlab/example-extension:plugin',
-  autoStart: true,
-  activate: () => {}
-};
-```
+**Correct**
 
 ```ts
 const extension: IRenderMime.IExtension = {
@@ -102,7 +127,7 @@ and have to be updated there. When that cost is too high, keep the ID and add an
 
 ## Options
 
-```ts
+```json
 {
   "reportIdEqualToPackageName": false
 }
@@ -112,10 +137,24 @@ and have to be updated there. When that cost is too high, keep the ID and add an
 
 Set to `true` to also report a plugin whose ID is exactly the package name, without `:` and a plugin name. These IDs are allowed by default because extension-level configuration can still match them.
 
+### Require a suffix when the option is enabled
+
+The following pair assumes `reportIdEqualToPackageName: true`. The first version is allowed with the default settings.
+
+**Incorrect**
+
 ```ts
-// Not reported by default; reported when reportIdEqualToPackageName is true
 const plugin: JupyterFrontEndPlugin<void> = {
   id: '@jupyterlab/example-extension',
+  activate: () => {}
+};
+```
+
+**Correct**
+
+```ts
+const plugin: JupyterFrontEndPlugin<void> = {
+  id: '@jupyterlab/example-extension:plugin',
   activate: () => {}
 };
 ```
@@ -123,7 +162,16 @@ const plugin: JupyterFrontEndPlugin<void> = {
 <details>
 <summary>Which plugin IDs are checked?</summary>
 
-The rule uses the nearest JupyterLab extension manifest with `jupyterlab.extension` or `jupyterlab.mimeExtension` enabled.
+The rule uses the nearest JupyterLab extension manifest with `jupyterlab.extension` or `jupyterlab.mimeExtension` enabled. For the examples above, the manifest is:
+
+```json
+{
+  "name": "@jupyterlab/example-extension",
+  "jupyterlab": { "extension": true }
+}
+```
+
+A MIME-only package can use `"mimeExtension": true` instead.
 
 The ID can be a string literal or assembled from constant strings:
 

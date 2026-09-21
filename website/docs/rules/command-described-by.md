@@ -2,7 +2,13 @@
 
 Ensure JupyterLab command registrations include a `describedBy` property.
 
-## Incorrect
+## Examples
+
+### Describe a command argument
+
+The `value` argument needs metadata describing the value callers should provide.
+
+**Incorrect**
 
 ```ts
 app.commands.addCommand(CommandIDs.test, {
@@ -13,7 +19,7 @@ app.commands.addCommand(CommandIDs.test, {
 });
 ```
 
-## Correct
+**Correct**
 
 ```ts
 app.commands.addCommand(CommandIDs.test, {

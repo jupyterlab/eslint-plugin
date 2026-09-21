@@ -3,35 +3,123 @@
 Require calls returning `IDisposable` to transfer ownership to a caller, field,
 or disposable collection.
 
-## Incorrect
+## Examples
+
+### Return the resource to its caller
+
+In these examples, `createDisposable()` returns `IDisposable`; enable type-aware linting so the rule can identify that return type.
+
+**Incorrect**
 
 ```ts
-createDisposable();
+function createResource() {
+  createDisposable();
+}
 ```
 
+**Correct**
+
 ```ts
-const disposable = createDisposable();
-console.log(disposable);
+function createResource() {
+  return createDisposable();
+}
 ```
 
-## Correct
+### Give a resource to a disposable collection
+
+A local variable keeps the value accessible only during construction. The collection keeps it until the owner is disposed.
+
+**Incorrect**
 
 ```ts
-this._disposables.add(createDisposable());
+class Owner {
+  constructor() {
+    const resource = createDisposable();
+    console.log(resource);
+  }
+
+  dispose(): void {
+    this._disposables.dispose();
+  }
+
+  private _disposables = new DisposableSet();
+}
 ```
 
-```ts
-const disposable = createDisposable();
-disposable.dispose();
-```
+**Correct**
 
 ```ts
-return createDisposable();
+class Owner {
+  constructor() {
+    const resource = createDisposable();
+    this._disposables.add(resource);
+  }
+
+  dispose(): void {
+    this._disposables.dispose();
+  }
+
+  private _disposables = new DisposableSet();
+}
 ```
 
+### Run cleanup immediately
+
+If the resource is no longer needed, call `dispose()` instead of dropping it.
+
+**Incorrect**
+
 ```ts
-const disposables = DisposableSet.from([createDisposable()]);
-disposables.dispose();
+function finishTask() {
+  const resource = createDisposable();
+  console.log(resource);
+}
+```
+
+**Correct**
+
+```ts
+function finishTask() {
+  const resource = createDisposable();
+  resource.dispose();
+}
+```
+
+### Pass a resource to a typed owner
+
+With type information, a disposable parameter in an options object counts as a handoff. The application helper `ownResource()` must actually take responsibility for disposal; logging the same object does not.
+
+**Incorrect**
+
+```ts
+const resource = createDisposable();
+console.log({ resource });
+```
+
+**Correct**
+
+```ts
+declare function ownResource(options: { resource: IDisposable }): void;
+
+const resource = createDisposable();
+ownResource({ resource });
+```
+
+### Keep the collection returned by a factory
+
+The collection owns its entries, but the collection itself also needs an owner or a disposal call.
+
+**Incorrect**
+
+```ts
+DisposableSet.from([createDisposable()]);
+```
+
+**Correct**
+
+```ts
+const resources = DisposableSet.from([createDisposable()]);
+resources.dispose();
 ```
 
 ## Why
@@ -41,7 +129,7 @@ Ignoring the returned value usually means the cleanup path has been lost.
 
 ## Usage
 
-By default, the rule checks factory-named calls such as `create*`, `make*`, `build*` and `new*` that return a disposable. Type-aware linting is needed to identify these return types; the known Lumino `DisposableSet.from()` and `ObservableDisposableSet.from()` factories are recognized without it.
+By default, the rule checks factory-named calls such as `create*`, `make*`, `build*` and `new*` that return `IDisposable` or `IObservableDisposable`. Type-aware linting is needed to identify these return types; the known Lumino `DisposableSet.from()` and `ObservableDisposableSet.from()` factories are recognized without it.
 
 Values created directly in a Jupyter plugin’s `activate()` function are exempt because they commonly live for the application lifetime. A reported value can be returned, assigned to a field, put in a disposable collection, passed to an ownership helper or disposed. Keeping it in a local variable without arranging cleanup is not enough.
 
@@ -69,7 +157,7 @@ Function or method names whose disposable return value should be treated as
 borrowed, or as owned by a registration or session API. Names given here are
 **added** to the defaults, which include `get`, `find`, `addCommand`, `open`, `register`, `set` and `transform`.
 
-Use this option with `checkAllDisposableReturns` to exempt APIs that return borrowed objects or registration handles. The default checks only factory-named calls.
+This is especially useful with `checkAllDisposableReturns`, which also checks APIs that may return borrowed objects or registration handles. A return type alone does not tell the rule who owns the object. See the full [default ignored-return list](https://github.com/jupyterlab/eslint-plugin/blob/main/src/rules/require-disposable-transfer.ts).
 
 ### `extendDefaultIgnoredReturnFunctionNames`
 
@@ -124,6 +212,16 @@ Strictest possible checking, dropping every default exemption:
 
 With type information, passing a disposable to a parameter declared as a disposable type counts as a handoff, including through an options object. Configured ownership helper names work without that type information.
 
-The rule also accepts class-field collections, exported bindings and unconditional disposal in a callback. These patterns establish an owner; they do not guarantee that the owner eventually disposes the resource.
+Other accepted patterns include:
+
+- Assigning the resource to an object field or a class field initializer.
+- Storing it in a class-field collection, such as `this._items.set(key, resource)`.
+- Passing it as a direct array item to `DisposableSet.from()` or `ObservableDisposableSet.from()`.
+- Exporting a binding, including inside an exported namespace. Reassigning an export does not preserve ownership of the previous value.
+- Disposing it unconditionally inside a callback, for example `requestAnimationFrame(() => resource.dispose())`. A conditional disposal inside that callback is still reported.
+
+A local variable can be handed off later, including through an options object or array. The plugin-activation exemption also covers a function named `activate` and a separate function referenced by the plugin's `activate` property.
+
+These patterns establish an owner; they do not guarantee that the owner eventually disposes the resource.
 
 </details>

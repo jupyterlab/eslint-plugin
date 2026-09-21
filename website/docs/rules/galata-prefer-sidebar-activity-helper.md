@@ -2,21 +2,61 @@
 
 Prefer Galata's sidebar and activity helpers over raw Playwright selectors when opening sidebar tabs or activating main area tabs.
 
-## Incorrect
+## Examples
+
+### Open Running Terminals and Kernels
+
+**Incorrect**
 
 ```ts
 await page.click('[title="Running Terminals and Kernels"]');
-await page.locator('[title="Property Inspector"]').click();
-await page.getByRole('tab', { name: 'File Browser' }).click();
-await page.click('div[role="main"] >> text=Lorenz.ipynb');
 ```
 
-## Correct
+**Correct**
 
 ```ts
 await page.sidebar.openTab('jp-running-sessions');
+```
+
+### Open the property inspector
+
+**Incorrect**
+
+```ts
+await page.locator('[title="Property Inspector"]').click();
+```
+
+**Correct**
+
+```ts
 await page.sidebar.openTab('jp-property-inspector');
+```
+
+### Open the file browser
+
+**Incorrect**
+
+```ts
+await page.getByRole('tab', { name: 'File Browser' }).click();
+```
+
+**Correct**
+
+```ts
 await page.sidebar.openTab('filebrowser');
+```
+
+### Activate a document tab
+
+**Incorrect**
+
+```ts
+await page.click('div[role="main"] >> text=Lorenz.ipynb');
+```
+
+**Correct**
+
+```ts
 await page.activity.activateTab('Lorenz.ipynb');
 ```
 

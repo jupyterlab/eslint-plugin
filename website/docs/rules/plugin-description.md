@@ -2,28 +2,72 @@
 
 Ensure all `JupyterFrontEndPlugin` objects define a non-empty `description` property.
 
-## Incorrect
+## Examples
+
+### Describe what the plugin provides
+
+**Incorrect**
 
 ```ts
 const plugin: JupyterFrontEndPlugin<void> = {
-  id: 'test-plugin:plugin',
+  id: 'my-extension:commands',
   autoStart: true,
-  activate: (app: JupyterFrontEnd) => {
-    console.log('Activated');
-  }
+  activate: activateCommands
 };
 ```
 
-## Correct
+**Correct**
 
 ```ts
 const plugin: JupyterFrontEndPlugin<void> = {
-  id: 'test-plugin:plugin',
-  description: 'Test plugin used for lint rule examples',
+  id: 'my-extension:commands',
+  description: 'Adds commands for exporting notebooks.',
   autoStart: true,
-  activate: (app: JupyterFrontEnd) => {
-    console.log('Activated');
-  }
+  activate: activateCommands
+};
+```
+
+### Replace an empty description
+
+**Incorrect**
+
+```ts
+const plugin: JupyterFrontEndPlugin<void> = {
+  id: 'my-extension:preview',
+  description: '',
+  activate: activatePreview
+};
+```
+
+**Correct**
+
+```ts
+const plugin: JupyterFrontEndPlugin<void> = {
+  id: 'my-extension:preview',
+  description: 'Provides a preview of the current document.',
+  activate: activatePreview
+};
+```
+
+### Replace a whitespace-only description
+
+**Incorrect**
+
+```ts
+const plugin: JupyterFrontEndPlugin<void> = {
+  id: 'my-extension:status',
+  description: '   ',
+  activate: activateStatus
+};
+```
+
+**Correct**
+
+```ts
+const plugin: JupyterFrontEndPlugin<void> = {
+  id: 'my-extension:status',
+  description: 'Shows the current kernel status.',
+  activate: activateStatus
 };
 ```
 

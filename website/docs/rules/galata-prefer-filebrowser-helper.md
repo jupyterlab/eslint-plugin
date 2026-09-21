@@ -2,24 +2,74 @@
 
 Prefer Galata's `page.filebrowser` and `page.notebook` helpers over raw Playwright selectors for JupyterLab file browser interactions.
 
-## Incorrect
+## Examples
+
+### Open a notebook in a subdirectory
+
+The helper opens intermediate directories and waits for the notebook.
+
+**Incorrect**
 
 ```ts
 await page.dblclick('[aria-label="File Browser Section"] >> text=notebooks');
 await page.dblclick('text=Data.ipynb');
-await page.click('.jp-BreadCrumbs-home svg');
-await page.locator('.jp-DirListing-item').dblclick();
-await page.locator('#filebrowser').getByText('notebooks').dblclick();
 ```
 
-## Correct
+**Correct**
 
 ```ts
 await page.notebook.openByPath('notebooks/Data.ipynb');
+```
+
+### Return to the home directory
+
+**Incorrect**
+
+```ts
+await page.click('.jp-BreadCrumbs-home svg');
+```
+
+**Correct**
+
+```ts
 await page.filebrowser.openHomeDirectory();
+```
+
+### Open a directory
+
+**Incorrect**
+
+```ts
+await page.locator('#filebrowser').getByText('notebooks').dblclick();
+```
+
+**Correct**
+
+```ts
 await page.filebrowser.openDirectory('notebooks');
-await page.filebrowser.open('data/bar.json');
-// The file selector dialog is out of scope
+```
+
+### Open a file
+
+**Incorrect**
+
+```ts
+await page.locator('.jp-DirListing-item').getByText('data.json').dblclick();
+```
+
+**Correct**
+
+```ts
+await page.filebrowser.open('data.json');
+```
+
+### File selector dialogs
+
+The file browser helper drives the sidebar, so it cannot replace interactions in a file selector dialog.
+
+**Allowed**
+
+```ts
 await page.locator('.jp-Dialog .jp-DirListing-itemName').first().dblclick();
 ```
 

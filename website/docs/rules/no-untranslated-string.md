@@ -2,81 +2,189 @@
 
 Wrap user-facing text in a translation call such as `trans.__()`.
 
-## Incorrect
+## Examples
+
+### Translate a command label
+
+**Incorrect**
 
 ```ts
 commands.addCommand('file-download', { label: 'Download' });
-node.setAttribute('aria-label', 'Download file');
 ```
 
-## Correct
+**Correct**
 
 ```ts
 commands.addCommand('file-download', { label: trans.__('Download') });
+```
+
+### Translate a label returned by a function
+
+**Incorrect**
+
+```ts
+commands.addCommand('file-download', { label: () => 'Download' });
+```
+
+**Correct**
+
+```ts
+commands.addCommand('file-download', { label: () => trans.__('Download') });
+```
+
+### Translate accessibility labels
+
+Text read by assistive technology needs translation too. The equivalent `node.ariaLabel` assignment is checked as well.
+
+**Incorrect**
+
+```ts
+node.setAttribute('aria-label', 'Download file');
+```
+
+**Correct**
+
+```ts
 node.setAttribute('aria-label', trans.__('Download file'));
+```
+
+### Translate a widget title
+
+**Incorrect**
+
+```ts
+this.title.label = 'Source';
+```
+
+**Correct**
+
+```ts
+this.title.label = trans.__('Source');
+```
+
+### Translate dialog text
+
+The same requirement applies to `new Dialog()`.
+
+**Incorrect**
+
+```ts
+showDialog({ title: 'Confirm', body: 'Are you sure?' });
+```
+
+**Correct**
+
+```ts
+showDialog({ title: trans.__('Confirm'), body: trans.__('Are you sure?') });
+```
+
+### Translate a dialog button
+
+**Incorrect**
+
+```ts
+Dialog.okButton({ label: 'Build' });
+```
+
+**Correct**
+
+```ts
+Dialog.okButton({ label: trans.__('Build') });
+```
+
+### Translate text assigned to the DOM
+
+**Incorrect**
+
+```ts
+element.textContent = 'Save';
+```
+
+**Correct**
+
+```ts
+element.textContent = trans.__('Save');
+```
+
+### Translate labels passed in options
+
+Configured property names are checked even for custom widgets. This also covers a launcher entry’s `category`.
+
+**Incorrect**
+
+```ts
+new MyField({ ...options, label: 'My field' });
+```
+
+**Correct**
+
+```ts
+new MyField({ ...options, label: trans.__('My field') });
+```
+
+### Translate JSX text
+
+Wrapping raw text in braces, such as `<span>{'Error message:'}</span>`, does not translate it.
+
+**Incorrect**
+
+```tsx
+const message = <span>Error message:</span>;
+```
+
+**Correct**
+
+```tsx
+const message = <span>{trans.__('Error message:')}</span>;
+```
+
+### Translate a JSX attribute
+
+**Incorrect**
+
+```tsx
+const checkbox = <MyCheckbox label="Enable feature" />;
+```
+
+**Correct**
+
+```tsx
+const checkbox = <MyCheckbox label={trans.__('Enable feature')} />;
+```
+
+### Translate both conditional branches
+
+**Incorrect**
+
+```tsx
+const button = <button title={visible ? 'Hide layer' : 'Show layer'} />;
+```
+
+**Correct**
+
+```tsx
+const button = (
+  <button title={visible ? trans.__('Hide layer') : trans.__('Show layer')} />
+);
+```
+
+### Translate a fallback value
+
+**Incorrect**
+
+```ts
+const options = { label: name ?? 'Untitled' };
+```
+
+**Correct**
+
+```ts
+const options = { label: name ?? trans.__('Untitled') };
 ```
 
 ## Why
 
 Untranslated labels remain in the original language even when users select a different language for JupyterLab. Translate visible text and accessibility labels so both sighted users and screen reader users receive localized text.
-
-## More examples
-
-### Widget and dialog text
-
-```ts
-// Incorrect
-this.title.label = 'Source';
-showDialog({ title: 'Confirm', body: 'Are you sure?' });
-Dialog.okButton({ label: 'Build' });
-
-// Correct
-this.title.label = trans.__('Source');
-showDialog({ title: trans.__('Confirm'), body: trans.__('Are you sure?') });
-Dialog.okButton({ label: trans.__('Build') });
-```
-
-The same applies to text assigned to DOM properties or passed in options:
-
-```ts
-// Incorrect
-element.textContent = 'Save';
-new MyField({ ...options, label: 'My field' });
-launcher.add({ command, category: 'Notebook' });
-
-// Correct
-element.textContent = trans.__('Save');
-new MyField({ ...options, label: trans.__('My field') });
-launcher.add({ command, category: trans.__('Notebook') });
-```
-
-### JSX text and attributes
-
-```tsx
-// Incorrect
-const message = <span>Error message:</span>;
-const checkbox = <MyCheckbox label="Enable feature" />;
-
-// Correct
-const message = <span>{trans.__('Error message:')}</span>;
-const checkbox = <MyCheckbox label={trans.__('Enable feature')} />;
-```
-
-### Conditional text
-
-Translate each possible message, including fallback values:
-
-```tsx
-// Incorrect
-const button = <button title={visible ? 'Hide layer' : 'Show layer'} />;
-const options = { label: name ?? 'Untitled' };
-
-// Correct
-const button = (
-  <button title={visible ? trans.__('Hide layer') : trans.__('Show layer')} />
-);
-const options = { label: name ?? trans.__('Untitled') };
-```
 
 ## Options
 

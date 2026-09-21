@@ -2,36 +2,95 @@
 
 Disallow calling `PageConfig.getBaseUrl()` outside of `makeSettings()`.
 
-## Incorrect
+## Examples
+
+### Build a request URL from the current settings
+
+Use the same server settings for the URL and the request.
+
+**Incorrect**
 
 ```ts
-// Stored on instance — URL can never change after construction
-constructor(options: IOptions) {
-  this._baseUrl = PageConfig.getBaseUrl();
+function requestContents(serverSettings: ServerConnection.ISettings) {
+  const url = URLExt.join(PageConfig.getBaseUrl(), 'api', 'contents');
+  return ServerConnection.makeRequest(url, {}, serverSettings);
 }
+```
 
-// Captured in a closure at activation time
-activate: (app: JupyterFrontEnd, paths: JupyterFrontEnd.IPaths) => {
-  const url = URLExt.join(PageConfig.getBaseUrl(), paths.urls.themes);
-  return new ThemeManager({ url });
+**Correct**
+
+```ts
+function requestContents(serverSettings: ServerConnection.ISettings) {
+  const url = URLExt.join(serverSettings.baseUrl, 'api', 'contents');
+  return ServerConnection.makeRequest(url, {}, serverSettings);
+}
+```
+
+### Store settings instead of a URL captured during construction
+
+Read `baseUrl` for each request. Caching `serverSettings.baseUrl` in the constructor would also prevent later changes from taking effect, although this rule only reports `PageConfig.getBaseUrl()` calls.
+
+**Incorrect**
+
+```ts
+class ApiClient {
+  constructor(serverSettings: ServerConnection.ISettings) {
+    this._serverSettings = serverSettings;
+    this._baseUrl = PageConfig.getBaseUrl();
+  }
+
+  request() {
+    const url = URLExt.join(this._baseUrl, 'api', 'contents');
+    return ServerConnection.makeRequest(url, {}, this._serverSettings);
+  }
+
+  private _baseUrl: string;
+  private _serverSettings: ServerConnection.ISettings;
+}
+```
+
+**Correct**
+
+```ts
+class ApiClient {
+  constructor(private _serverSettings: ServerConnection.ISettings) {}
+
+  request() {
+    const url = URLExt.join(this._serverSettings.baseUrl, 'api', 'contents');
+    return ServerConnection.makeRequest(url, {}, this._serverSettings);
+  }
+}
+```
+
+### Pass settings from plugin activation
+
+The command uses `requestContents()` from the first example, so it reads the current URL whenever it runs.
+
+**Incorrect**
+
+```ts
+const plugin: JupyterFrontEndPlugin<void> = {
+  id: 'my-extension:requests',
+  activate: (app: JupyterFrontEnd) => {
+    const baseUrl = PageConfig.getBaseUrl();
+    app.commands.addCommand('my-extension:request', {
+      execute: () => fetch(URLExt.join(baseUrl, 'api', 'contents'))
+    });
+  }
 };
 ```
 
-## Correct
+**Correct**
 
 ```ts
-// Access baseUrl from stored settings each time it is needed
-private async _requestAPI<T>(): Promise<T> {
-  const settings = this._serverSettings;
-  const requestUrl = URLExt.join(settings.baseUrl, API_PATH);
-  const response = await ServerConnection.makeRequest(requestUrl, {}, settings);
-  ...
-}
-
-// Pass serverSettings through and read baseUrl when needed
-activate: (app: JupyterFrontEnd) => {
-  const serverSettings = app.serviceManager.serverSettings;
-  return new MyManager({ serverSettings });
+const plugin: JupyterFrontEndPlugin<void> = {
+  id: 'my-extension:requests',
+  activate: (app: JupyterFrontEnd) => {
+    const serverSettings = app.serviceManager.serverSettings;
+    app.commands.addCommand('my-extension:request', {
+      execute: () => requestContents(serverSettings)
+    });
+  }
 };
 ```
 

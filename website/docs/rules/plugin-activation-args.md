@@ -2,33 +2,131 @@
 
 Ensure JupyterLab plugin `activate` arguments match the order and count of `requires` and `optional` tokens.
 
-## Incorrect
+## Examples
+
+### Put the application first
+
+**Incorrect**
 
 ```ts
 const plugin: JupyterFrontEndPlugin<void> = {
-  id: 'test-plugin',
+  id: 'my-extension:tracker',
+  requires: [INotebookTracker],
+  activate: (tracker: INotebookTracker, app: JupyterFrontEnd) => {}
+};
+```
+
+**Correct**
+
+```ts
+const plugin: JupyterFrontEndPlugin<void> = {
+  id: 'my-extension:tracker',
+  requires: [INotebookTracker],
+  activate: (app: JupyterFrontEnd, tracker: INotebookTracker) => {}
+};
+```
+
+### Match the order of required services
+
+**Incorrect**
+
+```ts
+const plugin: JupyterFrontEndPlugin<void> = {
+  id: 'my-extension:renderer',
   requires: [INotebookTracker, IRenderMimeRegistry],
-  activate: (tracker: INotebookTracker, app: JupyterFrontEnd) => {
-    console.log('Activated');
+  activate: (
+    app: JupyterFrontEnd,
+    renderMime: IRenderMimeRegistry,
+    tracker: INotebookTracker
+  ) => {}
+};
+```
+
+**Correct**
+
+```ts
+const plugin: JupyterFrontEndPlugin<void> = {
+  id: 'my-extension:renderer',
+  requires: [INotebookTracker, IRenderMimeRegistry],
+  activate: (
+    app: JupyterFrontEnd,
+    tracker: INotebookTracker,
+    renderMime: IRenderMimeRegistry
+  ) => {}
+};
+```
+
+### Include an argument for each service
+
+Remove an unused dependency from `requires` if the plugin does not need it, or include its corresponding argument.
+
+**Incorrect**
+
+```ts
+const plugin: JupyterFrontEndPlugin<void> = {
+  id: 'my-extension:tracker',
+  requires: [INotebookTracker],
+  activate: (app: JupyterFrontEnd) => {}
+};
+```
+
+**Correct**
+
+```ts
+const plugin: JupyterFrontEndPlugin<void> = {
+  id: 'my-extension:tracker',
+  requires: [INotebookTracker],
+  activate: (app: JupyterFrontEnd, tracker: INotebookTracker) => {}
+};
+```
+
+### Allow an optional service to be absent
+
+Optional services follow all required services. Handle the missing-service case before using one.
+
+**Incorrect**
+
+```ts
+const plugin: JupyterFrontEndPlugin<void> = {
+  id: 'my-extension:translation',
+  optional: [ITranslator],
+  activate: (app: JupyterFrontEnd, translator: ITranslator) => {
+    const trans = translator.load('my-extension');
   }
 };
 ```
 
-## Correct
+**Correct**
 
 ```ts
 const plugin: JupyterFrontEndPlugin<void> = {
-  id: 'test-plugin',
-  requires: [INotebookTracker, IRenderMimeRegistry],
+  id: 'my-extension:translation',
   optional: [ITranslator],
-  activate: (
-    app: JupyterFrontEnd,
-    tracker: INotebookTracker,
-    renderMime: IRenderMimeRegistry,
-    translator: ITranslator | null
-  ) => {
-    console.log('Activated');
+  activate: (app: JupyterFrontEnd, translator: ITranslator | null) => {
+    const trans = (translator ?? nullTranslator).load('my-extension');
   }
+};
+```
+
+### Use null for a service-manager plugin
+
+Service-manager plugins receive `null` in the first position, not the application.
+
+**Incorrect**
+
+```ts
+const plugin: ServiceManagerPlugin<void> = {
+  id: 'my-extension:service',
+  activate: (app: JupyterFrontEnd) => {}
+};
+```
+
+**Correct**
+
+```ts
+const plugin: ServiceManagerPlugin<void> = {
+  id: 'my-extension:service',
+  activate: (_: null) => {}
 };
 ```
 
@@ -44,10 +142,12 @@ Enable `parserOptions.project` or `projectService` in your ESLint configuration 
 
 ## Options
 
-```ts
+The defaults are:
+
+```json
 {
   "allowedFirstArgumentNames": ["app", "_app", "_"]
 }
 ```
 
-Use this option to permit your team’s preferred name for the first `activate` argument.
+Use this option to permit your team’s preferred name for the first `activate` argument. The rule also checks its type, the service argument types, missing arguments and extra arguments.

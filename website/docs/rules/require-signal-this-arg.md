@@ -2,14 +2,19 @@
 
 Require a `thisArg` when connecting a class method that references `this` to a Lumino signal.
 
-## Incorrect
+## Examples
+
+### Connect a method that uses the instance
+
+`_onChanged()` calls `this.update()`, so it needs the view as its receiver.
+
+**Incorrect**
 
 ```ts
-class NotebookWatcher {
-  constructor(model: IModel) {
-    // this._onChanged uses `this` internally — it will not be bound
-    // to this instance when the signal fires.
-    model.changed.connect(this._onChanged);
+class NotebookView extends Widget {
+  constructor(model: INotebookModel) {
+    super();
+    model.contentChanged.connect(this._onChanged);
   }
 
   private _onChanged(): void {
@@ -18,12 +23,13 @@ class NotebookWatcher {
 }
 ```
 
-## Correct
+**Correct**
 
 ```ts
-class NotebookWatcher {
-  constructor(model: IModel) {
-    model.changed.connect(this._onChanged, this);
+class NotebookView extends Widget {
+  constructor(model: INotebookModel) {
+    super();
+    model.contentChanged.connect(this._onChanged, this);
   }
 
   private _onChanged(): void {
@@ -32,30 +38,71 @@ class NotebookWatcher {
 }
 ```
 
+### Connect a function stored in a field
+
+A regular function stored in a class field does not capture `this` as an arrow function would.
+
+**Incorrect**
+
 ```ts
-// Arrow-function property: `this` is captured lexically, so there is no
-// runtime bug. Passing the thisArg anyway lets Signal.clearData(this) remove
-// the connection (see prefer-signal-this-arg).
-class NotebookWatcher {
-  constructor(model: IModel) {
-    model.changed.connect(this._onChanged, this);
+class NotebookView extends Widget {
+  constructor(model: INotebookModel) {
+    super();
+    model.contentChanged.connect(this._onChanged);
   }
 
-  private _onChanged = (): void => {
+  private _onChanged = function (this: NotebookView): void {
     this.update();
   };
 }
 ```
 
+**Correct**
+
 ```ts
-// Wrapping in an arrow also binds `this` lexically — again, the thisArg is
-// what makes the connection removable by Signal.clearData(this).
-class NotebookWatcher {
-  constructor(model: IModel) {
-    model.changed.connect((sender, args) => {
-      this.handleChange(sender, args);
-    }, this);
+class NotebookView extends Widget {
+  constructor(model: INotebookModel) {
+    super();
+    model.contentChanged.connect(this._onChanged, this);
   }
+
+  private _onChanged = function (this: NotebookView): void {
+    this.update();
+  };
+}
+```
+
+### Use an arrow callback
+
+The arrow captures `this` for execution. The second argument still registers a receiver so `Widget.dispose()` can clean up.
+
+**Allowed**
+
+```ts
+class NotebookView extends Widget {
+  constructor(model: INotebookModel) {
+    super();
+    model.contentChanged.connect(() => this.update(), this);
+  }
+}
+```
+
+### Use an arrow-function field
+
+An arrow-function field also captures the instance. Without the second argument there is no unbound-method error, but [prefer-signal-this-arg](../prefer-signal-this-arg) can still report a cleanup problem.
+
+**Allowed**
+
+```ts
+class NotebookView extends Widget {
+  constructor(model: INotebookModel) {
+    super();
+    model.contentChanged.connect(this._onChanged, this);
+  }
+
+  private _onChanged = (): void => {
+    this.update();
+  };
 }
 ```
 

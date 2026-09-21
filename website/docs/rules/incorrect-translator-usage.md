@@ -2,29 +2,71 @@
 
 Store translation bundles under a name the translation extractor recognizes, such as `trans`.
 
-## Incorrect
+## Examples
+
+### Keep the bundle before translating
+
+**Incorrect**
 
 ```ts
-// Chained call — the string is never extracted
-translator.load('jupyterlab').__('some-string');
-
-// Unrecognized variable name
-const someNameButNotTrans = translator.load('jupyterlab');
-someNameButNotTrans.__('some-string');
-
-// Unrecognized instance property name
-this._bundle = translator.load('mydomain');
+translator.load('jupyterlab').__('Open file');
 ```
 
-## Correct
+**Correct**
 
 ```ts
 const trans = translator.load('jupyterlab');
-trans.__('some-string');
+trans.__('Open file');
+```
 
-// In a class
+### Use a recognized variable name
+
+**Incorrect**
+
+```ts
+const bundle = translator.load('jupyterlab');
+bundle.__('Open file');
+```
+
+**Correct**
+
+```ts
+const trans = translator.load('jupyterlab');
+trans.__('Open file');
+```
+
+### Store a bundle on a class
+
+**Incorrect**
+
+```ts
+this._bundle = translator.load('mydomain');
+this._bundle.__('Open file');
+```
+
+**Correct**
+
+```ts
 this._trans = translator.load('mydomain');
-this._trans.__('some-string');
+this._trans.__('Open file');
+```
+
+### Keep translation methods on the bundle
+
+Destructuring loses the name the extractor uses to recognize translation calls.
+
+**Incorrect**
+
+```ts
+const { __ } = translator.load('jupyterlab');
+__('Open file');
+```
+
+**Correct**
+
+```ts
+const trans = translator.load('jupyterlab');
+trans.__('Open file');
 ```
 
 ## Why
