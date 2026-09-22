@@ -113,6 +113,8 @@ class SettingsPanel extends Widget {
 
 A settings registry lives longer than the panels that use it. Without a receiver, its signal keeps the callback connected after a panel is disposed. Passing `this` lets the inherited `Widget.dispose()` remove that connection.
 
+A stale callback that references a widget can keep the entire widget and its resources in memory. Repeatedly opening and closing panels can accumulate these memory leaks and unwanted callbacks, increasing memory use and slowing the interface.
+
 The same applies to a notebook model shared by multiple views: closing one view should remove its callbacks without disposing the model.
 
 This rule covers cleanup. For unbound methods that fail when called, see [require-signal-this-arg](../require-signal-this-arg). The two rules do not report the same connection. Adding a receiver alone does not provide cleanup in a class that has none; see [require-signal-cleanup](../require-signal-cleanup).

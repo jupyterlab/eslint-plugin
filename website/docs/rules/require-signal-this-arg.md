@@ -1,6 +1,6 @@
 # `require-signal-this-arg`
 
-Require a `thisArg` when connecting a class method that references `this` to a Lumino signal.
+Require `this` as the second argument when a class method that uses `this` is connected to a Lumino signal.
 
 ## Examples
 

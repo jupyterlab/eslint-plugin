@@ -43,7 +43,7 @@ await page.click('.lm-Menu-itemLabel:text("Markdown Preview")');
 await page.filebrowser.open('README.md', 'Markdown Preview');
 ```
 
-### Choose CSV Viewer using role locators
+### Choose CSV Viewer
 
 **Incorrect**
 

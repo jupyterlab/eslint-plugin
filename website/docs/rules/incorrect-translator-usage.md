@@ -4,7 +4,7 @@ Store translation bundles under a name the translation extractor recognizes, suc
 
 ## Examples
 
-### Keep the bundle before translating
+### Store the bundle in a variable
 
 **Incorrect**
 

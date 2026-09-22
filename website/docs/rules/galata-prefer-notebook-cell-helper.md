@@ -59,7 +59,7 @@ await page.notebook.selectCells(2);
 
 The console reuses editor markup but is not a notebook cell.
 
-**Allowed**
+**Not reported**
 
 ```ts
 await page
@@ -77,7 +77,7 @@ Raw cell selectors depend on notebook markup and skip the readiness checks built
 
 This rule has no options.
 
-## Choosing a helper
+## When not to use it
 
 `setCell()` replaces the entire cell source. Raw `type()` and `pressSequentially()` append at the caret, so check that replacing the source is what your test intends.
 

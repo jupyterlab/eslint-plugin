@@ -63,6 +63,8 @@ await page.click('.lm-Menu ul[role="menu"] >> text=Rename');
 
 Raw clicks depend on which menu is already open and when its submenus appear. `page.menu.clickMenuItem()` closes open menus, follows the requested path and waits for each submenu. This makes a sequence such as opening a terminal easier to read and less prone to timing failures.
 
+## Other menu helpers
+
 Use `page.menu.isOpen(path)` to check menu state and `page.menu.getMenuItemLocator(path)` to inspect an item. Prefer `openLocator()` and `getMenuItemLocator()` over the deprecated `open()` and `getMenuItem()` forms.
 
 ## Options

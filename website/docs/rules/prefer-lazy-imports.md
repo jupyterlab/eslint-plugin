@@ -94,7 +94,7 @@ export async function createGrid(): Promise<DataGrid> {
 
 ### Load an application-specific class during on-demand activation
 
-This plugin is activated on demand and does not declare `autoStart: true`. Importing the Notebook application package only for an instance check otherwise adds it to startup work. Review dependencies from autostart plugins too; see [Autostart plugins](#autostart-plugins).
+This plugin is activated on demand and does not declare `autoStart: true`. A static import of the Notebook application package, used only for an instance check, loads that package at startup. Review dependencies from autostart plugins too; see [Autostart plugins](#autostart-plugins).
 
 **Incorrect**
 
@@ -270,7 +270,7 @@ Packages declared with `bundled: false` in the extension's `jupyterlab.sharedPac
 
 ### `deferredPackages`
 
-Packages that should load on demand. Static imports and re-exports are reported in every file, including side-effect imports and imports with no runtime use. Whole `import type` and `export type` declarations are exempt, as are the asset types described below.
+Packages that should load on demand. Static imports and re-exports are reported in every file, including side-effect imports and imports with no runtime use. Whole `import type` and `export type` declarations are exempt, as are the asset types described below in the "Build assumptions, assets and shared packages" details section.
 
 Patterns work like `allowedPackages`. This list takes precedence over both `allowedPackages` and manifest exemptions; `ignoreImports` can still exempt an import.
 
@@ -377,7 +377,7 @@ A plugin without `autoStart: true` may still be required by an autostart plugin.
 
 Plugin files include declarations using `JupyterFrontEndPlugin` or `ServiceManagerPlugin`, including arrays, unions, promises, casts and factory return types. Untyped objects count when they contain a string `id`, an `activate` function and at least one of `autoStart`, `requires`, `optional`, `provides` or `description`. Aliased type names need type information.
 
-For packages outside `deferredPackages`, the default checks imports used only inside functions, methods or instance field initializers. It skips type-only uses, side-effect imports, plugin tokens and sources re-exported from the same file. Imports needed during module evaluation, including through a helper called at module scope, are left alone unless `reportModuleLevelUsage` is enabled. An eager re-export keeps the source in the startup bundle even if its other uses are deferred.
+For packages outside `deferredPackages`, by default the rule checks imports used only inside functions, methods or instance field initializers. It skips type-only uses, side-effect imports, plugin tokens and sources re-exported from the same file. Imports needed during module evaluation, including through a helper called at module scope, are left alone unless `reportModuleLevelUsage` is enabled. An eager re-export keeps the source in the startup bundle even if its other uses are deferred.
 
 </details>
 

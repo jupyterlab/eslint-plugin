@@ -85,7 +85,7 @@ test('single screenshot', async ({ page }) => {
 
 ## Why
 
-A hard snapshot assertion stops the test at its first failure. Later screenshots are never captured, so you cannot inspect all visual changes from that run. Use `expect.soft()` to continue to the remaining snapshots while still failing the test if any assertion fails. The last snapshot can use either form. This also allows later snapshots to be reached when running with `--update-snapshots`.
+A hard snapshot assertion stops the test at its first failure. Later screenshots are never captured, so you cannot inspect all visual changes from that run. Use `expect.soft()` to continue to the remaining snapshots while still failing the test if any assertion fails. The last snapshot can use either form. Soft assertions also let `--update-snapshots` reach every snapshot in one run.
 
 ## Options
 

@@ -56,7 +56,7 @@ new Token<IVersion2Service>('@test/pkg:IVersion2Service', 'Version 2 service');
 
 ## Why
 
-Including the package name and service symbol makes a token easy to identify. The part after `:` must start with an ASCII letter, `_` or `$` and contain only those characters or digits. A missing `:` is also reported.
+Including the package name and service symbol makes a token easy to identify.
 
 ## Options
 
@@ -66,5 +66,7 @@ This rule has no options.
 <summary>Which token IDs are checked?</summary>
 
 The rule checks string literals passed to `new Token(...)`. Variables and template literals are not checked.
+
+The part after `:` must start with an ASCII letter, `_` or `$` and contain only those characters or digits. A missing `:` is also reported.
 
 </details>
