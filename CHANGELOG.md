@@ -2,6 +2,40 @@
 
 <!-- <START NEW CHANGELOG ENTRY> -->
 
+## 1.3.0
+
+([Full Changelog](https://github.com/jupyterlab/eslint-plugin/compare/v1.2.0...df828cdbeca215b72b475775bffe166f3d5f7739))
+
+### Enhancements made
+
+- Make rule documentation easier to read [#125](https://github.com/jupyterlab/eslint-plugin/pull/125) ([@MUFFANUJ](https://github.com/MUFFANUJ), [@Darshan808](https://github.com/Darshan808), [@krassowski](https://github.com/krassowski))
+- Add `deferredPackages` option to the `prefer-lazy-imports` rule [#123](https://github.com/jupyterlab/eslint-plugin/pull/123) ([@krassowski](https://github.com/krassowski), [@Copilot](https://github.com/Copilot), [@MUFFANUJ](https://github.com/MUFFANUJ))
+- Detect untranslated strings in conditional branches [#120](https://github.com/jupyterlab/eslint-plugin/pull/120) ([@MUFFANUJ](https://github.com/MUFFANUJ), [@krassowski](https://github.com/krassowski))
+- Add plugin ID convention lint rule [#119](https://github.com/jupyterlab/eslint-plugin/pull/119) ([@MUFFANUJ](https://github.com/MUFFANUJ), [@krassowski](https://github.com/krassowski))
+- Improve performance of the slow rules [#118](https://github.com/jupyterlab/eslint-plugin/pull/118) ([@krassowski](https://github.com/krassowski), [@MUFFANUJ](https://github.com/MUFFANUJ))
+- Add `galata-prefer-context-menu-helper` rule [#112](https://github.com/jupyterlab/eslint-plugin/pull/112) ([@Darshan808](https://github.com/Darshan808), [@krassowski](https://github.com/krassowski))
+- Catch untranslated `label` props via a configurable name list in `no-untranslated-string` [#102](https://github.com/jupyterlab/eslint-plugin/pull/102) ([@Darshan808](https://github.com/Darshan808), [@krassowski](https://github.com/krassowski))
+
+### Bugs fixed
+
+- Show better message for heavy imports in autostart plugins, improve docs [#122](https://github.com/jupyterlab/eslint-plugin/pull/122) ([@krassowski](https://github.com/krassowski), [@Copilot](https://github.com/Copilot), [@MUFFANUJ](https://github.com/MUFFANUJ))
+
+### Other merged PRs
+
+- Bump the npm_and_yarn group across 1 directory with 3 updates [#115](https://github.com/jupyterlab/eslint-plugin/pull/115) ([@Darshan808](https://github.com/Darshan808))
+- Bump the npm_and_yarn group across 2 directories with 6 updates [#110](https://github.com/jupyterlab/eslint-plugin/pull/110) ([@Darshan808](https://github.com/Darshan808), [@krassowski](https://github.com/krassowski))
+
+### Contributors to this release
+
+The following people contributed discussions, new ideas, code and documentation contributions, and review.
+See [our definition of contributors](https://github-activity.readthedocs.io/en/latest/use/#how-does-this-tool-define-contributions-in-the-reports).
+
+([GitHub contributors page for this release](https://github.com/jupyterlab/eslint-plugin/graphs/contributors?from=2026-09-08&to=2026-09-23&type=c))
+
+@Copilot ([activity](https://github.com/search?q=repo%3Ajupyterlab%2Feslint-plugin+involves%3ACopilot+updated%3A2026-09-08..2026-09-23&type=Issues)) | @Darshan808 ([activity](https://github.com/search?q=repo%3Ajupyterlab%2Feslint-plugin+involves%3ADarshan808+updated%3A2026-09-08..2026-09-23&type=Issues)) | @krassowski ([activity](https://github.com/search?q=repo%3Ajupyterlab%2Feslint-plugin+involves%3Akrassowski+updated%3A2026-09-08..2026-09-23&type=Issues)) | @MUFFANUJ ([activity](https://github.com/search?q=repo%3Ajupyterlab%2Feslint-plugin+involves%3AMUFFANUJ+updated%3A2026-09-08..2026-09-23&type=Issues))
+
+<!-- <END NEW CHANGELOG ENTRY> -->
+
 ## 1.2.0
 
 ([Full Changelog](https://github.com/jupyterlab/eslint-plugin/compare/v1.1.0...711438261cdc852a201883b83f02ed916d03f8c4))
@@ -31,8 +65,6 @@ See [our definition of contributors](https://github-activity.readthedocs.io/en/l
 ([GitHub contributors page for this release](https://github.com/jupyterlab/eslint-plugin/graphs/contributors?from=2026-08-11&to=2026-09-08&type=c))
 
 @Copilot ([activity](https://github.com/search?q=repo%3Ajupyterlab%2Feslint-plugin+involves%3ACopilot+updated%3A2026-08-11..2026-09-08&type=Issues)) | @Darshan808 ([activity](https://github.com/search?q=repo%3Ajupyterlab%2Feslint-plugin+involves%3ADarshan808+updated%3A2026-08-11..2026-09-08&type=Issues)) | @krassowski ([activity](https://github.com/search?q=repo%3Ajupyterlab%2Feslint-plugin+involves%3Akrassowski+updated%3A2026-08-11..2026-09-08&type=Issues)) | @MUFFANUJ ([activity](https://github.com/search?q=repo%3Ajupyterlab%2Feslint-plugin+involves%3AMUFFANUJ+updated%3A2026-08-11..2026-09-08&type=Issues))
-
-<!-- <END NEW CHANGELOG ENTRY> -->
 
 ## 1.1.0
 
