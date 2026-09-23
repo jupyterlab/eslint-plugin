@@ -1,55 +1,89 @@
 # `incorrect-translator-usage`
 
-Require translation bundles returned by `translator.load()` to be stored under an extractor-recognized name (e.g. `trans`, `this.trans`, `this._trans`, `props.trans`, `this.props.trans`).
+Store translation bundles under a name the translation extractor recognizes, such as `trans`.
 
-## Why
+## Examples
 
-JupyterLab collects translatable strings statically with a gettext-based extractor. The extractor only recognizes translation calls made through a small set of names:
+### Store the bundle in a variable
 
-- `trans`
-- `this.trans`
-- `this._trans`
-- `this.props.trans`
-- `props.trans`
-
-Calling `__()` (or any other bundle method) directly on the result of `translator.load()`, or storing the bundle under any other name, silently hides those strings from the extractor: the code still runs, but the strings never end up in language packs and stay untranslated.
-See [Rules](https://jupyterlab.readthedocs.io/en/stable/extension/internationalization.html#rules).
-
-## Rule details
-
-The rule reports:
-
-- A translation bundle method (`__`, `_n`, `_p`, `_np`, `gettext`, `ngettext`, `pgettext`, `npgettext`, `dcnpgettext`) called directly on the result of a `<translator>.load(...)` call.
-- The result of `<translator>.load(...)` stored under a name the extractor does not recognize — a variable or object property not named `trans`, or a member target other than `this.trans`, `this._trans`, `props.trans` or `this.props.trans`.
-- Destructuring the result of `<translator>.load(...)`.
-
-An object counts as a translator when its name contains `translator` (for example `translator`, `this._translator`, `props.translator` or `nullTranslator`). A chained bundle method or an unrecognized target only triggers the rule when the underlying `.load(...)` is called on such a translator; an unrelated `.load(...)` API is left alone. Passing the bundle directly to a function or returning it is not reported: the receiver is responsible for storing it under a recognized name.
-
-## Incorrect
+**Incorrect**
 
 ```ts
-// Chained call — the string is never extracted
-translator.load('jupyterlab').__('some-string');
-
-// Unrecognized variable name
-const someNameButNotTrans = translator.load('jupyterlab');
-someNameButNotTrans.__('some-string');
-
-// Unrecognized instance property name
-this._bundle = translator.load('mydomain');
+translator.load('jupyterlab').__('Open file');
 ```
 
-## Correct
+**Correct**
 
 ```ts
 const trans = translator.load('jupyterlab');
-trans.__('some-string');
-
-// In a class
-this._trans = translator.load('mydomain');
-this._trans.__('some-string');
+trans.__('Open file');
 ```
+
+### Use a recognized variable name
+
+**Incorrect**
+
+```ts
+const bundle = translator.load('jupyterlab');
+bundle.__('Open file');
+```
+
+**Correct**
+
+```ts
+const trans = translator.load('jupyterlab');
+trans.__('Open file');
+```
+
+### Store a bundle on a class
+
+**Incorrect**
+
+```ts
+this._bundle = translator.load('mydomain');
+this._bundle.__('Open file');
+```
+
+**Correct**
+
+```ts
+this._trans = translator.load('mydomain');
+this._trans.__('Open file');
+```
+
+### Keep translation methods on the bundle
+
+Destructuring loses the name the extractor uses to recognize translation calls.
+
+**Incorrect**
+
+```ts
+const { __ } = translator.load('jupyterlab');
+__('Open file');
+```
+
+**Correct**
+
+```ts
+const trans = translator.load('jupyterlab');
+trans.__('Open file');
+```
+
+## Why
+
+A translation call can run correctly but still be missing from language packs. The extractor recognizes only `trans`, `this.trans`, `this._trans`, `props.trans` and `this.props.trans`. Use one of these names so your messages can be collected for translation.
+
+See the [JupyterLab translation rules](https://jupyterlab.readthedocs.io/en/stable/extension/internationalization.html#rules).
 
 ## Options
 
 This rule has no options.
+
+<details>
+<summary>Which bundle uses are checked?</summary>
+
+The rule checks `.load()` calls on objects whose names contain `translator`, including `nullTranslator`. It reports unrecognized storage names, destructuring, and translation methods called directly on the returned bundle. Unrelated `.load()` APIs are ignored.
+
+Passing a bundle to another function or returning it is allowed; the receiving code must store it under a recognized name.
+
+</details>

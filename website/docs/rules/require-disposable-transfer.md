@@ -3,89 +3,135 @@
 Require calls returning `IDisposable` to transfer ownership to a caller, field,
 or disposable collection.
 
+## Examples
+
+### Return the resource to its caller
+
+In these examples, `createDisposable()` returns `IDisposable`; enable type-aware linting so the rule can identify that return type.
+
+**Incorrect**
+
+```ts
+function createResource() {
+  createDisposable();
+}
+```
+
+**Correct**
+
+```ts
+function createResource() {
+  return createDisposable();
+}
+```
+
+### Give a resource to a disposable collection
+
+A local variable keeps the value accessible only during construction. The collection keeps it until the owner is disposed.
+
+**Incorrect**
+
+```ts
+class Owner {
+  constructor() {
+    const resource = createDisposable();
+    console.log(resource);
+  }
+
+  dispose(): void {
+    this._disposables.dispose();
+  }
+
+  private _disposables = new DisposableSet();
+}
+```
+
+**Correct**
+
+```ts
+class Owner {
+  constructor() {
+    const resource = createDisposable();
+    this._disposables.add(resource);
+  }
+
+  dispose(): void {
+    this._disposables.dispose();
+  }
+
+  private _disposables = new DisposableSet();
+}
+```
+
+### Run cleanup immediately
+
+If the resource is no longer needed, call `dispose()` instead of dropping it.
+
+**Incorrect**
+
+```ts
+function finishTask() {
+  const resource = createDisposable();
+  console.log(resource);
+}
+```
+
+**Correct**
+
+```ts
+function finishTask() {
+  const resource = createDisposable();
+  resource.dispose();
+}
+```
+
+### Pass a resource to a typed owner
+
+With type information, a disposable parameter in an options object counts as a handoff. The application helper `ownResource()` must actually take responsibility for disposal; logging the same object does not.
+
+**Incorrect**
+
+```ts
+const resource = createDisposable();
+console.log({ resource });
+```
+
+**Correct**
+
+```ts
+declare function ownResource(options: { resource: IDisposable }): void;
+
+const resource = createDisposable();
+ownResource({ resource });
+```
+
+### Keep the collection returned by a factory
+
+The collection owns its entries, but the collection itself also needs an owner or a disposal call.
+
+**Incorrect**
+
+```ts
+DisposableSet.from([createDisposable()]);
+```
+
+**Correct**
+
+```ts
+const resources = DisposableSet.from([createDisposable()]);
+resources.dispose();
+```
+
 ## Why
 
 Functions that return `IDisposable` hand cleanup responsibility to the caller.
 Ignoring the returned value usually means the cleanup path has been lost.
 
-## Rule details
+## Usage
 
-This rule checks factory-like call expressions such as `create*`, `make*`,
-`build*`, and `new*` whose return type is compatible with `IDisposable` or
-`IObservableDisposable` when TypeScript type information is available. It also
-recognizes the known Lumino factories `DisposableSet.from(...)` and
-`ObservableDisposableSet.from(...)`.
+By default, the rule checks factory-named calls such as `create*`, `make*`, `build*` and `new*` that return `IDisposable` or `IObservableDisposable`. Type-aware linting is needed to identify these return types; the known Lumino `DisposableSet.from()` and `ObservableDisposableSet.from()` factories are recognized without it.
 
-It ignores disposable values created directly inside a Jupyter plugin `activate`
-function, where services commonly live for the application lifetime. All three
-ways of writing one are recognised: an inline `activate` property, a function
-named `activate`, and a separate function referenced as `activate: activateFoo`.
-
-It accepts common ownership patterns:
-
-- Adding the result to a typed `DisposableSet` or a conventionally named
-  disposable collection such as `this._disposables.add(...)`
-- Passing the result as a direct array item to `DisposableSet.from(...)` or
-  `ObservableDisposableSet.from(...)`
-- Returning the result
-- Assigning it to an object field
-- Storing it in a class-field collection with `this._items.set(...)`
-- Calling `.dispose()` immediately
-- Storing it in a variable that is later added, returned, assigned to a field,
-  or disposed
-- Passing it to a configured ownership helper function or default ownership
-  sink such as `add`, `addCell`, `addItem`, `addMenu`, `addWidget`,
-  `insertWidget`, or `registerStatusItem`
-- Passing it to a call or constructor that declares the corresponding parameter
-  as a disposable type, including as a property of an options object. This is
-  decided from the callee's declared types, so it works for your own APIs and
-  needs no table of known classes.
-- Disposing it unconditionally inside a callback, so the
-  `requestAnimationFrame(() => splash.dispose())` and
-  `void load().then(() => splash.dispose())` idioms are accepted. Disposal that
-  is itself conditional inside the callback is still reported.
-- Declaring it as an exported binding (`export const tracker = ...`, including
-  inside an exported `namespace`): ownership of a module singleton passes to the
-  importers of the module.
-
-By default, the rule does not report calls whose return value is a borrowed
-reference, a fluent initializer, or a registration handle that the caller is not
-expected to own. Representative entries are `get`, `find`, `add`, `addCommand`,
-`open`, `register`, `set`, and `transform`, plus any name matching
-`add*Factory`. For the full list see the
-[`DEFAULT_IGNORED_RETURN_FUNCTION_NAMES`](https://github.com/search?q=repo%3Ajupyterlab%2Feslint-plugin+const+DEFAULT_IGNORED_RETURN_FUNCTION_NAMES&type=code)
-constant.
-
-## Incorrect
-
-```ts
-createDisposable();
-```
-
-```ts
-const disposable = createDisposable();
-console.log(disposable);
-```
-
-## Correct
-
-```ts
-this._disposables.add(createDisposable());
-```
-
-```ts
-const disposable = createDisposable();
-disposable.dispose();
-```
-
-```ts
-return createDisposable();
-```
-
-```ts
-const disposables = DisposableSet.from([createDisposable()]);
-disposables.dispose();
-```
+Values created directly in a Jupyter plugin’s `activate()` function are exempt because they commonly live for the application lifetime. A reported value can be returned, assigned to a field, put in a disposable collection, passed to an ownership helper or disposed. Keeping it in a local variable without arranging cleanup is not enough.
 
 ## Options
 
@@ -109,16 +155,9 @@ entirely.
 
 Function or method names whose disposable return value should be treated as
 borrowed, or as owned by a registration or session API. Names given here are
-**added** to the default list described above.
+**added** to the defaults, which include `get`, `find`, `addCommand`, `open`, `register`, `set` and `transform`.
 
-Note that this option has no effect under the default settings: only
-factory-named calls (`create*`, `build*`, `make*`, `new*`) have their return
-value checked, and no name in the default list matches that pattern. The list
-becomes load-bearing only once `checkAllDisposableReturns` is enabled, where on
-JupyterLab it takes the finding count down by an order of magnitude.
-Whether a returned disposable is borrowed or freshly created is not something
-the declared types express, which is why this remains a name list while ownership
-does not.
+This is especially useful with `checkAllDisposableReturns`, which also checks APIs that may return borrowed objects or registration handles. A return type alone does not tell the rule who owns the object. See the full [default ignored-return list](https://github.com/jupyterlab/eslint-plugin/blob/main/src/rules/require-disposable-transfer.ts).
 
 ### `extendDefaultIgnoredReturnFunctionNames`
 
@@ -167,3 +206,22 @@ Strictest possible checking, dropping every default exemption:
   ]
 }
 ```
+
+<details>
+<summary>Other recognized ownership patterns</summary>
+
+With type information, passing a disposable to a parameter declared as a disposable type counts as a handoff, including through an options object. Configured ownership helper names work without that type information.
+
+Other accepted patterns include:
+
+- Assigning the resource to an object field or a class field initializer.
+- Storing it in a class-field collection, such as `this._items.set(key, resource)`.
+- Passing it as a direct array item to `DisposableSet.from()` or `ObservableDisposableSet.from()`.
+- Exporting a binding, including inside an exported namespace. Reassigning an export does not preserve ownership of the previous value.
+- Disposing it unconditionally inside a callback, for example `requestAnimationFrame(() => resource.dispose())`. A conditional disposal inside that callback is still reported.
+
+A local variable can be handed off later, including through an options object or array. The plugin-activation exemption also covers a function named `activate` and a separate function referenced by the plugin's `activate` property.
+
+These patterns establish an owner; they do not guarantee that the owner eventually disposes the resource.
+
+</details>

@@ -2,61 +2,91 @@
 
 Disallow `enum` in settings JSON schema files; use `oneOf` with `const`, `title`, and an explicit `type` instead.
 
+## Examples
+
+### Give string choices readable labels
+
+These are setting definitions within a `schema/*.json` file. Keep stored values stable while adding labels that can be translated.
+
+**Incorrect**
+
+```json
+{
+  "type": "string",
+  "enum": ["fit-to-width", "fit-to-height"]
+}
+```
+
+**Correct**
+
+```json
+{
+  "type": "string",
+  "oneOf": [
+    { "const": "fit-to-width", "title": "Fit to width" },
+    { "const": "fit-to-height", "title": "Fit to height" }
+  ]
+}
+```
+
+### Declare the type of string choices
+
+Labels alone are not enough: the containing setting needs `type` for the editor to render string choices. This missing type can be fixed automatically.
+
+**Incorrect**
+
+```json
+{
+  "oneOf": [
+    { "const": "light", "title": "Light theme" },
+    { "const": "dark", "title": "Dark theme" }
+  ]
+}
+```
+
+**Correct**
+
+```json
+{
+  "type": "string",
+  "oneOf": [
+    { "const": "light", "title": "Light theme" },
+    { "const": "dark", "title": "Dark theme" }
+  ]
+}
+```
+
+### Label numeric choices
+
+The rule also reports numeric `enum` arrays. Keep the numeric type and values when adding labels.
+
+**Incorrect**
+
+```json
+{
+  "type": "integer",
+  "enum": [2, 4, 8]
+}
+```
+
+**Correct**
+
+```json
+{
+  "type": "integer",
+  "oneOf": [
+    { "const": 2, "title": "Two spaces" },
+    { "const": 4, "title": "Four spaces" },
+    { "const": 8, "title": "Eight spaces" }
+  ]
+}
+```
+
 ## Why
 
-In JupyterLab/Notebook v7+, using `enum` in a settings JSON schema prevents associating user-facing labels with values and makes the options untranslatable. The `oneOf` pattern with `const` and `title` per entry solves both problems: the `title` is what the user sees, and the `const` is the value stored — and `title` can be passed through the translation system.
+With `enum`, users see stored values such as `fit-to-width`, and the schema cannot associate them with translatable labels. With `oneOf`, each `title` provides a readable, translatable label while `const` preserves the stored value.
 
-String-valued `oneOf` choices also need `"type": "string"` on the containing schema object. Without the explicit type, React JSON Schema Form may fail to render the setting editor control.
-
-## Rule details
-
-The rule inspects JSON files located inside a `schema/` directory and reports any property named `"enum"` whose value is an array. It also reports string-valued `oneOf` choices that are missing a sibling `"type": "string"` declaration and can automatically add it. It does not flag `enum` used with a non-array value, and it ignores JSON files outside of `schema/` directories.
-
-Requires [`jsonc-eslint-parser`](https://github.com/ota-meshi/jsonc-eslint-parser) (v2) to be configured as the parser for JSON files.
-
-## Incorrect
-
-```json
-{
-  "properties": {
-    "defaultZoom": {
-      "type": "string",
-      "enum": ["fit-to-width", "fit-to-height", "100%"]
-    }
-  }
-}
-```
-
-```json
-{
-  "properties": {
-    "defaultZoom": {
-      "oneOf": [
-        { "const": "fit-to-width", "title": "Fit to width" },
-        { "const": "fit-to-height", "title": "Fit to height" },
-        { "const": "100%", "title": "100%" }
-      ]
-    }
-  }
-}
-```
-
-## Correct
-
-```json
-{
-  "properties": {
-    "defaultZoom": {
-      "type": "string",
-      "oneOf": [
-        { "const": "fit-to-width", "title": "Fit to width" },
-        { "const": "fit-to-height", "title": "Fit to height" },
-        { "const": "100%", "title": "100%" }
-      ]
-    }
-  }
-}
-```
+String choices also need `"type": "string"` on the containing setting so the settings editor can render the control. The rule can add a missing type automatically.
 
 ## Options
 
@@ -64,7 +94,7 @@ This rule has no options.
 
 ## Configuration
 
-Add the rule to your ESLint flat config for schema JSON files:
+This rule checks JSON files inside a `schema/` directory. Configure [`jsonc-eslint-parser`](https://github.com/ota-meshi/jsonc-eslint-parser) (v2) for those files:
 
 ```js
 import * as jsoncParser from 'jsonc-eslint-parser';
@@ -81,3 +111,10 @@ export default [
   }
 ];
 ```
+
+<details>
+<summary>Which schema values are checked?</summary>
+
+The rule reports `enum` properties whose value is an array in JSON files directly inside a `schema/` directory. It also reports a missing sibling `type` when every `oneOf` choice has a string `const`. It does not add types to numeric or mixed choices, and it does not check JSON files outside these schema directories.
+
+</details>

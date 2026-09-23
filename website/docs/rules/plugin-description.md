@@ -2,41 +2,78 @@
 
 Ensure all `JupyterFrontEndPlugin` objects define a non-empty `description` property.
 
+## Examples
+
+### Describe what the plugin provides
+
+**Incorrect**
+
+```ts
+const plugin: JupyterFrontEndPlugin<void> = {
+  id: 'my-extension:commands',
+  autoStart: true,
+  activate: activateCommands
+};
+```
+
+**Correct**
+
+```ts
+const plugin: JupyterFrontEndPlugin<void> = {
+  id: 'my-extension:commands',
+  description: 'Adds commands for exporting notebooks.',
+  autoStart: true,
+  activate: activateCommands
+};
+```
+
+### Replace an empty description
+
+**Incorrect**
+
+```ts
+const plugin: JupyterFrontEndPlugin<void> = {
+  id: 'my-extension:preview',
+  description: '',
+  activate: activatePreview
+};
+```
+
+**Correct**
+
+```ts
+const plugin: JupyterFrontEndPlugin<void> = {
+  id: 'my-extension:preview',
+  description: 'Provides a preview of the current document.',
+  activate: activatePreview
+};
+```
+
+### Replace a whitespace-only description
+
+**Incorrect**
+
+```ts
+const plugin: JupyterFrontEndPlugin<void> = {
+  id: 'my-extension:status',
+  description: '   ',
+  activate: activateStatus
+};
+```
+
+**Correct**
+
+```ts
+const plugin: JupyterFrontEndPlugin<void> = {
+  id: 'my-extension:status',
+  description: 'Shows the current kernel status.',
+  activate: activateStatus
+};
+```
+
 ## Why
 
-A plugin description improves readability for maintainers and integrators, especially in larger extension ecosystems.
-
-## Rule details
-
-The rule inspects `JupyterFrontEndPlugin` object declarations and reports when:
-
-- `description` is missing
-- `description` is an empty string
-
-## Incorrect
-
-```ts
-const plugin: JupyterFrontEndPlugin<void> = {
-  id: 'test-plugin:plugin',
-  autoStart: true,
-  activate: (app: JupyterFrontEnd) => {
-    console.log('Activated');
-  }
-};
-```
-
-## Correct
-
-```ts
-const plugin: JupyterFrontEndPlugin<void> = {
-  id: 'test-plugin:plugin',
-  description: 'Test plugin used for lint rule examples',
-  autoStart: true,
-  activate: (app: JupyterFrontEnd) => {
-    console.log('Activated');
-  }
-};
-```
+A description tells maintainers and integrators what a plugin does without requiring them to read its activation code. Use a short, meaningful description; an empty or whitespace-only string is also reported.
 
 ## Options
 

@@ -2,48 +2,98 @@
 
 Require `expect.soft()` for snapshot assertions that are not the last in a Playwright test block.
 
-## Why
+## Examples
 
-Playwright's `toMatchSnapshot()` paired with a hard `expect()` call short-circuits on the first failure: subsequent snapshot assertions never run, so their snapshots cannot be captured or updated in the same run. Using `expect.soft()` for all but the last snapshot ensures every snapshot is evaluated even when one fails, keeping the full suite updatable with `--update-snapshots`.
+### Capture each step after a mismatch
 
-## Rule details
+A mismatch in `before.png` should not prevent capturing `after.png`.
 
-The rule inspects any callback passed to `test(...)`, `it(...)`, or their dot-property variants — including modifiers (`test.only`, `test.skip`, `test.fixme`, `test.fail`) and hooks (`test.beforeAll`, `test.beforeEach`, `test.afterAll`, `test.afterEach`) — and collects every `expect(...).toMatchSnapshot(...)` call found within that callback. When a block contains more than one snapshot assertion:
-
-- All assertions **except the last** must use `expect.soft(...)`.
-- The last assertion may use either `expect(...)` or `expect.soft(...)`.
-- Non-snapshot assertions (e.g. `await expect(locator).toBeVisible()`) are ignored entirely.
-
-## Incorrect
+**Incorrect**
 
 ```ts
 test('multi-step screenshot', async ({ page }) => {
-  expect(await page.screenshot()).toMatchSnapshot('step-1.png'); // ❌ not last, must be soft
-  await page.click('button');
-  expect(await page.screenshot()).toMatchSnapshot('step-2.png'); // ❌ not last, must be soft
-  expect.soft(await page.screenshot()).toMatchSnapshot('step-3.png');
+  expect(await page.screenshot()).toMatchSnapshot('before.png');
+  await page.getByRole('button', { name: 'Open' }).click();
+  expect(await page.screenshot()).toMatchSnapshot('after.png');
 });
 ```
 
-## Correct
+**Correct**
 
 ```ts
 test('multi-step screenshot', async ({ page }) => {
-  expect.soft(await page.screenshot()).toMatchSnapshot('step-1.png');
-  await page.click('button');
-  expect.soft(await page.screenshot()).toMatchSnapshot('step-2.png');
-  expect(await page.screenshot()).toMatchSnapshot('step-3.png'); // last — hard is fine
+  expect.soft(await page.screenshot()).toMatchSnapshot('before.png');
+  await page.getByRole('button', { name: 'Open' }).click();
+  expect(await page.screenshot()).toMatchSnapshot('after.png');
 });
 ```
 
-A single snapshot per test requires no change:
+### Keep all earlier snapshots soft
+
+Making only the first assertion soft is not enough. Every snapshot before the last must be soft; the last can also be soft.
+
+**Incorrect**
+
+```ts
+test('three views', async ({ page }) => {
+  expect.soft(await page.screenshot()).toMatchSnapshot('first.png');
+  await showSecondView(page);
+  expect(await page.screenshot()).toMatchSnapshot('second.png');
+  await showThirdView(page);
+  expect.soft(await page.screenshot()).toMatchSnapshot('third.png');
+});
+```
+
+**Correct**
+
+```ts
+test('three views', async ({ page }) => {
+  expect.soft(await page.screenshot()).toMatchSnapshot('first.png');
+  await showSecondView(page);
+  expect.soft(await page.screenshot()).toMatchSnapshot('second.png');
+  await showThirdView(page);
+  expect.soft(await page.screenshot()).toMatchSnapshot('third.png');
+});
+```
+
+### Keep readiness assertions hard
+
+The rule does not require changing non-snapshot assertions. A failed readiness check may still stop the test.
+
+**Allowed**
+
+```ts
+test('ready panel', async ({ page }) => {
+  await expect(page.getByRole('tabpanel')).toBeVisible();
+  expect.soft(await page.screenshot()).toMatchSnapshot('panel.png');
+  await openDetails(page);
+  expect(await page.screenshot()).toMatchSnapshot('details.png');
+});
+```
+
+### Take a single snapshot
+
+There are no later snapshots to preserve, so a hard assertion is fine.
+
+**Allowed**
 
 ```ts
 test('single screenshot', async ({ page }) => {
-  expect(await page.screenshot()).toMatchSnapshot('page.png'); // only snapshot — fine
+  expect(await page.screenshot()).toMatchSnapshot('page.png');
 });
 ```
+
+## Why
+
+A hard snapshot assertion stops the test at its first failure. Later screenshots are never captured, so you cannot inspect all visual changes from that run. Use `expect.soft()` to continue to the remaining snapshots while still failing the test if any assertion fails. The last snapshot can use either form. Soft assertions also let `--update-snapshots` reach every snapshot in one run.
 
 ## Options
 
 This rule has no options.
+
+<details>
+<summary>Which assertions are checked?</summary>
+
+The rule checks `toMatchSnapshot()` assertions in `test()` and `it()` callbacks, including modifiers and hooks such as `test.only()` and `test.beforeEach()`. Other assertions, such as `toBeVisible()` and `toHaveScreenshot()`, are not checked.
+
+</details>

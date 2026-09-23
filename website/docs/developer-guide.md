@@ -21,6 +21,15 @@ npm test
 3. Build and run tests
 4. Add or update rule documentation under `website/docs/rules`
 
+Start each rule page with a short description and an `Examples` section. Give
+each scenario a descriptive heading and put its incorrect example immediately
+before the corresponding correction.
+
+Explain the user-visible problem, then document options and practical caveats.
+Keep secondary technical details in `<details>` sections.
+Leave implementation details already covered by tests or code comments out of
+the rule documentation.
+
 ### Documentation Workflow
 
 To run the documentation site locally:

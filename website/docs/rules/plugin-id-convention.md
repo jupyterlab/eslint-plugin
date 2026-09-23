@@ -1,6 +1,74 @@
 # `plugin-id-convention`
 
-Ensure JupyterLab plugin IDs are prefixed with the extension package name.
+Prefix each plugin ID with the extension package name followed by `:`.
+
+These examples belong to a package named `@jupyterlab/example-extension`. The same convention applies to MIME renderer extensions.
+
+## Examples
+
+### Match the extension package
+
+Using another package’s prefix makes deferring or locking this extension miss the plugin.
+
+**Incorrect**
+
+```ts
+const plugin: JupyterFrontEndPlugin<void> = {
+  id: '@jupyterlab/other-extension:plugin',
+  activate: () => {}
+};
+```
+
+**Correct**
+
+```ts
+const plugin: JupyterFrontEndPlugin<void> = {
+  id: '@jupyterlab/example-extension:plugin',
+  activate: () => {}
+};
+```
+
+### Include the package before a short plugin name
+
+**Incorrect**
+
+```ts
+const plugin: JupyterFrontEndPlugin<void> = {
+  id: 'commands',
+  activate: () => {}
+};
+```
+
+**Correct**
+
+```ts
+const plugin: JupyterFrontEndPlugin<void> = {
+  id: '@jupyterlab/example-extension:commands',
+  activate: () => {}
+};
+```
+
+### Name a MIME renderer extension
+
+MIME renderer entries are registered as plugins under their IDs too.
+
+**Incorrect**
+
+```ts
+const extension: IRenderMime.IExtension = {
+  id: '@jupyterlab/other-extension:factory',
+  rendererFactory
+};
+```
+
+**Correct**
+
+```ts
+const extension: IRenderMime.IExtension = {
+  id: '@jupyterlab/example-extension:factory',
+  rendererFactory
+};
+```
 
 ## Why
 
@@ -12,73 +80,6 @@ JupyterLab 4.7, disabling by package name disables every plugin the package
 provides, and the browser console warns about each plugin whose ID does not
 follow the convention.
 
-## Rule details
-
-The rule reads the nearest JupyterLab extension `package.json` and reports
-plugin IDs that do not start with `<package name>:`.
-
-MIME renderer extension entries (`IRenderMime.IExtension`) are registered as
-plugins under their `id`, so the rule checks them the same way, in packages
-that declare `jupyterlab.extension` or `jupyterlab.mimeExtension`.
-
-For example, in a package with this manifest:
-
-```json
-{
-  "name": "@jupyterlab/example-extension",
-  "jupyterlab": {
-    "extension": true
-  }
-}
-```
-
-A plugin whose ID is exactly the package name, with no `:` part, is not
-reported by default. Such an ID does not follow the convention, but
-`disabledExtensions`, `deferredExtensions` and `lockedExtensions` match it in
-full, so it has no user impact. Set `reportIdEqualToPackageName` to
-report such an ID.
-
-## Incorrect
-
-The plugin ID uses a different package prefix, so extension-level
-configuration for `@jupyterlab/example-extension` does not apply to this plugin.
-
-```ts
-const plugin: JupyterFrontEndPlugin<void> = {
-  id: '@jupyterlab/other-extension:plugin',
-  autoStart: true,
-  activate: () => {}
-};
-```
-
-A MIME renderer entry under a different prefix is skipped the same way.
-
-```ts
-const extension: IRenderMime.IExtension = {
-  id: '@jupyterlab/other-extension:factory',
-  rendererFactory
-};
-```
-
-## Correct
-
-The plugin ID starts with the package name followed by `:`.
-
-```ts
-const plugin: JupyterFrontEndPlugin<void> = {
-  id: '@jupyterlab/example-extension:plugin',
-  autoStart: true,
-  activate: () => {}
-};
-```
-
-```ts
-const extension: IRenderMime.IExtension = {
-  id: '@jupyterlab/example-extension:factory',
-  rendererFactory
-};
-```
-
 ## Limitations
 
 Renaming a plugin that has shipped has a cost. A `disabledExtensions`,
@@ -88,6 +89,9 @@ JupyterLab's own plugins do, the user settings and any `overrides.json` entry
 stay under the old ID as well. The extension can migrate the user settings
 while a schema for the old ID is still served, which for a prefix that belonged
 to another package is the case only while a package of that name is installed:
+
+<details>
+<summary>Example: migrating user settings after renaming a plugin</summary>
 
 ```ts
 import { ISettingRegistry } from '@jupyterlab/settingregistry';
@@ -115,13 +119,15 @@ const plugin: JupyterFrontEndPlugin<void> = {
 };
 ```
 
+</details>
+
 Entries in `overrides.json` and in the page config are deployment configuration
 and have to be updated there. When that cost is too high, keep the ID and add an
 `eslint-disable-next-line jupyter/plugin-id-convention` comment with the reason.
 
 ## Options
 
-```ts
+```json
 {
   "reportIdEqualToPackageName": false
 }
@@ -129,18 +135,43 @@ and have to be updated there. When that cost is too high, keep the ID and add an
 
 ### `reportIdEqualToPackageName`
 
-Set to `true` to also report a plugin whose ID is exactly the package name. The
-report asks for the `<package>:<plugin>` form.
+Set to `true` to also report a plugin whose ID is exactly the package name, without `:` and a plugin name. These IDs are allowed by default because extension-level configuration can still match them.
+
+### Require a suffix when the option is enabled
+
+The following pair assumes `reportIdEqualToPackageName: true`. The first version is allowed with the default settings.
+
+**Incorrect**
 
 ```ts
-// Not reported by default; reported when reportIdEqualToPackageName is true
 const plugin: JupyterFrontEndPlugin<void> = {
   id: '@jupyterlab/example-extension',
   activate: () => {}
 };
 ```
 
-### Technical details
+**Correct**
+
+```ts
+const plugin: JupyterFrontEndPlugin<void> = {
+  id: '@jupyterlab/example-extension:plugin',
+  activate: () => {}
+};
+```
+
+<details>
+<summary>Which plugin IDs are checked?</summary>
+
+The rule uses the nearest JupyterLab extension manifest with `jupyterlab.extension` or `jupyterlab.mimeExtension` enabled. For the examples above, the manifest is:
+
+```json
+{
+  "name": "@jupyterlab/example-extension",
+  "jupyterlab": { "extension": true }
+}
+```
+
+A MIME-only package can use `"mimeExtension": true` instead.
 
 The ID can be a string literal or assembled from constant strings:
 
@@ -151,3 +182,5 @@ The ID can be a string literal or assembled from constant strings:
 
 An ID the rule cannot resolve to a string, such as one built
 from a reassigned variable or a function call, is not checked.
+
+</details>

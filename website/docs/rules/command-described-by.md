@@ -2,19 +2,13 @@
 
 Ensure JupyterLab command registrations include a `describedBy` property.
 
-## Why
+## Examples
 
-JupyterLab commands with arguments should include explicit command argument metadata.
-This improves discoverability and helps maintain command contracts.
+### Describe a command argument
 
-## Rule details
+The `value` argument needs metadata that describes the value a caller should pass.
 
-The rule checks calls that match `*.addCommand(...)` patterns and reports when:
-
-- The command options object has an `execute` function
-- But does not provide `describedBy`
-
-## Incorrect
+**Incorrect**
 
 ```ts
 app.commands.addCommand(CommandIDs.test, {
@@ -25,7 +19,7 @@ app.commands.addCommand(CommandIDs.test, {
 });
 ```
 
-## Correct
+**Correct**
 
 ```ts
 app.commands.addCommand(CommandIDs.test, {
@@ -43,6 +37,18 @@ app.commands.addCommand(CommandIDs.test, {
   }
 });
 ```
+
+## Why
+
+Commands are a fundamental building block in Jupyter frontend applications. They define actions reused by menus, shortcuts and the command palette. Commands are also reused by extension authors and AI integrations alike.
+
+Adding a description of the arguments helps extension authors develop better integrations and LLMs call the command with the right shape of arguments. Certain LLM extensions map commands to tool calls 1:1.
+
+The schema-based argument description is also used programmatically in JupyterLab and extensions:
+
+- in the Keyboard Shortcuts UI, allowing users to tweak the action invoked on a shortcut press
+- in the ui-profiler extension
+- in plugin-playground
 
 ## Options
 
