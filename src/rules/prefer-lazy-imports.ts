@@ -39,7 +39,8 @@ const DEFAULT_OPTIONS: LazyImportOptions = {
   ignoreImports: [],
   minimumSize: DEFAULT_MINIMUM_SIZE,
   reportInteractionCallbacks: false,
-  reportModuleLevelUsage: false
+  reportModuleLevelUsage: false,
+  reportReExports: false
 };
 
 const jupyterPreferLazyImports = createRule<[LazyImportOptions], string>({
@@ -82,7 +83,10 @@ const jupyterPreferLazyImports = createRule<[LazyImportOptions], string>({
         'Remove the import, or make it `import type`.',
       deferredPackageReExport:
         "'{{ source }}' is in `deferredPackages`, so it must only be loaded with `await import()`, but this re-export loads it together with the module. " +
-        "Remove the re-export and use `await import('{{ source }}')` where the package is needed."
+        "Remove the re-export and use `await import('{{ source }}')` where the package is needed.",
+      reExportKeepsImportEager:
+        "'{{ source }}' is imported only for use inside functions, but this re-export keeps it in the startup bundle. " +
+        "Export types with `export type` instead, or remove the re-export and import '{{ source }}' where it is used."
     },
     schema: [
       {
@@ -127,6 +131,12 @@ const jupyterPreferLazyImports = createRule<[LazyImportOptions], string>({
             default: false,
             description:
               'Also report imports used at module level, excluding tokens referenced in `requires`, `optional` and `provides`.'
+          },
+          reportReExports: {
+            type: 'boolean',
+            default: false,
+            description:
+              'Also report value re-exports of modules whose imports are only used inside functions, which would otherwise keep the module in the startup bundle.'
           }
         },
         additionalProperties: false
@@ -142,7 +152,8 @@ const jupyterPreferLazyImports = createRule<[LazyImportOptions], string>({
       ignoreImports,
       minimumSize,
       reportInteractionCallbacks,
-      reportModuleLevelUsage
+      reportModuleLevelUsage,
+      reportReExports
     } = options;
 
     let services: ParserServices | null = null;
@@ -164,6 +175,10 @@ const jupyterPreferLazyImports = createRule<[LazyImportOptions], string>({
     const importDeclarations: TSESTree.ImportDeclaration[] = [];
     // Sources kept in the startup bundle by a value re-export.
     const reExportedSources = new Set<string>();
+    const reExportDeclarations = new Map<
+      string,
+      (TSESTree.ExportNamedDeclaration | TSESTree.ExportAllDeclaration)[]
+    >();
 
     function mentionsPluginType(
       typeNode: TSESTree.TypeNode | undefined | null
@@ -288,7 +303,10 @@ const jupyterPreferLazyImports = createRule<[LazyImportOptions], string>({
       source: string,
       declarations: TSESTree.ImportDeclaration[]
     ): void {
-      if (isExempt(source) || reExportedSources.has(source)) {
+      if (
+        isExempt(source) ||
+        (!reportReExports && reExportedSources.has(source))
+      ) {
         return;
       }
 
@@ -319,14 +337,25 @@ const jupyterPreferLazyImports = createRule<[LazyImportOptions], string>({
             isInInteractionCallback(identifier)
           )
         ) {
-          reportUnlessTooSmall({
-            node: declarations[0],
-            messageId: 'preferLazyImportInteraction',
-            data: {
-              source,
-              snippet: buildDeferredImportSnippet(declarations)
+          const reExports = reExportDeclarations.get(source);
+          if (reExports && reportReExports) {
+            for (const reExportNode of reExports) {
+              reportUnlessTooSmall({
+                node: reExportNode,
+                messageId: 'reExportKeepsImportEager',
+                data: { source }
+              });
             }
-          });
+          } else {
+            reportUnlessTooSmall({
+              node: declarations[0],
+              messageId: 'preferLazyImportInteraction',
+              data: {
+                source,
+                snippet: buildDeferredImportSnippet(declarations)
+              }
+            });
+          }
         }
         return;
       }
@@ -370,6 +399,17 @@ const jupyterPreferLazyImports = createRule<[LazyImportOptions], string>({
       }
 
       if (tokenList === 0 && eager === 0 && deferrable > 0) {
+        const reExports = reExportDeclarations.get(source);
+        if (reExports && reportReExports) {
+          for (const reExportNode of reExports) {
+            reportUnlessTooSmall({
+              node: reExportNode,
+              messageId: 'reExportKeepsImportEager',
+              data: { source }
+            });
+          }
+          return;
+        }
         reportUnlessTooSmall({
           node: declarations[0],
           messageId: 'preferLazyImport',
@@ -481,7 +521,8 @@ const jupyterPreferLazyImports = createRule<[LazyImportOptions], string>({
      * is erased under `verbatimModuleSyntax`, the rest stays as
      * `export {} from '...'` and loads the source. For any other source a
      * value re-export keeps it in the startup bundle, so deferring the
-     * matching import would gain nothing and the usage check skips it.
+     * matching import would gain nothing and the usage check skips it, unless
+     * `reportReExports` is enabled to report the re-export instead.
      */
     function checkReExport(
       node: TSESTree.ExportNamedDeclaration | TSESTree.ExportAllDeclaration,
@@ -496,6 +537,12 @@ const jupyterPreferLazyImports = createRule<[LazyImportOptions], string>({
         });
       } else if (hasValueSpecifier) {
         reExportedSources.add(source);
+        const list = reExportDeclarations.get(source);
+        if (list) {
+          list.push(node);
+        } else {
+          reExportDeclarations.set(source, [node]);
+        }
       }
     }
 
