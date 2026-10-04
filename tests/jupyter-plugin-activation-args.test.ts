@@ -510,6 +510,82 @@ ruleTester.run('plugin-activation-args', pluginActivationArgs, {
           activate
         };
       `
+    },
+    {
+      // Plugins in typed array
+      filename: 'tests/type-aware-fixture.ts',
+      code: `
+        import { INotebookTracker } from './fixtures/types';
+        const plugins: JupyterFrontEndPlugin<any>[] = [
+          {
+            id: 'test-plugin-1',
+            requires: [INotebookTracker],
+            activate: (app: JupyterFrontEnd, tracker: INotebookTracker) => {}
+          },
+          {
+            id: 'test-plugin-2',
+            activate: (app: JupyterFrontEnd) => {}
+          }
+        ];
+      `
+    },
+    {
+      // Plugin in array cast
+      filename: 'tests/type-aware-fixture.ts',
+      code: `
+        import { INotebookTracker } from './fixtures/types';
+        const plugins = [
+          {
+            id: 'test-plugin-1',
+            requires: [INotebookTracker],
+            activate: (app: JupyterFrontEnd, tracker: INotebookTracker) => {}
+          }
+        ] as JupyterFrontEndPlugin<any>[];
+      `
+    },
+    {
+      // Plugin in default exported array
+      filename: 'tests/type-aware-fixture.ts',
+      code: `
+        import { INotebookTracker } from './fixtures/types';
+        export default [
+          {
+            id: 'test-plugin-1',
+            requires: [INotebookTracker],
+            activate: (app: JupyterFrontEnd, tracker: INotebookTracker) => {}
+          }
+        ] as JupyterFrontEndPlugin<any>[];
+      `
+    },
+    {
+      // Plugin returned from factory function
+      filename: 'tests/type-aware-fixture.ts',
+      code: `
+        import { INotebookTracker } from './fixtures/types';
+        function createPlugin(): JupyterFrontEndPlugin<void> {
+          return {
+            id: 'test-plugin',
+            requires: [INotebookTracker],
+            activate: (app: JupyterFrontEnd, tracker: INotebookTracker) => {}
+          };
+        }
+      `
+    },
+    {
+      // Plugin array returned from factory function
+      filename: 'tests/type-aware-fixture.ts',
+      code: `
+        import { INotebookTracker } from './fixtures/types';
+        function createPlugins(): JupyterFrontEndPlugin<void>[] {
+          return [
+            {
+              id: 'test-plugin',
+              requires: [INotebookTracker],
+              activate: (app: JupyterFrontEnd, tracker: INotebookTracker) => {}
+            }
+          ];
+        }
+      `
     }
   ],
 
@@ -1010,6 +1086,62 @@ ruleTester.run('plugin-activation-args', pluginActivationArgs, {
           messageId: 'appNotFirst',
           data: { arg: 'tracker', allowedNames: '"app", "_app", "_"' }
         }
+      ]
+    },
+    {
+      // Missing argument in array plugin
+      filename: 'tests/type-aware-fixture.ts',
+      code: `
+        import { INotebookTracker } from './fixtures/types';
+        const plugins: JupyterFrontEndPlugin<any>[] = [
+          {
+            id: 'test-plugin-1',
+            requires: [INotebookTracker],
+            activate: (app: JupyterFrontEnd) => {}
+          }
+        ];
+      `,
+      errors: [
+        { messageId: 'wrongArgumentCount' },
+        { messageId: 'missingArgument', data: { token: 'INotebookTracker' } }
+      ]
+    },
+    {
+      // app not first in export default array plugin
+      filename: 'tests/type-aware-fixture.ts',
+      code: `
+        import { INotebookTracker } from './fixtures/types';
+        export default [
+          {
+            id: 'test-plugin-1',
+            requires: [INotebookTracker],
+            activate: (tracker: INotebookTracker, app: JupyterFrontEnd) => {}
+          }
+        ] as JupyterFrontEndPlugin<any>[];
+      `,
+      errors: [
+        {
+          messageId: 'appNotFirst',
+          data: { arg: 'tracker', allowedNames: '"app", "_app", "_"' }
+        }
+      ]
+    },
+    {
+      // Missing argument in plugin returned from factory function
+      filename: 'tests/type-aware-fixture.ts',
+      code: `
+        import { INotebookTracker } from './fixtures/types';
+        function createPlugin(): JupyterFrontEndPlugin<void> {
+          return {
+            id: 'test-plugin',
+            requires: [INotebookTracker],
+            activate: (app: JupyterFrontEnd) => {}
+          };
+        }
+      `,
+      errors: [
+        { messageId: 'wrongArgumentCount' },
+        { messageId: 'missingArgument', data: { token: 'INotebookTracker' } }
       ]
     }
   ]

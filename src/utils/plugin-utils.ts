@@ -7,7 +7,10 @@ import { TSESTree } from '@typescript-eslint/types';
 import { ASTUtils, TSESLint } from '@typescript-eslint/utils';
 import * as ts from 'typescript';
 
-export type JupyterPluginKind = 'frontend' | 'service-manager';
+export type JupyterPluginKind =
+  | 'frontend'
+  | 'service-manager'
+  | 'mime-renderer';
 
 /**
  * Gets plugin kind from a variable declaration type annotation.
@@ -449,4 +452,337 @@ export function looksLikeMimeExtensionObject(
 ): boolean {
   const properties = getObjectProperties(node);
   return hasId && properties.has('id') && properties.has('rendererFactory');
+}
+
+/**
+ * Finds the function that owns a return statement.
+ */
+export function getEnclosingFunction(
+  node: TSESTree.Node
+):
+  | TSESTree.FunctionDeclaration
+  | TSESTree.FunctionExpression
+  | TSESTree.ArrowFunctionExpression
+  | null {
+  let current = node.parent;
+  while (current) {
+    if (
+      current.type === 'FunctionDeclaration' ||
+      current.type === 'FunctionExpression' ||
+      current.type === 'ArrowFunctionExpression'
+    ) {
+      return current;
+    }
+    current = current.parent;
+  }
+  return null;
+}
+
+/**
+ * Resolves the plugin kind from a TypeScript type annotation node, unwrapping
+ * arrays, tuples, type operators (readonly), unions, and wrappers like Promise.
+ */
+export function getPluginKindFromType(
+  typeNode: TSESTree.TypeNode | undefined | null,
+  checker?: ts.TypeChecker | null,
+  getTSNode?: ((n: TSESTree.Node) => ts.Node | undefined) | null,
+  options?: { matchMime?: boolean },
+  depth = 0
+): JupyterPluginKind | null {
+  if (!typeNode || depth > 6) {
+    return null;
+  }
+
+  if (typeNode.type === 'TSTypeReference') {
+    let name = extractTypeName(typeNode.typeName);
+    if (name === 'JupyterFrontEndPlugin') {
+      return 'frontend';
+    }
+    if (name === 'ServiceManagerPlugin') {
+      return 'service-manager';
+    }
+    if (
+      options?.matchMime &&
+      isMimeExtensionReference(typeNode, checker, getTSNode)
+    ) {
+      return 'mime-renderer';
+    }
+
+    if (checker && getTSNode && typeNode.typeName.type === 'Identifier') {
+      const resolved = resolveTypeAlias(typeNode.typeName, checker, getTSNode);
+      if (resolved === 'JupyterFrontEndPlugin') {
+        return 'frontend';
+      }
+      if (resolved === 'ServiceManagerPlugin') {
+        return 'service-manager';
+      }
+      if (resolved) {
+        name = resolved;
+      }
+    }
+
+    if (
+      name === 'Array' ||
+      name === 'ReadonlyArray' ||
+      name === 'ArrayLike' ||
+      name === 'Promise'
+    ) {
+      const typeParam = typeNode.typeArguments?.params[0];
+      return getPluginKindFromType(
+        typeParam,
+        checker,
+        getTSNode,
+        options,
+        depth + 1
+      );
+    }
+    return null;
+  }
+
+  if (typeNode.type === 'TSArrayType') {
+    return getPluginKindFromType(
+      typeNode.elementType,
+      checker,
+      getTSNode,
+      options,
+      depth + 1
+    );
+  }
+
+  if (typeNode.type === 'TSTupleType') {
+    for (const member of typeNode.elementTypes) {
+      let elementType =
+        member.type === 'TSNamedTupleMember' ? member.elementType : member;
+      if (elementType.type === 'TSOptionalType') {
+        elementType = elementType.typeAnnotation;
+      }
+      if (elementType.type === 'TSRestType') {
+        const restTarget: TSESTree.TypeNode =
+          elementType.typeAnnotation ??
+          (elementType as unknown as { elementType?: TSESTree.TypeNode })
+            .elementType ??
+          elementType;
+        const kind = getPluginKindFromType(
+          restTarget,
+          checker,
+          getTSNode,
+          options,
+          depth + 1
+        );
+        if (kind) {
+          return kind;
+        }
+      } else {
+        const kind = getPluginKindFromType(
+          elementType,
+          checker,
+          getTSNode,
+          options,
+          depth + 1
+        );
+        if (kind) {
+          return kind;
+        }
+      }
+    }
+    return null;
+  }
+
+  if (typeNode.type === 'TSTypeOperator' && typeNode.operator === 'readonly') {
+    return getPluginKindFromType(
+      typeNode.typeAnnotation,
+      checker,
+      getTSNode,
+      options,
+      depth + 1
+    );
+  }
+
+  if (
+    typeNode.type === 'TSUnionType' ||
+    typeNode.type === 'TSIntersectionType'
+  ) {
+    const nonNullTypes = typeNode.types.filter(
+      t => t.type !== 'TSNullKeyword' && t.type !== 'TSUndefinedKeyword'
+    );
+    for (const t of nonNullTypes) {
+      const kind = getPluginKindFromType(
+        t,
+        checker,
+        getTSNode,
+        options,
+        depth + 1
+      );
+      if (kind) {
+        return kind;
+      }
+    }
+    return null;
+  }
+
+  return null;
+}
+
+function getKindFromEnclosingFunctionReturn(
+  expr: TSESTree.Node,
+  checker?: ts.TypeChecker | null,
+  getTSNode?: ((n: TSESTree.Node) => ts.Node | undefined) | null,
+  options?: PluginObjectKindOptions
+): JupyterPluginKind | null {
+  const parent = expr.parent;
+  if (parent?.type === 'ReturnStatement' && parent.argument === expr) {
+    const fn = getEnclosingFunction(parent);
+    if (fn?.returnType?.typeAnnotation) {
+      return getPluginKindFromType(
+        fn.returnType.typeAnnotation,
+        checker,
+        getTSNode,
+        options
+      );
+    }
+  }
+  if (parent?.type === 'ArrowFunctionExpression' && parent.body === expr) {
+    if (parent.returnType?.typeAnnotation) {
+      return getPluginKindFromType(
+        parent.returnType.typeAnnotation,
+        checker,
+        getTSNode,
+        options
+      );
+    }
+  }
+  return null;
+}
+
+export interface PluginObjectKindOptions {
+  allowUntyped?: boolean;
+  matchMime?: boolean;
+}
+
+/**
+ * Returns the plugin kind ('frontend', 'service-manager', or 'mime-renderer')
+ * for an object literal expression by inspecting its type annotation, type cast,
+ * enclosing array/tuple, factory function return type, or shape (when allowUntyped is true).
+ */
+export function getPluginObjectKind(
+  node: TSESTree.ObjectExpression,
+  checker?: ts.TypeChecker | null,
+  getTSNode?: ((n: TSESTree.Node) => ts.Node | undefined) | null,
+  options?: PluginObjectKindOptions
+): JupyterPluginKind | null {
+  // 1. Unwrap any type assertions directly wrapping the object expression.
+  let current: TSESTree.Node = node;
+  while (
+    current.parent &&
+    (current.parent.type === 'TSAsExpression' ||
+      current.parent.type === 'TSSatisfiesExpression' ||
+      current.parent.type === 'TSTypeAssertion')
+  ) {
+    const castNode = current.parent as
+      | TSESTree.TSAsExpression
+      | TSESTree.TSSatisfiesExpression
+      | TSESTree.TSTypeAssertion;
+    const kind = getPluginKindFromType(
+      castNode.typeAnnotation,
+      checker,
+      getTSNode,
+      options
+    );
+    if (kind) {
+      return kind;
+    }
+    current = castNode;
+  }
+
+  // 2. Check if current is directly assigned to a typed variable declarator.
+  if (current.parent?.type === 'VariableDeclarator') {
+    const varDecl = current.parent;
+    if (varDecl.id.type === 'Identifier' && varDecl.id.typeAnnotation) {
+      const kind = getPluginKindFromType(
+        varDecl.id.typeAnnotation.typeAnnotation,
+        checker,
+        getTSNode,
+        options
+      );
+      if (kind) {
+        return kind;
+      }
+    }
+  }
+
+  // 3. Check if current is returned from a function with an explicit return type.
+  const returnedKind = getKindFromEnclosingFunctionReturn(
+    current,
+    checker,
+    getTSNode,
+    options
+  );
+  if (returnedKind) {
+    return returnedKind;
+  }
+
+  // 4. Check if current is an element of an ArrayExpression.
+  if (current.parent?.type === 'ArrayExpression') {
+    let arrayNode: TSESTree.Node = current.parent;
+
+    while (
+      arrayNode.parent &&
+      (arrayNode.parent.type === 'TSAsExpression' ||
+        arrayNode.parent.type === 'TSSatisfiesExpression' ||
+        arrayNode.parent.type === 'TSTypeAssertion')
+    ) {
+      const castNode = arrayNode.parent as
+        | TSESTree.TSAsExpression
+        | TSESTree.TSSatisfiesExpression
+        | TSESTree.TSTypeAssertion;
+      const kind = getPluginKindFromType(
+        castNode.typeAnnotation,
+        checker,
+        getTSNode,
+        options
+      );
+      if (kind) {
+        return kind;
+      }
+      arrayNode = castNode;
+    }
+
+    if (arrayNode.parent?.type === 'VariableDeclarator') {
+      const varDecl = arrayNode.parent;
+      if (varDecl.id.type === 'Identifier' && varDecl.id.typeAnnotation) {
+        const kind = getPluginKindFromType(
+          varDecl.id.typeAnnotation.typeAnnotation,
+          checker,
+          getTSNode,
+          options
+        );
+        if (kind) {
+          return kind;
+        }
+      }
+    }
+
+    const returnedArrayKind = getKindFromEnclosingFunctionReturn(
+      arrayNode,
+      checker,
+      getTSNode,
+      options
+    );
+    if (returnedArrayKind) {
+      return returnedArrayKind;
+    }
+  }
+
+  // 5. If untyped plugin detection is enabled, check shape.
+  if (options?.allowUntyped) {
+    const hasId = getObjectProperties(node).has('id');
+    if (looksLikePluginObject(node, hasId)) {
+      return 'frontend';
+    }
+    if (options.matchMime && looksLikeMimeExtensionObject(node, hasId)) {
+      return 'mime-renderer';
+    }
+  }
+
+  return null;
 }
