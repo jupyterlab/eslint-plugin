@@ -162,7 +162,11 @@ function makeTestConfig(projectName) {
         `${projectName}/galata/test/**/*.ts`,
         `${projectName}/ui-tests/test/**/*.ts`
       ],
-      ignores: [`${projectName}/galata/src/helpers/**`],
+      ignores: [
+        `${projectName}/galata/src/helpers/**`,
+        // Benchmarks use the plain Playwright fixture, without Galata page helpers.
+        `${projectName}/galata/test/benchmark/**`
+      ],
       plugins: {
         jupyter: resolvedPlugin,
         '@typescript-eslint': resolvedTsPlugin,
