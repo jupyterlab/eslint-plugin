@@ -34,16 +34,7 @@ const resolvedJsoncParser = jsoncParserModule.default ?? jsoncParserModule;
 const JUPYTERLAB_LAZY_IMPORTS = {
   deferredPackages: [
     ...lazyImports.DEFAULT_DEFERRED_PACKAGES,
-    '@mermaid-js/layout-elk',
-    '@plutojl/lang-julia',
-    '@xterm/xterm',
-    '@xterm/addon-*',
-    'marked',
-    'marked-gfm-heading-id',
-    'marked-mangle',
-    'mathjax-full',
-    'regexp-match-indices',
-    'vega-embed'
+    'regexp-match-indices'
   ],
   allowedPackages: [
     ...lazyImports.DEFAULT_ALLOWED_PACKAGES,
