@@ -50,6 +50,16 @@ The schema-based argument description is also used programmatically in JupyterLa
 - in the ui-profiler extension
 - in plugin-playground
 
+<details>
+<summary>Which commands are checked?</summary>
+
+Commands added to a registry the code creates itself are not checked, such as
+`const commands = new CommandRegistry()` behind a context menu. That registry is
+never listed or queried alongside the application's, so argument descriptions
+are not required.
+
+</details>
+
 ## Options
 
 This rule has no options.
