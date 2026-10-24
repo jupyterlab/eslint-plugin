@@ -436,6 +436,19 @@ ruleTester.run('command-id-convention', commandIdConvention, {
           data: { commandId: 'my-extension:', segment: 'name' }
         }
       ]
+    },
+    {
+      code: `
+        app.commands.addCommand('my-extension:sub:', {
+          execute: () => {}
+        });
+      `,
+      errors: [
+        {
+          messageId: 'emptySegment',
+          data: { commandId: 'my-extension:sub:', segment: 'name' }
+        }
+      ]
     }
   ]
 });
@@ -472,6 +485,21 @@ typeAwareTester.run('command-id-convention (type-aware)', commandIdConvention, {
       `,
       filename: 'tests/type-aware-fixture.ts',
       errors: [{ messageId: 'missingNamespace', data: { commandId: 'open' } }]
+    },
+    {
+      code: `
+        declare const id: 'my-extension:sub:';
+        app.commands.addCommand(id, {
+          execute: () => {}
+        });
+      `,
+      filename: 'tests/type-aware-fixture.ts',
+      errors: [
+        {
+          messageId: 'emptySegment',
+          data: { commandId: 'my-extension:sub:', segment: 'name' }
+        }
+      ]
     }
   ]
 });

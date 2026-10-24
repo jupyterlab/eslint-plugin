@@ -102,7 +102,7 @@ const commandIdConvention = createRule({
         const segment =
           separator === 0
             ? 'namespace'
-            : separator === commandId.length - 1
+            : commandId.endsWith(':')
               ? 'name'
               : null;
         if (segment) {
