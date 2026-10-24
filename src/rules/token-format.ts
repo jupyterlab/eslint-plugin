@@ -4,6 +4,8 @@
  */
 
 import { createRule } from '../utils/create-rule';
+import { resolveStaticString } from '../utils/plugin-utils';
+import { getTypeServices } from '../utils/type-services';
 
 /**
  * Token symbol (part after the first ':') must be a valid JavaScript identifier.
@@ -31,6 +33,8 @@ const tokenFormat = createRule({
   defaultOptions: [],
 
   create(context) {
+    const { checker, getTSNode } = getTypeServices(context);
+
     return {
       NewExpression(node) {
         if (node.callee.type !== 'Identifier' || node.callee.name !== 'Token') {
@@ -42,12 +46,21 @@ const tokenFormat = createRule({
         }
 
         const firstArg = node.arguments[0];
-
-        if (firstArg.type !== 'Literal' || typeof firstArg.value !== 'string') {
+        if (firstArg.type === 'SpreadElement') {
           return;
         }
 
-        const tokenId: string = firstArg.value;
+        const tokenId = resolveStaticString(
+          firstArg,
+          context.sourceCode.getScope(node),
+          checker,
+          getTSNode
+        );
+
+        if (tokenId === null) {
+          return;
+        }
+
         const colonIndex = tokenId.indexOf(':');
 
         if (colonIndex === -1) {

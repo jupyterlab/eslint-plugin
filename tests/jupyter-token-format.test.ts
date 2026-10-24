@@ -3,6 +3,7 @@
  * Distributed under the terms of the Modified BSD License.
  */
 
+import * as path from 'path';
 import { RuleTester } from '@typescript-eslint/rule-tester';
 import tokenFormat from '../src/rules/token-format';
 
@@ -12,6 +13,21 @@ const ruleTester = new RuleTester({
     parserOptions: {
       ecmaVersion: 2020,
       sourceType: 'module'
+    }
+  }
+});
+
+const typeAwareTester = new RuleTester({
+  languageOptions: {
+    parser: require('@typescript-eslint/parser'),
+    parserOptions: {
+      ecmaVersion: 2020,
+      sourceType: 'module',
+      projectService: {
+        allowDefaultProject: ['tests/*.ts'],
+        defaultProject: 'tsconfig.json'
+      },
+      tsconfigRootDir: path.resolve(__dirname, '..')
     }
   }
 });
@@ -38,12 +54,26 @@ ruleTester.run('token-format', tokenFormat, {
       code: `new Token()`
     },
     {
-      // new Token(variable) is skipped — non-literal first arg
+      // Unresolved dynamic variable is skipped
       code: `new Token(myTokenId)`
     },
     {
-      // Template literal first arg cannot be statically validated — skipped
-      code: 'new Token(`@test/pkg:kebab-case`)'
+      // Static template literal with valid symbol
+      code: 'new Token<IFoo>(`@test/pkg:IFoo`)'
+    },
+    {
+      // Template literal with variable package
+      code: `
+        const PKG = '@test/pkg';
+        new Token<IFoo>(\`\${PKG}:IFoo\`);
+      `
+    },
+    {
+      // Constant string
+      code: `
+        const TOKEN_ID = '@test/pkg:IFoo';
+        new Token<IFoo>(TOKEN_ID);
+      `
     },
     {
       // Unrelated new expressions are not checked
@@ -92,6 +122,81 @@ ruleTester.run('token-format', tokenFormat, {
         {
           messageId: 'invalidTokenSymbol',
           data: { tokenId: '@test/pkg:IFoo.IBar', symbol: 'IFoo.IBar' }
+        }
+      ]
+    },
+    {
+      // Template literal with invalid symbol
+      code: 'new Token<IFoo>(`@test/pkg:kebab-case`)',
+      errors: [
+        {
+          messageId: 'invalidTokenSymbol',
+          data: {
+            tokenId: '@test/pkg:kebab-case',
+            symbol: 'kebab-case'
+          }
+        }
+      ]
+    },
+    {
+      // Template literal with variable package and invalid symbol
+      code: `
+        const PKG = '@test/pkg';
+        new Token<IFoo>(\`\${PKG}:kebab-case\`);
+      `,
+      errors: [
+        {
+          messageId: 'invalidTokenSymbol',
+          data: {
+            tokenId: '@test/pkg:kebab-case',
+            symbol: 'kebab-case'
+          }
+        }
+      ]
+    },
+    {
+      // Constant string with invalid symbol
+      code: `
+        const TOKEN_ID = '@test/pkg:kebab-case';
+        new Token<IFoo>(TOKEN_ID);
+      `,
+      errors: [
+        {
+          messageId: 'invalidTokenSymbol',
+          data: {
+            tokenId: '@test/pkg:kebab-case',
+            symbol: 'kebab-case'
+          }
+        }
+      ]
+    }
+  ]
+});
+
+typeAwareTester.run('token-format (type-aware)', tokenFormat, {
+  valid: [
+    {
+      code: `
+        declare const id: '@test/pkg:IFoo';
+        new Token<IFoo>(id);
+      `,
+      filename: 'tests/type-aware-fixture.ts'
+    }
+  ],
+  invalid: [
+    {
+      code: `
+        declare const id: '@test/pkg:kebab-case';
+        new Token<IFoo>(id);
+      `,
+      filename: 'tests/type-aware-fixture.ts',
+      errors: [
+        {
+          messageId: 'invalidTokenSymbol',
+          data: {
+            tokenId: '@test/pkg:kebab-case',
+            symbol: 'kebab-case'
+          }
         }
       ]
     }
