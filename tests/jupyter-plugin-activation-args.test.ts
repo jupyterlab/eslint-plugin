@@ -37,7 +37,33 @@ nonTypeAwareTester.run(
   'plugin-activation-args (non-type-aware)',
   pluginActivationArgs,
   {
-    valid: [],
+    valid: [
+      {
+        code: `
+          const plugin: JupyterFrontEndPlugin<void> = {
+            id: 'test-plugin',
+            optional: [ITranslator],
+            activate: (app: JupyterFrontEnd, translator: ITranslator | null = null) => {}
+          };
+        `
+      },
+      {
+        code: `
+          const plugin: JupyterFrontEndPlugin<void> = {
+            id: 'test-plugin',
+            activate: ({ commands }: JupyterFrontEnd) => {}
+          };
+        `
+      },
+      {
+        code: `
+          const plugin: JupyterFrontEndPlugin<void> = {
+            id: 'test-plugin',
+            activate: (app: JupyterFrontEnd, ...rest: unknown[]) => {}
+          };
+        `
+      }
+    ],
     invalid: [
       // This same case is in valid cases for the type-aware tester
       {
@@ -648,6 +674,105 @@ ruleTester.run('plugin-activation-args', pluginActivationArgs, {
         const plugin: MyPlugin<void> = {
           id: 'test-my-plugin',
           activate: (app: JupyterFrontEnd) => {}
+        };
+      `
+    },
+    {
+      // Optional token with default null value
+      filename: 'tests/type-aware-fixture.ts',
+      code: `
+        import { ITranslator } from './fixtures/types';
+        const plugin: JupyterFrontEndPlugin<void> = {
+          id: 'test-plugin',
+          optional: [ITranslator],
+          activate: (
+            app: JupyterFrontEnd,
+            translator: ITranslator | null = null
+          ) => {}
+        };
+      `
+    },
+    {
+      // Optional and required tokens with default values
+      filename: 'tests/type-aware-fixture.ts',
+      code: `
+        import { INotebookTracker, ITranslator } from './fixtures/types';
+        declare const defaultTracker: INotebookTracker;
+        const plugin: JupyterFrontEndPlugin<void> = {
+          id: 'test-plugin',
+          requires: [INotebookTracker],
+          optional: [ITranslator],
+          activate: (
+            app: JupyterFrontEnd,
+            tracker: INotebookTracker = defaultTracker,
+            translator: ITranslator | null = null
+          ) => {}
+        };
+      `
+    },
+    {
+      // Method shorthand with default parameter
+      filename: 'tests/type-aware-fixture.ts',
+      code: `
+        import { ITranslator } from './fixtures/types';
+        const plugin: JupyterFrontEndPlugin<void> = {
+          id: 'test-plugin',
+          optional: [ITranslator],
+          activate(
+            app: JupyterFrontEnd,
+            translator: ITranslator | null = null
+          ) {}
+        };
+      `
+    },
+    {
+      // Referenced activate function with default parameter
+      filename: 'tests/type-aware-fixture.ts',
+      code: `
+        import { ITranslator } from './fixtures/types';
+        function activate(
+          app: JupyterFrontEnd,
+          translator: ITranslator | null = null
+        ): void {}
+        const plugin: JupyterFrontEndPlugin<void> = {
+          id: 'test-plugin',
+          optional: [ITranslator],
+          activate
+        };
+      `
+    },
+    {
+      // Destructured parameter in activate function is skipped
+      filename: 'tests/type-aware-fixture.ts',
+      code: `
+        const plugin: JupyterFrontEndPlugin<void> = {
+          id: 'test-plugin',
+          activate: ({ commands }: JupyterFrontEnd) => {}
+        };
+      `
+    },
+    {
+      // Rest parameter in activate function is skipped
+      filename: 'tests/type-aware-fixture.ts',
+      code: `
+        const plugin: JupyterFrontEndPlugin<void> = {
+          id: 'test-plugin',
+          activate: (app: JupyterFrontEnd, ...rest: unknown[]) => {}
+        };
+      `
+    },
+    {
+      // Destructured token parameter in activate function is skipped
+      filename: 'tests/type-aware-fixture.ts',
+      code: `
+        import { INotebookTracker } from './fixtures/types';
+        const plugin: JupyterFrontEndPlugin<void> = {
+          id: 'test-plugin',
+          requires: [INotebookTracker],
+          activate: (
+            app: JupyterFrontEnd,
+            { currentWidget }: INotebookTracker
+          ) => {}
         };
       `
     }
@@ -1271,6 +1396,56 @@ ruleTester.run('plugin-activation-args', pluginActivationArgs, {
         {
           messageId: 'appNotFirst',
           data: { arg: 'invalidApp', allowedNames: '"app", "_app", "_"' }
+        }
+      ]
+    },
+    {
+      // Optional token with non-nullable default value
+      filename: 'tests/type-aware-fixture.ts',
+      code: `
+        import { ITranslator } from './fixtures/types';
+        declare const fallbackTranslator: ITranslator;
+        const plugin: JupyterFrontEndPlugin<void> = {
+          id: 'test-plugin',
+          optional: [ITranslator],
+          activate: (
+            app: JupyterFrontEnd,
+            translator: ITranslator = fallbackTranslator
+          ) => {}
+        };
+      `,
+      errors: [
+        {
+          messageId: 'optionalNotNullable',
+          data: { arg: 'translator', type: 'ITranslator' }
+        }
+      ]
+    },
+    {
+      // Tokens in wrong order with default parameters
+      filename: 'tests/type-aware-fixture.ts',
+      code: `
+        import { INotebookTracker, IRenderMimeRegistry } from './fixtures/types';
+        declare const defaultTracker: INotebookTracker;
+        declare const defaultRenderMime: IRenderMimeRegistry;
+        const plugin: JupyterFrontEndPlugin<void> = {
+          id: 'test-plugin',
+          requires: [INotebookTracker, IRenderMimeRegistry],
+          activate: (
+            app: JupyterFrontEnd,
+            rendermime: IRenderMimeRegistry = defaultRenderMime,
+            tracker: INotebookTracker = defaultTracker
+          ) => {}
+        };
+      `,
+      errors: [
+        {
+          messageId: 'mismatchedOrder',
+          data: { arg: 'rendermime' }
+        },
+        {
+          messageId: 'mismatchedOrder',
+          data: { arg: 'tracker' }
         }
       ]
     }
