@@ -205,7 +205,8 @@ Defaults:
     "tooltip",
     "textContent",
     "innerText"
-  ]
+  ],
+  "extendDefaultCheckProperties": true
 }
 ```
 
@@ -222,7 +223,49 @@ item.textContent = '/';
 
 Names of object properties, DOM attributes, assignment targets and JSX attributes to check. Hyphenated and camelCase spellings are equivalent: either `aria-label` or `ariaLabel` covers both.
 
-This list **replaces** the defaults. Pass `[]` to turn off these configurable checks. Command text, dialog text, dialog button labels and JSX text are still checked.
+Names given here are **added** to the default list unless `extendDefaultCheckProperties` is `false`, so a project only has to name its own properties:
+
+```json
+{
+  "jupyter/no-untranslated-string": [
+    "warn",
+    {
+      "checkProperties": ["helperText"]
+    }
+  ]
+}
+```
+
+### `extendDefaultCheckProperties`
+
+Type: `boolean`, default: `true`.
+
+Set to `false` to replace the default list instead of extending it:
+
+```json
+{
+  "jupyter/no-untranslated-string": [
+    "warn",
+    {
+      "checkProperties": ["helperText"],
+      "extendDefaultCheckProperties": false
+    }
+  ]
+}
+```
+
+With no `checkProperties` given, `false` drops the defaults entirely to turn off configurable property checks (command text, dialog text, dialog button labels and JSX text are still checked):
+
+```json
+{
+  "jupyter/no-untranslated-string": [
+    "warn",
+    {
+      "extendDefaultCheckProperties": false
+    }
+  ]
+}
+```
 
 <details>
 <summary>Which text is checked?</summary>

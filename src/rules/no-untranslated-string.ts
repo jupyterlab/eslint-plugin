@@ -5,6 +5,7 @@
 
 import { TSESTree } from '@typescript-eslint/utils';
 import { isAddCommandCall } from '../utils/commands';
+import { resolveNameListOption } from '../utils/options';
 import { getObjectProperties } from '../utils/plugin-utils';
 import { unwrapExpression } from '../utils/translation';
 import { createRule } from '../utils/create-rule';
@@ -137,6 +138,7 @@ const DEFAULT_CHECK_PROPERTIES = [
 interface Options {
   enforcePunctuation?: boolean;
   checkProperties?: string[];
+  extendDefaultCheckProperties?: boolean;
 }
 
 type MessageId =
@@ -201,7 +203,15 @@ const noUntranslatedString = createRule({
           checkProperties: {
             type: 'array',
             items: { type: 'string' },
-            uniqueItems: true
+            uniqueItems: true,
+            description:
+              'Property or attribute names checked for untranslated strings. Added to the built-in defaults unless extendDefaultCheckProperties is false.'
+          },
+          extendDefaultCheckProperties: {
+            type: 'boolean',
+            default: true,
+            description:
+              'Whether checkProperties extends the built-in defaults. Set to false to replace them, or to drop them entirely when no list is given.'
           }
         },
         additionalProperties: false
@@ -211,15 +221,18 @@ const noUntranslatedString = createRule({
   defaultOptions: [
     {
       enforcePunctuation: false,
-      checkProperties: DEFAULT_CHECK_PROPERTIES
+      checkProperties: undefined as string[] | undefined,
+      extendDefaultCheckProperties: true
     }
   ],
 
   create(context) {
     const options = context.options[0] as Options | undefined;
     const enforcePunctuation = options?.enforcePunctuation ?? false;
-    const checkProperties = new Set(
-      (options?.checkProperties ?? DEFAULT_CHECK_PROPERTIES).map(normalizeName)
+    const checkProperties = resolveNameListOption(
+      options?.checkProperties?.map(normalizeName),
+      DEFAULT_CHECK_PROPERTIES.map(normalizeName),
+      options?.extendDefaultCheckProperties !== false
     );
 
     function isMonitoredName(name: string): boolean {
